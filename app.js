@@ -3125,40 +3125,17 @@ window.loadRapoarteCashout = async function() {
   showLoader(true);
   try {
     const data = await api(`/api/cashouts?${p}`);
-    if (!tableStates['rep-cashout']) tableStates['rep-cashout'] = { page: 1, limit: 20, rows: [] };
+    window._cashoutRawData = data; // store for filtering
     
-    tableStates['rep-cashout'].rows = data.map((r, i) => {
-      const hh = r.hh_ron || 0;
-      const jp = r.jackpot_ron || 0;
-      const out = r.cashout_ron || 0;
-      let tip = 'Cashout';
-      if (jp > 0) tip = 'Jackpot';
-      if (hh > 0) tip = 'Handpay';
-      
-      const val = Math.max(out, jp, hh);
-      const est_in_str = r.est_in > 0 ? fmt(r.est_in) : '—';
-      const cTime = r.c_time ? r.c_time.substring(11, 16) : '—';
-      const cDate = r.c_date ? r.c_date.split('-').reverse().join('.') : '—';
-      
-      return `<tr>
-        <td style="padding-left:16px;"><input type="checkbox" class="row-checkbox"></td>
-        <td>${i+1}</td>
-        <td>
-          <div style="font-weight:700;color:var(--text)">${cDate}</div>
-          <div style="font-size:10px;color:var(--muted)">${cTime}</div>
-        </td>
-        <td><div style="font-weight:700;color:var(--text)">${(r.player_name||'Necunoscut').trim()}</div></td>
-        <td>${r.locatie || '—'}</td>
-        <td>
-          <div style="font-weight:700;color:var(--text)">#${r.machine_id} (SN: ${r.serial_nr || '?'})</div>
-          <div style="font-size:10px;color:var(--muted)">${r.producator || '—'}</div>
-        </td>
-        <td class="num" style="color:var(--red); font-weight:700;">-${fmt(val)}</td>
-        <td><div style="display:inline-block; padding:2px 8px; border-radius:12px; background:var(--surface2); border:1px solid var(--border); font-size:10px;">${tip}</div></td>
-        <td class="num" style="color:var(--green); font-weight:700;">${est_in_str}</td>
-      </tr>`;
-    });
-    renderTablePaginated('rep-cashout');
+    // Populate location filter dropdown
+    const locSel = document.getElementById('csh-filter-loc');
+    if (locSel) {
+      const locs = [...new Set(data.map(r => r.locatie).filter(Boolean))].sort();
+      locSel.innerHTML = '<option value="">Toate locațiile</option>' + 
+        locs.map(l => `<option value="${l}">${l}</option>`).join('');
+    }
+    
+    window.filterCashoutTable();
   } catch(err) {
     console.error('loadRapoarteCashout error:', err);
     if (!tableStates['rep-cashout']) tableStates['rep-cashout'] = { page: 1, limit: 20, rows: [] };
@@ -3171,6 +3148,82 @@ window.loadRapoarteCashout = async function() {
     showLoader(false);
   }
 };
+
+window.filterCashoutTable = function() {
+  const data = window._cashoutRawData || [];
+  const q = (document.getElementById('csh-search')?.value || '').toLowerCase();
+  const locF = document.getElementById('csh-filter-loc')?.value || '';
+  const tipF = document.getElementById('csh-filter-tip')?.value || '';
+  
+  if (!tableStates['rep-cashout']) tableStates['rep-cashout'] = { page: 1, limit: 20, rows: [] };
+  tableStates['rep-cashout'].page = 1;
+  
+  const filtered = data.filter(r => {
+    const hh = r.hh_ron || 0, jp = r.jackpot_ron || 0, out = r.cashout_ron || 0;
+    let tip = 'Cashout';
+    if (jp > 0) tip = 'Jackpot';
+    if (hh > 0) tip = 'Handpay';
+    
+    if (locF && r.locatie !== locF) return false;
+    if (tipF && tip !== tipF) return false;
+    if (q) {
+      const haystack = [r.player_name, r.locatie, r.serial_nr, String(r.machine_id), r.producator].join(' ').toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    return true;
+  });
+  
+  tableStates['rep-cashout'].rows = filtered.map((r, i) => {
+    const hh = r.hh_ron || 0, jp = r.jackpot_ron || 0, out = r.cashout_ron || 0;
+    let tip = 'Cashout';
+    if (jp > 0) tip = 'Jackpot';
+    if (hh > 0) tip = 'Handpay';
+    const val = Math.max(out, jp, hh);
+    const est_in_str = r.est_in > 0 ? fmt(r.est_in) : '—';
+    const cTime = r.c_time ? r.c_time.substring(11, 16) : '—';
+    const cDate = r.c_date ? r.c_date.split('-').reverse().join('.') : '—';
+    const tipColor = tip === 'Jackpot' ? 'var(--yellow)' : tip === 'Handpay' ? 'var(--pink)' : 'var(--muted)';
+    return `<tr>
+      <td style="padding-left:16px;"><input type="checkbox" class="row-checkbox"></td>
+      <td>${i+1}</td>
+      <td>
+        <div style="font-weight:700;color:var(--text)">${cDate}</div>
+        <div style="font-size:10px;color:var(--muted)">${cTime}</div>
+      </td>
+      <td><div style="font-weight:700;color:var(--text)">${(r.player_name||'Necunoscut').trim()}</div></td>
+      <td>${r.locatie || '—'}</td>
+      <td>
+        <div style="font-weight:700;color:var(--text)">#${r.machine_id} (SN: ${r.serial_nr || '?'})</div>
+        <div style="font-size:10px;color:var(--muted)">${r.producator || '—'}</div>
+      </td>
+      <td class="num" style="color:var(--red); font-weight:700;">-${fmt(val)}</td>
+      <td><div style="display:inline-block; padding:2px 8px; border-radius:12px; background:var(--surface2); border:1px solid ${tipColor}; color:${tipColor}; font-size:10px; font-weight:700;">${tip}</div></td>
+      <td class="num" style="color:var(--green); font-weight:700;">${est_in_str}</td>
+    </tr>`;
+  });
+  renderTablePaginated('rep-cashout');
+};
+
+window.exportCashoutCSV = function() {
+  const data = window._cashoutRawData || [];
+  const rows = [['Data','Ora','Jucator','Locatie','Aparat','SN','Suma RON','Tip','Est. IN RON']];
+  data.forEach(r => {
+    const hh = r.hh_ron||0, jp = r.jackpot_ron||0, out = r.cashout_ron||0;
+    let tip = 'Cashout'; if (jp>0) tip='Jackpot'; if (hh>0) tip='Handpay';
+    rows.push([
+      r.c_date||'', (r.c_time||'').substring(11,16),
+      (r.player_name||'Necunoscut').trim(), r.locatie||'', r.machine_id||'', r.serial_nr||'',
+      Math.max(out,jp,hh), tip, r.est_in||0
+    ]);
+  });
+  const csv = rows.map(r => r.join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = `cashout_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+};
+
+
 
 // ─── AUTHENTICATION & ADMIN ───────────────────────────────────────────────────
 

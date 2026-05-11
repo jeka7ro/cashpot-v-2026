@@ -802,8 +802,24 @@
         <!-- ═══ PAGE: CASHOUT ═══ -->
         <div id="rep-page-cashout" class="rep-page" style="display:none;">
           <section class="card" style="margin-top:0; border-top-left-radius:0; padding:0; overflow:hidden;">
-            <div style="padding:14px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+            <div style="padding:14px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
               <span style="font-size:11px; font-weight:700; color:var(--text); text-transform:uppercase; letter-spacing:.05em;">Istoric Cashout-uri</span>
+              <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                <input type="text" id="csh-search" placeholder="🔍 Caută jucător, aparat, SN..." oninput="filterCashoutTable()" 
+                  style="background:var(--surface2); color:var(--text); border:1px solid var(--border); border-radius:20px; padding:5px 14px; font-size:11px; width:220px; outline:none;">
+                <select id="csh-filter-loc" onchange="filterCashoutTable()" 
+                  style="background:var(--surface2); color:var(--text); border:1px solid var(--border); border-radius:20px; padding:5px 12px; font-size:11px; cursor:pointer;">
+                  <option value="">Toate locațiile</option>
+                </select>
+                <select id="csh-filter-tip" onchange="filterCashoutTable()"
+                  style="background:var(--surface2); color:var(--text); border:1px solid var(--border); border-radius:20px; padding:5px 12px; font-size:11px; cursor:pointer;">
+                  <option value="">Toate tipurile</option>
+                  <option value="Cashout">Cashout</option>
+                  <option value="Handpay">Handpay</option>
+                  <option value="Jackpot">Jackpot</option>
+                </select>
+                <button onclick="exportCashoutCSV()" style="background:var(--accent); color:#fff; border:none; border-radius:20px; padding:5px 14px; font-size:11px; cursor:pointer; font-weight:600;">⬇ Export CSV</button>
+              </div>
             </div>
             <div class="table-scroll">
               <table class="data-table w-full">
@@ -811,7 +827,7 @@
                   <tr>
                     <th style="width:40px; padding-left:16px;"><input type="checkbox" id="csh-select-all"></th>
                     <th style="width:40px;">Nr.</th>
-                    <th>Data & Ora</th>
+                    <th>Data &amp; Ora</th>
                     <th>Jucător</th>
                     <th>Locație</th>
                     <th>Aparat / Joc</th>
