@@ -1197,15 +1197,20 @@ async function loadDashboardLiveCard() {
           const c = cashouts[i];
           const d = (c.cashout_time||'').substring(5,16).replace('-', '.');
           const t = (c.cashout_time||'').substring(11,16);
+          const hh = c.hh_ron||0, jp = c.jackpot_ron||0, out = c.cashout_ron||0;
+          let tip = 'Cashout'; if (jp>0) tip='Jackpot'; if (hh>0) tip='Handpay';
+          const tipColor = jp>0 ? '#eab308' : hh>0 ? '#ec4899' : '#94a3b8';
+          const mixInfo = [c.mix, c.cabinet, c.joc].filter(Boolean).join(' · ');
           chHtm += `
             <div style="border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:8px;">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
                 <strong style="font-size:12px; color:var(--accent); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${c.locatie || '—'}</strong>
-                <strong style="color:var(--danger); font-size:12px; white-space:nowrap;">${fmt(Math.max(c.cashout_ron||0, c.jackpot_ron||0, c.hh_ron||0))} <span style="font-size:9px">RON</span></strong>
+                <strong style="color:var(--red); font-size:12px; white-space:nowrap;">${fmt(Math.max(out, jp, hh))} <span style="font-size:9px">RON</span></strong>
               </div>
+              ${mixInfo ? `<div style="font-size:10px;color:var(--text);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600">${mixInfo}</div>` : ''}
               <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; color:var(--muted);">
-                <span>#${c.machine_id} &bull; ${d}</span>
-                <span>${t}</span>
+                <span>#${c.machine_id || c.serial_nr} • ${d}</span>
+                <span style="color:${tipColor};font-weight:700">${tip} ${t}</span>
               </div>
             </div>
           `;
@@ -3183,6 +3188,7 @@ window.filterCashoutTable = function() {
     const cTime = r.c_time ? r.c_time.substring(11, 16) : '—';
     const cDate = r.c_date ? r.c_date.split('-').reverse().join('.') : '—';
     const tipColor = tip === 'Jackpot' ? 'var(--yellow)' : tip === 'Handpay' ? 'var(--pink)' : 'var(--muted)';
+    const mixInfo = [r.mix, r.cabinet, r.joc].filter(Boolean).join(' · ');
     return `<tr>
       <td style="padding-left:16px;"><input type="checkbox" class="row-checkbox"></td>
       <td>${i+1}</td>
@@ -3194,7 +3200,8 @@ window.filterCashoutTable = function() {
       <td>${r.locatie || '—'}</td>
       <td>
         <div style="font-weight:700;color:var(--text)">#${r.machine_id} (SN: ${r.serial_nr || '?'})</div>
-        <div style="font-size:10px;color:var(--muted)">${r.producator || '—'}</div>
+        <div style="font-size:10px;color:var(--accent);font-weight:600">${r.mix || r.producator || '—'}</div>
+        <div style="font-size:10px;color:var(--muted)">${r.cabinet || ''}${r.joc ? ' · ' + r.joc : ''}</div>
       </td>
       <td class="num" style="color:var(--red); font-weight:700;">-${fmt(val)}</td>
       <td><div style="display:inline-block; padding:2px 8px; border-radius:12px; background:var(--surface2); border:1px solid ${tipColor}; color:${tipColor}; font-size:10px; font-weight:700;">${tip}</div></td>
@@ -3204,23 +3211,22 @@ window.filterCashoutTable = function() {
   renderTablePaginated('rep-cashout');
 };
 
-window.exportCashoutCSV = function() {
+window.exportCashoutExcel = window.exportCashoutCSV = function() {
   const data = window._cashoutRawData || [];
-  const rows = [['Data','Ora','Jucator','Locatie','Aparat','SN','Suma RON','Tip','Est. IN RON']];
+  let html = '<html><head><meta charset="UTF-8"></head><body><table border="1">';
+  html += '<tr><th>Data</th><th>Ora</th><th>Jucator</th><th>Locatie</th><th>Aparat</th><th>SN</th><th>Mix</th><th>Cabinet</th><th>Joc</th><th>Suma RON</th><th>Tip</th><th>Est. IN RON</th></tr>';
   data.forEach(r => {
     const hh = r.hh_ron||0, jp = r.jackpot_ron||0, out = r.cashout_ron||0;
     let tip = 'Cashout'; if (jp>0) tip='Jackpot'; if (hh>0) tip='Handpay';
-    rows.push([
-      r.c_date||'', (r.c_time||'').substring(11,16),
-      (r.player_name||'Necunoscut').trim(), r.locatie||'', r.machine_id||'', r.serial_nr||'',
-      Math.max(out,jp,hh), tip, r.est_in||0
-    ]);
+    html += `<tr><td>${r.c_date||''}</td><td>${(r.c_time||'').substring(11,16)}</td><td>${(r.player_name||'Necunoscut').trim()}</td><td>${r.locatie||''}</td><td>${r.machine_id||''}</td><td>${r.serial_nr||''}</td><td>${r.mix||''}</td><td>${r.cabinet||''}</td><td>${r.joc||''}</td><td>${Math.max(out,jp,hh)}</td><td>${tip}</td><td>${r.est_in||0}</td></tr>`;
   });
-  const csv = rows.map(r => r.join(',')).join('\n');
+  html += '</table></body></html>';
+  const blob = new Blob(['\ufeff' + html], {type: 'application/vnd.ms-excel;charset=UTF-8'});
+  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
-  a.download = `cashout_${new Date().toISOString().slice(0,10)}.csv`;
+  a.href = url; a.download = `cashout_${new Date().toISOString().slice(0,10)}.xls`;
   a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 
 

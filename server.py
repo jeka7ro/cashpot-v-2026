@@ -896,6 +896,12 @@ def live_monitor():
             mas.updated_at          as cashout_time,
             mas.date                as cashout_date,
             CONCAT(p.first_name, ' ', p.last_name) as player_name,
+            mt.name                 as mix,
+            mct.name                as cabinet,
+            (SELECT mg2.name FROM machine_real_time_activities rta2
+             LEFT JOIN machine_games mg2 ON rta2.machine_game_id = mg2.id
+             WHERE rta2.machine_id = m.id
+             ORDER BY rta2.updated_at DESC LIMIT 1) as joc,
             -- Data ultimului handpay ANTERIOR datei de azi
             (SELECT MAX(mas2.date) FROM machine_audit_summaries mas2
              WHERE mas2.machine_id = mas.machine_id
@@ -906,6 +912,7 @@ def live_monitor():
         JOIN machines m ON mas.machine_id = m.id
         JOIN locations l ON m.location_id = l.id
         LEFT JOIN machine_types mt  ON m.machine_type_id = mt.id
+        LEFT JOIN machine_cabinet_types mct ON m.cabinet_type_id = mct.id
         LEFT JOIN players p         ON m.player_id = p.id
         WHERE mas.date = CURDATE() AND (mas.`out` > 0 OR mas.jackpot > 0 OR mas.hh > 0)
     """ + lf_m + """
@@ -1584,6 +1591,12 @@ def api_cashouts():
                 m.id                    as machine_id,
                 REPLACE(REPLACE(COALESCE(l.display_code, l.code), ' E.S', ''), 'E.S', '') as locatie,
                 mt.manufacturer         as producator,
+                mt.name                 as mix,
+                mct.name                as cabinet,
+                (SELECT mg.name FROM machine_real_time_activities rta
+                 LEFT JOIN machine_games mg ON rta.machine_game_id = mg.id
+                 WHERE rta.machine_id = m.id
+                 ORDER BY rta.updated_at DESC LIMIT 1) as joc,
                 mas.`out`               as cashout_ron,
                 mas.jackpot             as jackpot_ron,
                 mas.hh                  as hh_ron,
@@ -1610,6 +1623,7 @@ def api_cashouts():
             JOIN machines m ON mas.machine_id = m.id
             JOIN locations l ON m.location_id = l.id
             LEFT JOIN machine_types mt  ON m.machine_type_id = mt.id
+            LEFT JOIN machine_cabinet_types mct ON m.cabinet_type_id = mct.id
             LEFT JOIN players p         ON m.player_id = p.id
             WHERE (mas.`out` > 0 OR mas.jackpot > 0 OR mas.hh > 0)
         """ + lf_m + """
