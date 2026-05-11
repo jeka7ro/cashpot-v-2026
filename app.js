@@ -638,7 +638,7 @@ async function loadKPI(s,e){
   document.getElementById('v-betgame').textContent='Bet/Game: '+fmt(d.avg_bet_game,2);
   document.getElementById('v-ap').textContent=d.aparate;
   document.getElementById('v-ap-day').textContent='Drop/ap/zi: '+fmt(d.avg_in_ap_zi)+' RON';
-  document.getElementById('last-updated').textContent='Actualizat: '+new Date().toLocaleString('ro-RO', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'});
+  updateTime();
   
   const renderTrend = (id, curr, prev, daysText) => {
     const el = document.getElementById(id);
@@ -1165,21 +1165,17 @@ async function loadDashboardLiveCard() {
           const bet = p.bet_ron || 0;
           const est_in_str = (p.est_in !== undefined) ? fmt(p.est_in) : '—';
           html += `
-            <div style="border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:4px; cursor:pointer;" onclick="openPlayerDetails(${p.player_id_live||''})">
-              <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2px;">
-                <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:65%;">
-                  <strong style="font-size:12px; color:var(--accent);">${i+1}. ${n}</strong>
-                  <span style="font-size:10px; color:var(--muted); margin-left:4px;">(${p.locatie})</span>
-                </div>
-                <div style="text-align:right; white-space:nowrap;">
-                  <strong style="color:var(--accent); font-size:12px;">${fmt(c)} <span style="font-size:9px">RON</span></strong>
-                  <div style="font-size:10px; color:var(--orange); margin-top:2px;">
-                    Bet: ${fmt(bet)} <span style="color:var(--muted); margin:0 4px;">|</span> <span style="color:#10b981;">Est. IN: ${est_in_str}</span>
-                  </div>
-                </div>
+            <div style="border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:8px; cursor:pointer;" onclick="openPlayerDetails(${p.player_id_live||''})">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <strong style="font-size:12px; color:var(--accent); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${i+1}. ${n}</strong>
+                <strong style="color:${c < 0 ? 'var(--danger)' : 'var(--blue)'}; font-size:12px; white-space:nowrap;">${fmt(c)} <span style="font-size:9px">RON</span></strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; font-size:10px;">
+                <span style="color:var(--muted);">${p.locatie} &bull; Bet: <span style="color:var(--orange)">${fmt(bet)}</span></span>
+                <span style="color:#10b981; font-weight:700;">Est. IN: ${est_in_str}</span>
               </div>
               <div style="font-size:10px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                <strong>#${p.machine_id}</strong> (SN: ${p.serial_nr}) &bull; ${p.joc_activ || 'Joc...'}
+                <strong style="color:var(--text);">#${p.aparat || '—'}</strong> (SN: ${p.serial_nr || '—'}) &bull; ${p.joc || 'Necunoscut'}
               </div>
             </div>
           `;
@@ -1198,25 +1194,17 @@ async function loadDashboardLiveCard() {
         let chHtm = '<div style="display:flex; flex-direction:column; gap:8px;">';
         for (let i = 0; i < cashouts.length; i++) {
           const c = cashouts[i];
-          const n = (c.player_name || 'Necunoscut').trim();
-          const val = Math.max(c.cashout_ron||0, c.jackpot_ron||0, c.hh_ron||0);
-          const full_time = c.cashout_time || ''; 
-          const display_time = full_time ? full_time.substring(5, 16).replace('-', '.') : 'Azi';
-          const est_in_str = (c.est_in !== undefined && c.est_in > 0) ? fmt(c.est_in) : '—';
+          const d = (c.cashout_time||'').substring(5,16).replace('-', '.');
+          const t = (c.cashout_time||'').substring(11,16);
           chHtm += `
-            <div style="border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:4px; cursor:pointer;" onclick="window.location.hash='#rapoarte/cashout'">
-              <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2px;">
-                <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:65%;">
-                  <strong style="font-size:12px; color:var(--text);">${i+1}. ${n}</strong>
-                  <span style="font-size:10px; color:var(--muted); margin-left:4px;">(${c.locatie})</span>
-                </div>
-                <div style="text-align:right; white-space:nowrap;">
-                  <strong style="color:var(--red); font-size:12px;">-${fmt(val)} <span style="font-size:9px">RON</span></strong>
-                  <div style="font-size:9px; color:var(--muted); margin-top:2px;">${display_time} <span style="color:var(--muted); margin:0 4px;">|</span> <span style="color:#10b981;">Est. IN: ${est_in_str}</span></div>
-                </div>
+            <div style="border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:8px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <strong style="font-size:12px; color:var(--accent); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${c.locatie || '—'}</strong>
+                <strong style="color:var(--danger); font-size:12px; white-space:nowrap;">${fmt(c.amount)} <span style="font-size:9px">RON</span></strong>
               </div>
-              <div style="font-size:10px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                <strong>#${c.machine_id}</strong> (SN: ${c.serial_nr})
+              <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; color:var(--muted);">
+                <span>#${c.machine_id} &bull; ${d}</span>
+                <span>${t}</span>
               </div>
             </div>
           `;
@@ -1709,7 +1697,7 @@ window.loadHhReport = async function() {
         plugins: { legend: { labels: { color: '#94a3b8', usePointStyle: true, pointStyle: 'circle' } } },
         scales: {
           x: { ticks: { color: '#64748b' }, grid: { display: false } },
-          y1: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.03)' } }
+          y1: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,.03)' } }
         }
       }
     });
@@ -1735,7 +1723,7 @@ window.loadHhReport = async function() {
         plugins: { legend: { display: true, position: 'bottom' } },
         scales: {
           x: { ticks: { color: '#64748b' }, grid: { display: false } },
-          y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.03)' } }
+          y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,.03)' } }
         }
       }
     });
@@ -2766,7 +2754,12 @@ window._renderPlayerDetails = async function(pid) {
   document.getElementById('body-pd-history').innerHTML = '<tr><td colspan="8" style="text-align:center;">Se încarcă datele...</td></tr>';
   
   try {
-    const res = await api('/api/players/' + pid);
+    const {s, e} = getPeriod();
+    let queryParams = '';
+    if (s && e) {
+      queryParams = `?start=${s}&end=${e}`;
+    }
+    const res = await api('/api/players/' + pid + queryParams);
     if (!res || !res.sessions) {
       document.getElementById('body-pd-history').innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--red);">Eroare la preluarea datelor jucătorului.</td></tr>';
       return;
@@ -2809,25 +2802,35 @@ window._renderPlayerDetails = async function(pid) {
     // Charts Data
     let machStats = {};
     let dayStats = {};
-    let hourStats = new Array(24).fill(0);
-    let totalIn = 0; let totalOut = 0; let totalGGR = 0;
+    let hourStats = new Array(24).fill(0).map(()=>({in:0, bet:0, ggr:0}));
+    let totalIn = 0; let totalOut = 0; let totalGGR = 0; let totalBet = 0;
     
     res.sessions.forEach(s => {
       const ggr = s.ggr || 0;
+      const sIn = s.in || 0;
+      const sBet = s.bet || 0;
+      
       const prodMix = (s.producator || '') + ' ' + (s.mix || '');
-      const mach = prodMix.trim().length > 2 ? `${prodMix.trim()} (SN: ${s.serial_nr})` : (s.serial_nr || 'Necunoscut');
+      const mach = prodMix.trim().length > 2 ? `${prodMix.trim()}` : (s.serial_nr || 'Necunoscut');
       if (!machStats[mach]) machStats[mach] = 0;
-      machStats[mach] += Math.abs(ggr) + (s.in || 0); // activity metric
+      machStats[mach] += Math.abs(ggr) + sIn; // activity metric
       
       const day = s.created_at.split(' ')[0].substring(5); // MM-DD
-      if (!dayStats[day]) dayStats[day] = 0;
-      dayStats[day]++;
+      if (!dayStats[day]) dayStats[day] = { in:0, bet:0, ggr:0 };
+      dayStats[day].in += sIn;
+      dayStats[day].bet += sBet;
+      dayStats[day].ggr += ggr;
       
       const hr = new Date(s.created_at).getHours();
-      if (!isNaN(hr)) hourStats[hr]++;
+      if (!isNaN(hr)) {
+        hourStats[hr].in += sIn;
+        hourStats[hr].bet += sBet;
+        hourStats[hr].ggr += ggr;
+      }
       
-      totalIn += (s.in || 0);
+      totalIn += sIn;
       totalOut += (s.out || 0);
+      totalBet += sBet;
       totalGGR += ggr;
     });
     
@@ -2835,7 +2838,7 @@ window._renderPlayerDetails = async function(pid) {
     const sortedMachs = Object.keys(machStats).sort((a,b) => machStats[b] - machStats[a]);
     const topMach = sortedMachs[0] || 'N/A';
     
-    const peakHour = hourStats.indexOf(Math.max(...hourStats));
+    const peakHour = hourStats.map((h,i) => ({hr:i, val:h.in+Math.abs(h.ggr)})).sort((a,b)=>b.val-a.val)[0].hr;
     let timePref = 'Necunoscut';
     if (peakHour >= 6 && peakHour < 12) timePref = 'Dimineața (06:00 - 12:00)';
     else if (peakHour >= 12 && peakHour < 18) timePref = 'Prânz (12:00 - 18:00)';
@@ -2843,13 +2846,12 @@ window._renderPlayerDetails = async function(pid) {
     else timePref = 'Noaptea (00:00 - 06:00)';
     
     const activeDays = Object.keys(dayStats).length;
-    const avgInPerSession = res.sessions.length ? (totalIn / res.sessions.length).toFixed(0) : 0;
     
     let aiText = `Jucătorul are un comportament stabil, fiind activ pe parcursul a <strong>${activeDays} zile</strong> din perioada selectată. `;
     aiText += `Perioada preferată pentru vizite este <strong>${timePref}</strong>. `;
-    if (topMach !== 'N/A') aiText += `Aparatul/Mixul favorit este în mod clar <strong>${topMach}</strong>. `;
-    aiText += `În medie, generează intrări de <strong>${fmt(avgInPerSession)}</strong> per sesiune. `;
-    aiText += `GGR-ul cumulat din aceste sesiuni este de <strong>${fmt(totalGGR)}</strong>, indicând un profil de jucător ${totalGGR > 0 ? 'profitabil pentru locație' : 'cu noroc, pe minus pentru locație'}.`;
+    if (topMach !== 'N/A') aiText += `Aparatul favorit este <strong>${topMach}</strong>. `;
+    aiText += `Rulajul total (Bet) pe aparatele jucate este de <strong>${fmt(totalBet)} RON</strong>. `;
+    aiText += `GGR-ul cumulat al aparatelor în zilele jucate de el este de <strong>${fmt(totalGGR)} RON</strong>.`;
     
     document.getElementById('pd-ai-analysis').innerHTML = aiText;
     
@@ -2873,20 +2875,23 @@ window._renderPlayerDetails = async function(pid) {
     if (window.pdDaysChart) window.pdDaysChart.destroy();
     
     const dayLabels = Object.keys(dayStats).sort();
-    const dayData = dayLabels.map(k => dayStats[k]);
     
     window.pdDaysChart = new Chart(daysCtx, {
       type: 'bar',
       data: {
         labels: dayLabels.length ? dayLabels : ['Fără date'],
-        datasets: [{ label:'Sesiuni / Zi', data: dayData, backgroundColor: 'rgba(59,130,246,0.6)', borderRadius:4 }]
+        datasets: [
+          { label:'IN', type: 'bar', data: dayLabels.map(k => dayStats[k].in), backgroundColor: 'rgba(59,130,246,0.5)', borderRadius:4, yAxisID: 'y' },
+          { label:'BET', type: 'bar', data: dayLabels.map(k => dayStats[k].bet), backgroundColor: 'rgba(16,185,129,0.5)', borderRadius:4, yAxisID: 'y' },
+          { label:'GGR', type: 'line', data: dayLabels.map(k => dayStats[k].ggr), borderColor: 'rgba(245,158,11,1)', backgroundColor: 'rgba(245,158,11,0.1)', borderWidth: 2, tension: 0.4, fill: true, yAxisID: 'y' }
+        ]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: {display:false} },
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
         scales: {
           x: { grid:{display:false}, ticks:{color:'#64748b', font:{size:10}} },
-          y: { grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#64748b', stepSize:1} }
+          y: { type: 'linear', display: true, position: 'left', grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#64748b'} }
         }
       }
     });
@@ -2899,14 +2904,18 @@ window._renderPlayerDetails = async function(pid) {
       type: 'bar',
       data: {
         labels: Array.from({length:24}, (_,i) => i+':00'),
-        datasets: [{ label:'Sesiuni / Oră', data: hourStats, backgroundColor: 'rgba(16,185,129,0.6)', borderRadius:4 }]
+        datasets: [
+          { label:'IN', type: 'bar', data: hourStats.map(h => h.in), backgroundColor: 'rgba(59,130,246,0.5)', borderRadius:4 },
+          { label:'BET', type: 'bar', data: hourStats.map(h => h.bet), backgroundColor: 'rgba(16,185,129,0.5)', borderRadius:4 },
+          { label:'GGR', type: 'line', data: hourStats.map(h => h.ggr), borderColor: 'rgba(245,158,11,1)', borderWidth: 2, tension: 0.4, fill: false }
+        ]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
-        plugins: { legend: {display:false} },
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } } },
         scales: {
           x: { grid:{display:false}, ticks:{color:'#64748b', font:{size:10}} },
-          y: { grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#64748b', stepSize:1} }
+          y: { grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#64748b'} }
         }
       }
     });

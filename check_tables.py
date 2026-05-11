@@ -1,14 +1,7 @@
+import sys
+sys.path.append('.')
 from server import qry
 
-try:
-    for r in qry("SELECT count(*) as cnt FROM sas_machine_meters", []): print("sas_machine_meters:", r['cnt'])
-except: pass
-
-try:
-    for r in qry("SELECT count(*) as cnt FROM machine_daily_meters", []): print("machine_daily_meters:", r['cnt'])
-except: pass
-
-try:
-    for r in qry("SELECT count(*) as cnt FROM machine_audit_summaries", []): print("machine_audit_summaries:", r['cnt'])
-except: pass
-
+rows = qry("SHOW TABLES")
+for r in rows:
+    print(r.values())
