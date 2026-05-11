@@ -179,7 +179,7 @@ td.cell-neg-3 { background:rgba(239,68,68,.38) !important; }
 .bonus-cost-low  { background:rgba(16,185,129,.15); color:var(--green); }
 .bonus-cost-mid  { background:rgba(245,158,11,.15); color:var(--orange); }
 .bonus-cost-high { background:rgba(239,68,68,.15); color:var(--red); }
-.kpi-trend { font-size:11px; font-weight:700; padding:2px 6px; border-radius:4px; }
+.kpi-trend { font-size:11px; font-weight:700; padding:2px 6px; border-radius:4px; flex-shrink:0; white-space:nowrap; }
 .kpi-trend.up { background: rgba(16,185,129,.15); color: var(--green); }
 .kpi-trend.down { background: rgba(239,68,68,.15); color: var(--red); }
 .slot-icon { height:16px; vertical-align:middle; margin-right:6px; border-radius:3px; }

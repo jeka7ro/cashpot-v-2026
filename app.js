@@ -819,7 +819,7 @@ async function loadLocations(s,e){
       clientiVal = r.clienti_total > 0 ? String(Math.round(r.clienti_total)) : '—';
     } else {
       const avg = r.zile > 0 ? (r.clienti_total||0) / r.zile : 0;
-      clientiVal = avg > 0 ? avg.toFixed(1).replace('.', ',') : '—';
+      clientiVal = avg > 0 ? String(Math.round(avg)) : '—';
     }
 
     return`<tr>
@@ -865,7 +865,7 @@ async function loadLocations(s,e){
   } else {
     const totalZile = data.reduce((s,r) => s + (+r.zile||0), 0.01);
     const avgCl = tClientiTotal / totalZile;
-    footerClienti = avgCl > 0 ? `<strong>${avgCl.toFixed(1).replace('.', ',')}</strong>` : '—';
+    footerClienti = avgCl > 0 ? `<strong>${Math.round(avgCl)}</strong>` : '—';
   }
   document.getElementById('foot-locatii').innerHTML=`<tr style="font-weight:700">
     <td>TOTAL / MEDIE</td>
@@ -1652,6 +1652,7 @@ window.loadHhReport = async function() {
       let bdown = '';
       if (advData && Object.keys(advData).length > 0) {
         const names = {};
+        if (locData) locData.forEach(r => names[r.id] = r.locatie);
         hhHistData.forEach(r => names[r.location_id] = r.locatie);
         let poz = [], neg = [];
         for (const [lid, st] of Object.entries(advData)) {
@@ -2586,7 +2587,7 @@ async function loadLive() {
           <td style="color:var(--muted);white-space:nowrap">${m.locatie||'—'}</td>
           <td style="color:var(--muted);max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${(m.tip_cabinet||'').replace(/"/g,'')}">${m.tip_cabinet||'—'}</td>
           <td style="color:var(--muted);max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${(m.joc_activ||'').replace(/"/g,'')}">${m.joc_activ||'—'}</td>
-          <td style="max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${hasPlayer?`<span style="font-weight:700;color:var(--blue)">${m.player_name}</span>`:`<span style="color:var(--muted)">—</span>`}</td>
+          <td style="max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${hasPlayer?`<span style="font-weight:700;color:var(--blue);cursor:pointer;" onclick="openPlayerDetails(${m.player_id_live})">${m.player_name}</span>`:`<span style="color:var(--muted)">—</span>`}</td>
           <td class="num" style="text-align:center;color:var(--muted)">${m.pozitie||'—'}</td>
           <td class="num" style="font-weight:900;color:var(--accent);white-space:nowrap">${fmtK(m.credite_ron ?? m.current_credits * (m.denomination || 0.01))}</td>
           <td class="num" style="color:var(--text)">${fmtK(m.bet_ron ?? m.current_bet * (m.denomination || 0.01))}</td>

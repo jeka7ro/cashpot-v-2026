@@ -9,6 +9,11 @@
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="style.css">
+<script>
+  if (window.location.hash.startsWith('#invite')) {
+    document.write('<style>#app-container, #view-login { display: none !important; } #view-register { display: flex !important; }</style>');
+  }
+</script>
 <style>
   .tahoe-icon-btn {
     display: flex;
@@ -174,30 +179,30 @@
         <div style="display:flex; gap:16px; margin-bottom:20px;">
           <div style="flex:1;">
             <label style="display:block; font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Nume</label>
-            <input type="text" id="reg-nume" class="premium-input" placeholder="Ion" required>
+            <input type="text" id="reg-nume" class="glass-select" style="width:100%; box-sizing:border-box; padding:10px 14px;" placeholder="Ion" required>
           </div>
           <div style="flex:1;">
             <label style="display:block; font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Prenume</label>
-            <input type="text" id="reg-prenume" class="premium-input" placeholder="Popescu" required>
+            <input type="text" id="reg-prenume" class="glass-select" style="width:100%; box-sizing:border-box; padding:10px 14px;" placeholder="Popescu" required>
           </div>
         </div>
 
         <div style="margin-bottom:20px;">
           <label style="display:block; font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Adresă Email (alocată)</label>
-          <input type="email" id="reg-email" class="premium-input" readonly style="opacity:0.6; cursor:not-allowed;">
+          <input type="email" id="reg-email" class="glass-select" readonly style="width:100%; box-sizing:border-box; padding:10px 14px; opacity:0.6; cursor:not-allowed;">
         </div>
 
         <div style="margin-bottom:20px;">
           <label style="display:block; font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Telefon</label>
-          <input type="text" id="reg-phone" class="premium-input" placeholder="07xx xxx xxx">
+          <input type="text" id="reg-phone" class="glass-select" style="width:100%; box-sizing:border-box; padding:10px 14px;" placeholder="07xx xxx xxx">
         </div>
 
         <div style="margin-bottom:32px;">
           <label style="display:block; font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Parolă Nouă</label>
-          <input type="password" id="reg-password" class="premium-input" required>
+          <input type="password" id="reg-password" class="glass-select" style="width:100%; box-sizing:border-box; padding:10px 14px;" required>
         </div>
 
-        <button type="submit" class="premium-btn">Setează Contul</button>
+        <button type="submit" class="btn-primary" style="width:100%; padding:12px; font-size:14px; display:flex; justify-content:center;">Setează Contul</button>
       </form>
       <div id="reg-error" style="color:#ef4444; margin-top:20px; font-size:12px; font-weight:600; text-align:center; height:16px;"></div>
     </div>
@@ -265,7 +270,7 @@
       <section class="kpi-grid" id="kpi-section">
     <div class="kpi-card" id="kpi-in">
       <div class="kpi-label">Total IN</div>
-      <div style="display:flex; align-items:center; gap:8px;">
+      <div style="display:flex; align-items:center; flex-wrap:wrap; gap:8px;">
         <div class="kpi-value" id="v-in">—</div>
         <div class="kpi-trend" id="t-in" style="display:none"></div>
       </div>
@@ -273,7 +278,7 @@
     </div>
     <div class="kpi-card accent-green" id="kpi-ggr">
       <div class="kpi-label">GGR</div>
-      <div style="display:flex; align-items:center; gap:8px;">
+      <div style="display:flex; align-items:center; flex-wrap:wrap; gap:8px;">
         <div class="kpi-value" id="v-ggr">—</div>
         <div class="kpi-trend" id="t-ggr" style="display:none"></div>
       </div>
@@ -399,7 +404,7 @@
       <div class="table-scroll">
         <table class="data-table">
           <thead><tr>
-            <th>Locație</th><th>Buc</th><th>Zile</th><th class="num" style="text-align:right">Clienți/zi</th>
+            <th>Locație</th><th>Buc</th><th>Zile</th><th class="num" style="width:50px; text-align:right">Clienți/zi</th>
             <th class="num">Total IN</th><th class="num">GGR</th><th class="num" style="width:70px">KPI</th><th class="num">GGR €</th>
             <th class="num">Jackpot</th><th class="num">HH</th><th class="num">Cashback</th>
             <th class="num">Games</th><th class="num">Hold%</th><th class="num">Bonus Cost</th>

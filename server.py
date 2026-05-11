@@ -1385,7 +1385,7 @@ def hh_players():
 @app.route('/api/players/<int:pid>')
 def api_player_details(pid):
     # Base info
-    player = qry_one("SELECT id, first_name, last_name, phone, points, total_bets, avg_bet FROM players WHERE id = %s", [pid])
+    player = qry_one("SELECT id, first_name, last_name, phone, points/100 as points, total_bets/100 as total_bets, avg_bet/100 as avg_bet FROM players WHERE id = %s", [pid])
     if not player:
         return jsonify({'error': 'Player not found'}), 404
         
@@ -1395,7 +1395,7 @@ def api_player_details(pid):
             pcl.created_at, 
             REPLACE(COALESCE(l.display_code, l.code), ' E.S', '') as locatie,
             m.slot_machine_id as serial_nr,
-            mt.manufacturer as producator,
+            mm.name as producator,
             mt.name as mix,
             (SELECT SUM(mas.`in`) FROM machine_audit_summaries mas WHERE mas.machine_id = m.id AND mas.date = DATE(pcl.created_at)) as `in`,
             (SELECT SUM(mas.`out`) FROM machine_audit_summaries mas WHERE mas.machine_id = m.id AND mas.date = DATE(pcl.created_at)) as `out`,
@@ -1403,6 +1403,7 @@ def api_player_details(pid):
         FROM player_card_logs pcl
         JOIN machines m ON m.id = JSON_UNQUOTE(JSON_EXTRACT(pcl.params, '$.machine_id'))
         LEFT JOIN machine_types mt ON m.machine_type_id = mt.id
+        LEFT JOIN machine_manufacturers mm ON mt.manufacturer_id = mm.id
         LEFT JOIN locations l ON pcl.location_id = l.id
         WHERE pcl.player_id = %s AND pcl.log_type = 2
         ORDER BY pcl.created_at DESC
