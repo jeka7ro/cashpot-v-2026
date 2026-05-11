@@ -1510,7 +1510,7 @@ def api_cashouts():
                 pass
                 
         # loc_filter foloseste request.args, NU user
-        lf_m, lp_m = loc_filter(request, 'm.location_id')
+        lf_m, lp_m = loc_filter(request, 'm')
         
         # Add date filters
         if lf_m:
