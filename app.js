@@ -873,8 +873,8 @@ async function loadLocations(s,e){
     <td style="text-align:center">—</td>
     <td class="num">${footerClienti}</td>
     <td class="num">${fmt(tIn)}${totalInBadge}</td>
-    <td class="num">${fmt(tGgr)}${totalGgrBadge}</td>
-    <td class="num" style="min-width:70px"></td>
+    <td class="num">${fmt(tGgr)}</td>
+    <td class="num" style="text-align:right">${totalGgrBadge}</td>
     <td class="num">${fmtE(tGgr)}</td>
     <td class="num">${fmt(tJp)}</td>
     <td class="num">${fmt(tHh)}</td>
