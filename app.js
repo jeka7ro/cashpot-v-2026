@@ -42,6 +42,7 @@ window.reloadCurrentView = function() {
   const hash = window.location.hash || '#dashboard';
   if (hash.startsWith('#rapoarte/evolutie-ore')) loadHourlyReport();
   else if (hash.startsWith('#rapoarte/hh')) loadHhReport();
+  else if (hash.startsWith('#rapoarte/marketing')) loadMarketingReport();
   else if (hash.startsWith('#rapoarte/clienti')) loadClientiReport();
   else if (hash.startsWith('#admin/sloturi')) loadAdminSloturi();
   else loadAll();
@@ -828,7 +829,7 @@ async function loadLocations(s,e){
       <td class="num">${fmt(r.total_in)}${inB}</td>
       <td class="num ${cc}">${fmt(r.ggr)}${ggrB}</td>
       <td class="num">${fmtE(r.ggr)}</td>
-      <td class="num">${fmt(r.jackpot)}</td><td class="num">${fmt(r.hh)}</td><td class="num">${fmt(r.cashback)}</td>
+      <td class="num">${fmt(r.jackpot)}</td><td class="num">${fmt(r.hh)}</td><td class="num">${fmt(r.cashback)}</td><td class="num">${fmt(r.roata||0)}</td>
       <td class="num">${fmt(r.games)}</td><td class="num">${pill(r.hold_pct)}</td><td class="num">${bonusCost(r.bonus_cost_pct||0)}</td>
     </tr>`;
   });
@@ -850,14 +851,13 @@ async function loadLocations(s,e){
   const avgHold = tIn > 0 ? (tGgr / tIn) * 100 : 0;
   const avgBonusCost=tBet>0?round2(tMkt/tBet*100):0;
   const totalBuc = data.reduce((sum, r) => sum + (+r.buc||0), 0);
+  const tRoata = data.reduce((sum, r) => sum + (+r.roata||0), 0);
   
   const elCard = document.getElementById('v-clienti-card');
   const elTot = document.getElementById('v-clienti-total');
   if (elCard) elCard.textContent = tClientiCard;
   if (elTot) elTot.textContent = tClientiTotal;
   
-  // Footer - exact 14 celule ca header-ul
-  // Header: Locatie(1) Buc(2) Zile(3) Clienti/zi(4) TotalIN(5) GGR(6) KPI(7) GGR€(8) JP(9) HH(10) CB(11) Games(12) Hold(13) Bonus(14)
   const anyOneDay2 = data.every(r => +r.zile === 1);
   let footerClienti;
   if (anyOneDay2) {
@@ -878,6 +878,7 @@ async function loadLocations(s,e){
     <td class="num">${fmt(tJp)}</td>
     <td class="num">${fmt(tHh)}</td>
     <td class="num">${fmt(tCb)}</td>
+    <td class="num">${fmt(tRoata)}</td>
     <td class="num">${fmt(tGm)}</td>
     <td class="num">${pill(avgHold)}</td>
     <td class="num">${bonusCost(avgBonusCost)}</td>
@@ -941,7 +942,7 @@ async function loadProviders(s,e){
       <td class="num">${fmt(r.total_in)}${inB}</td>
       <td class="num ${cc}">${fmt(r.ggr)}${ggrB}</td>
       <td class="num">${fmtE(r.ggr)}</td>
-      <td class="num">${fmt(r.jackpot)}</td><td class="num">${fmt(r.cashback)}</td>
+      <td class="num">${fmt(r.jackpot)}</td><td class="num">${fmt(r.cashback)}</td><td class="num">${fmt(r.roata||0)}</td>
       <td class="num">${fmt(r.games)}</td><td class="num">${pill(r.hold_pct)}</td><td class="num">${bonusCost(r.bonus_cost_pct||0)}</td>
     </tr>`;
   });
@@ -1292,6 +1293,7 @@ window.addEventListener('hashchange', () => {
       
       if (subHash === 'ore') loadHourlyReport();
       else if (subHash === 'hh') loadHhReport();
+      else if (subHash === 'marketing') loadMarketingReport();
       else if (subHash === 'clienti') {
         if (parts[2]) {
           _renderPlayerDetails(parts[2]);
@@ -2924,6 +2926,126 @@ window._renderPlayerDetails = async function(pid) {
     console.error(e);
     document.getElementById('pd-history-body').innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--red);">Eroare la preluarea datelor jucătorului.</td></tr>';
   }
+};
+
+// ─── RAPOARTE: MARKETING ──────────────────────────────────────────────────────────
+window.mktEvoChart = null;
+window.mktPieChart = null;
+window.loadMarketingReport = async function() {
+  const dts = document.getElementById('tl-range-display').textContent.split(' - ');
+  if(dts.length !== 2) return;
+  const s = formatDateForAPI(dts[0]), e = formatDateForAPI(dts[1]);
+  showLoader(true);
+  try {
+    const [dDaily, dLoc] = await Promise.all([
+      api(`/api/daily?res=day&start=${s}&end=${e}${locParam()}`),
+      api(`/api/locations?start=${s}&end=${e}${locParam()}`)
+    ]);
+    
+    // KPIs
+    let tCb = 0, tJp = 0, tHh = 0, tRoata = 0, tBet = 0, tMkt = 0;
+    dLoc.totals = dLoc.totals || {};
+    tCb = dLoc.totals.cashback || 0;
+    tJp = dLoc.totals.jackpot || 0;
+    tHh = dLoc.totals.hh || 0;
+    tRoata = dLoc.totals.roata || 0;
+    tBet = dLoc.totals.bet || 0;
+    tMkt = tCb + tJp + tHh + tRoata;
+
+    document.getElementById('mkt-kpi-cb').textContent = fmt(tCb) + ' RON';
+    document.getElementById('mkt-kpi-jp').textContent = fmt(tJp) + ' RON';
+    document.getElementById('mkt-kpi-hh').textContent = fmt(tHh) + ' RON';
+    document.getElementById('mkt-kpi-roata').textContent = fmt(tRoata) + ' RON';
+
+    // Evo Chart
+    const labels = dDaily.map(r => r.date.substring(5));
+    const cbData = dDaily.map(r => r.cb || 0);
+    const jpData = dDaily.map(r => r.jp || 0);
+    const hhData = dDaily.map(r => r.hh || 0);
+    const roataData = dDaily.map(r => r.roata || 0);
+
+    if (window.mktEvoChart) window.mktEvoChart.destroy();
+    window.mktEvoChart = new Chart(document.getElementById('mkt-evo-chart').getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: labels,
+        datasets: [
+          { label: 'Roata Norocului', data: roataData, backgroundColor: 'rgba(168, 85, 247, 0.6)' },
+          { label: 'Jackpot', data: jpData, backgroundColor: 'rgba(234, 179, 8, 0.6)' },
+          { label: 'Happy Hour', data: hhData, backgroundColor: 'rgba(236, 72, 153, 0.6)' },
+          { label: 'Cashback', data: cbData, backgroundColor: 'rgba(249, 115, 22, 0.6)' }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        scales: {
+          x: { stacked: true, grid: { display: false } },
+          y: { stacked: true, grid: { color: 'rgba(255,255,255,0.05)' } }
+        },
+        plugins: { legend: { position: 'bottom' } }
+      }
+    });
+
+    // Pie Chart
+    if (window.mktPieChart) window.mktPieChart.destroy();
+    window.mktPieChart = new Chart(document.getElementById('mkt-pie-chart').getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Cashback', 'Jackpot', 'Happy Hour', 'Roata Norocului'],
+        datasets: [{
+          data: [tCb, tJp, tHh, tRoata],
+          backgroundColor: ['#f97316', '#eab308', '#ec4899', '#a855f7'],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, cutout: '60%',
+        plugins: {
+          legend: { position: 'right', labels: { color: '#94a3b8' } }
+        }
+      }
+    });
+
+    // Table
+    const tbody = document.getElementById('body-mkt-locatii');
+    const locs = dLoc.locations || [];
+    let htm = '';
+    locs.forEach(l => {
+      const lCb = l.cashback || 0;
+      const lJp = l.jackpot || 0;
+      const lHh = l.hh || 0;
+      const lRoata = l.roata || 0;
+      const lTot = lCb + lJp + lHh + lRoata;
+      const lBet = l.bet || 0;
+      const pct = lBet > 0 ? (lTot / lBet * 100).toFixed(2) : 0;
+      htm += `<tr>
+        <td>${l.locatie}</td>
+        <td class="num">${fmt(lBet)}</td>
+        <td class="num" style="color:var(--orange)">${fmt(lCb)}</td>
+        <td class="num" style="color:var(--yellow)">${fmt(lJp)}</td>
+        <td class="num" style="color:var(--pink)">${fmt(lHh)}</td>
+        <td class="num" style="color:var(--purple)">${fmt(lRoata)}</td>
+        <td class="num" style="background:var(--surface2); font-weight:bold;">${fmt(lTot)}</td>
+        <td class="num" style="color:${pct > 5 ? 'var(--danger)' : 'var(--success)'}">${pct}%</td>
+      </tr>`;
+    });
+    tbody.innerHTML = htm;
+
+    document.getElementById('foot-mkt-locatii').innerHTML = `<tr>
+        <td><strong>TOTAL</strong></td>
+        <td class="num"><strong>${fmt(tBet)}</strong></td>
+        <td class="num" style="color:var(--orange)"><strong>${fmt(tCb)}</strong></td>
+        <td class="num" style="color:var(--yellow)"><strong>${fmt(tJp)}</strong></td>
+        <td class="num" style="color:var(--pink)"><strong>${fmt(tHh)}</strong></td>
+        <td class="num" style="color:var(--purple)"><strong>${fmt(tRoata)}</strong></td>
+        <td class="num" style="background:var(--surface2); font-weight:bold;"><strong>${fmt(tMkt)}</strong></td>
+        <td class="num"><strong>${tBet > 0 ? (tMkt / tBet * 100).toFixed(2) : 0}%</strong></td>
+    </tr>`;
+
+  } catch (e) {
+    console.error(e);
+  }
+  showLoader(false);
 };
 
 // ─── Clienti Report ─────────────────────────────────────────────────────────

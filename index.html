@@ -63,6 +63,10 @@
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
           Happy Hour
         </a>
+        <a href="#rapoarte/marketing" class="nav-item sub-item">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+          Marketing
+        </a>
         <a href="#rapoarte/clienti" class="nav-item sub-item" id="rep-nav-clienti">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           Clienti
@@ -406,7 +410,7 @@
           <thead><tr>
             <th>Locație</th><th>Buc</th><th>Zile</th><th class="num" style="width:50px; text-align:right">Clienți/zi</th>
             <th class="num">Total IN</th><th class="num">GGR</th><th class="num">GGR €</th>
-            <th class="num">Jackpot</th><th class="num">HH</th><th class="num">Cashback</th>
+            <th class="num">Jackpot</th><th class="num">HH</th><th class="num">Cashback</th><th class="num">Roata</th>
             <th class="num">Games</th><th class="num">Hold%</th><th class="num">Bonus Cost</th>
           </tr></thead>
           <tbody id="body-locatii"></tbody>
@@ -422,7 +426,7 @@
           <thead><tr>
             <th>#</th><th>Provider</th><th>Buc</th><th>Zile</th>
             <th class="num">Total IN</th><th class="num">GGR</th><th class="num">GGR €</th>
-            <th class="num">Jackpot</th><th class="num">Cashback</th>
+            <th class="num">Jackpot</th><th class="num">Cashback</th><th class="num">Roata</th>
             <th class="num">Games</th><th class="num">Hold%</th><th class="num">Bonus Cost</th>
           </tr></thead>
           <tbody id="body-provideri"></tbody>
@@ -642,6 +646,54 @@
             </div>
             </section>
             </div><!-- /rep-page-hh -->
+
+        <!-- ═══ PAGE: MARKETING ═══ -->
+        <div id="rep-page-marketing" class="rep-page" style="display:none;">
+          <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:16px; margin-bottom: 24px;">
+            <div class="kpi-card">
+              <div class="kpi-label" style="color:var(--orange)">Cashback</div>
+              <div class="kpi-value" id="mkt-kpi-cb">0</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label" style="color:var(--yellow)">Jackpot</div>
+              <div class="kpi-value" id="mkt-kpi-jp">0</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label" style="color:var(--pink)">Happy Hour</div>
+              <div class="kpi-value" id="mkt-kpi-hh">0</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label" style="color:var(--purple)">Roata Norocului</div>
+              <div class="kpi-value" id="mkt-kpi-roata">0</div>
+            </div>
+          </div>
+
+          <div style="display:flex; gap:24px; margin-bottom: 32px;">
+            <div class="chart-card" style="flex: 2;">
+              <div class="chart-title">Evoluție Cost Marketing pe Zile</div>
+              <div class="canvas-wrap" style="height: 320px;"><canvas id="mkt-evo-chart"></canvas></div>
+            </div>
+            <div class="chart-card" style="flex: 1;">
+              <div class="chart-title">Pondere Tipuri de Marketing (Total RON)</div>
+              <div class="canvas-wrap" style="height: 320px;"><canvas id="mkt-pie-chart"></canvas></div>
+            </div>
+          </div>
+          
+          <section class="card" style="padding:0; overflow:hidden;">
+            <div style="padding:14px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:11px; font-weight:700; color:var(--text); text-transform:uppercase; letter-spacing:.05em;">Breakdown Marketing pe Locații</span>
+            </div>
+            <div class="table-scroll">
+              <table class="data-table">
+                <thead><tr>
+                  <th>Locație</th><th class="num">Bet Total</th><th class="num">Cashback</th><th class="num">Jackpot</th><th class="num">Happy Hour</th><th class="num">Roata Norocului</th><th class="num" style="background:var(--surface2)">Cost Total Marketing</th><th class="num">% din Bet</th>
+                </tr></thead>
+                <tbody id="body-mkt-locatii"></tbody>
+                <tfoot id="foot-mkt-locatii"></tfoot>
+              </table>
+            </div>
+          </section>
+        </div><!-- /rep-page-marketing -->
             
             <div id="rep-page-clienti" class="rep-page" style="display:none;">
           <div id="clienti-main-view">

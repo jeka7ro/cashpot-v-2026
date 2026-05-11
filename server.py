@@ -259,10 +259,11 @@ def locations():
             SUM(mas.jackpot) AS jackpot,
             SUM(mas.hh) AS hh,
             SUM(mas.cashback) AS cashback,
+            SUM(mas.cb_fortune_wheel) AS roata,
             SUM(mas.`in`-mas.`out`-COALESCE(mas.jackpot,0)-COALESCE(mas.hh,0)-COALESCE(mas.cashback,0)) AS ngr,
             SUM(mas.games) AS games,
             SUM(mas.bet) AS bet,
-            SUM(COALESCE(mas.jackpot,0)+COALESCE(mas.cb_real,0)+COALESCE(mas.hh,0)+COALESCE(mas.cb_birthday,0)) AS marketing
+            SUM(COALESCE(mas.jackpot,0)+COALESCE(mas.cb_real,0)+COALESCE(mas.hh,0)+COALESCE(mas.cb_birthday,0)+COALESCE(mas.cb_fortune_wheel,0)) AS marketing
         FROM machine_audit_summaries mas
         JOIN locations l ON l.id = mas.location_id
         WHERE mas.date >= %s AND mas.date <= %s
@@ -286,8 +287,7 @@ def locations():
             merged[canon]['locatie'] = name
             merged[canon]['id']      = canon
         else:
-            # Sum numeric columns
-            for k in ('total_in','total_out','ggr','jackpot','hh','cashback','ngr','games','bet','marketing'):
+            for k in ('total_in','total_out','ggr','jackpot','hh','cashback','roata','ngr','games','bet','marketing'):
                 merged[canon][k] = (merged[canon].get(k) or 0) + (r.get(k) or 0)
             merged[canon]['buc']  = max(merged[canon].get('buc',0) or 0, r.get('buc',0) or 0)
             merged[canon]['zile'] = max(merged[canon].get('zile',0) or 0, r.get('zile',0) or 0)
@@ -331,9 +331,9 @@ def providers():
             SUM(mas.`in`) AS total_in,
             SUM(mas.`in`-mas.`out`) AS ggr,
             SUM(mas.jackpot) AS jackpot, SUM(mas.hh) AS hh,
-            SUM(mas.cashback) AS cashback,
+            SUM(mas.cashback) AS cashback, SUM(mas.cb_fortune_wheel) AS roata,
             SUM(mas.games) AS games, SUM(mas.bet) AS bet,
-            SUM(COALESCE(mas.jackpot,0)+COALESCE(mas.cb_real,0)+COALESCE(mas.hh,0)+COALESCE(mas.cb_birthday,0)) AS marketing
+            SUM(COALESCE(mas.jackpot,0)+COALESCE(mas.cb_real,0)+COALESCE(mas.hh,0)+COALESCE(mas.cb_birthday,0)+COALESCE(mas.cb_fortune_wheel,0)) AS marketing
         FROM machine_audit_summaries mas
         LEFT JOIN machine_types mt ON mt.id = mas.machine_type_id
         LEFT JOIN machine_manufacturers mm ON mm.id = mt.manufacturer_id
@@ -608,6 +608,7 @@ def daily():
                 SUM(COALESCE(mas.jackpot, 0)) as jackpot,
                 SUM(COALESCE(mas.hh, 0)) as hh,
                 SUM(COALESCE(mas.cashback, 0)) as cashback,
+                SUM(COALESCE(mas.cb_fortune_wheel, 0)) as roata,
                 SUM(mas.bet) as bet,
                 COUNT(DISTINCT mas.machine_id) as aparate
             FROM machine_audit_summaries mas
@@ -626,7 +627,7 @@ def daily():
             if day not in daily_data:
                 daily_data[day] = {
                     'date': day, 'ggr': 0, 'total_in': 0, 'jp': 0,
-                    'hh': 0, 'cb': 0, 'bet': 0, 'aparate': 0,
+                    'hh': 0, 'cb': 0, 'roata': 0, 'bet': 0, 'aparate': 0,
                     'loc_details': []
                 }
             dd = daily_data[day]
@@ -635,6 +636,7 @@ def daily():
             dd['jp']       += safe(r['jackpot'])
             dd['hh']       += safe(r['hh'])
             dd['cb']       += safe(r['cashback'])
+            dd['roata']    += safe(r['roata'])
             dd['bet']      += safe(r['bet'])
             dd['aparate']  += int(r['aparate'] or 0)
             dd['loc_details'].append({
