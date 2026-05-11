@@ -2944,12 +2944,14 @@ window.loadMarketingReport = async function() {
     
     // KPIs
     let tCb = 0, tJp = 0, tHh = 0, tRoata = 0, tBet = 0, tMkt = 0;
-    dLoc.totals = dLoc.totals || {};
-    tCb = dLoc.totals.cashback || 0;
-    tJp = dLoc.totals.jackpot || 0;
-    tHh = dLoc.totals.hh || 0;
-    tRoata = dLoc.totals.roata || 0;
-    tBet = dLoc.totals.bet || 0;
+    
+    dLoc.forEach(l => {
+      tCb += l.cashback || 0;
+      tJp += l.jackpot || 0;
+      tHh += l.hh || 0;
+      tRoata += l.roata || 0;
+      tBet += l.bet || 0;
+    });
     tMkt = tCb + tJp + tHh + tRoata;
 
     document.getElementById('mkt-kpi-cb').textContent = fmt(tCb) + ' RON';
@@ -3008,9 +3010,8 @@ window.loadMarketingReport = async function() {
 
     // Table
     const tbody = document.getElementById('body-mkt-locatii');
-    const locs = dLoc.locations || [];
     let htm = '';
-    locs.forEach(l => {
+    dLoc.forEach(l => {
       const lCb = l.cashback || 0;
       const lJp = l.jackpot || 0;
       const lHh = l.hh || 0;
