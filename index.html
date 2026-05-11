@@ -367,7 +367,7 @@
     </div>
   </section>
 
-  <section class="charts-row" style="grid-template-columns: 1fr 1fr 1fr 1fr;">
+  <section class="charts-row" style="grid-template-columns: 1fr 1fr 1fr 1fr 1fr;">
     <div class="chart-card">
       <div class="chart-title">GGR per Locație</div>
       <div class="canvas-wrap"><canvas id="loc-pie"></canvas></div>
@@ -386,6 +386,14 @@
       </div>
       <div id="v-latest-cashouts" style="height:260px; overflow-y:auto; padding-right:8px; font-size:11px; display:flex; flex-direction:column; gap:8px; color:var(--text);">
         Așteptare date...
+      </div>
+    </div>
+    <div class="chart-card" onclick="window.location.hash='#rapoarte/multigame'" style="cursor:pointer; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='none'">
+      <div class="chart-title" style="color:var(--yellow); display:flex; align-items:center; gap:6px;">
+        Top 10 Jocuri (Live)
+      </div>
+      <div id="top10-games-body" style="height:260px; overflow-y:auto; padding-right:8px; display:flex; flex-direction:column;">
+        <div style="color:var(--muted);padding:16px;font-size:11px">Încărcare...</div>
       </div>
     </div>
     <div class="chart-card">

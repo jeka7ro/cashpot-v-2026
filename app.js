@@ -27,6 +27,60 @@ function getProviderLogo(name) {
   return 'https://ui-avatars.com/api/?name='+encodeURIComponent(name)+'&background=random&color=fff&rounded=true';
 }
 function bar(v,max){const w=Math.min(100,max?(Math.abs(v)/max)*100:0);const bg=v<0?'var(--red)':'var(--accent)';return`<div class="pct-bar" style="justify-content:flex-end"><div class="bar-track"><div class="bar-fill" style="width:${w}%;background:${bg}"></div></div></div>`;}
+
+// CDN Thumbnail helper — strips common suffixes and prefixes, converts spaces to underscores
+function gameThumbUrl(name) {
+  if (!name) return '';
+  let n = name.trim();
+  // Strip "BL " prefix (Bell Link)
+  if (n.startsWith('BL ')) n = n.substring(3);
+  // Strip common suffixes
+  const suffixes = [' Bell Link', ' Bell link', ' Progressive Jackpot', ' Cash H', ' Extreme Bell Link', ' Extreme', ' Cash', ' Plus'];
+  suffixes.forEach(s => {
+    if (n.toLowerCase().endsWith(s.toLowerCase())) {
+      n = n.substring(0, n.length - s.length);
+    }
+  });
+  const fname = n.trim().replace(/\s+/g, '_');
+  return `https://cdn.cashpot.ro/cashpot/t1/thumbnail_games/${fname}.jpg`;
+}
+
+// Top 10 Games card loader for dashboard
+async function loadTop10Games() {
+  const el = document.getElementById('top10-games-body');
+  if (!el) return;
+  try {
+    const {s, e} = getPeriod();
+    const data = await api(`/api/multigame?start=${s}&end=${e}${locParam()}`);
+    if (!data || !data.length) { el.innerHTML = '<div style="color:var(--muted);padding:16px;font-size:11px">Nu există date</div>'; return; }
+    const top10 = data.slice(0, 10);
+    const maxBet = Math.max(...top10.map(r => r.bet || 0));
+    el.innerHTML = top10.map((r, i) => {
+      const thumb = gameThumbUrl(r.game);
+      const ggrC = (r.ggr || 0) >= 0 ? 'var(--green)' : 'var(--red)';
+      const barW = maxBet > 0 ? Math.round((r.bet || 0) / maxBet * 100) : 0;
+      return `
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid var(--border);"
+          onmouseenter="this.style.background='var(--surface2)'" onmouseleave="this.style.background=''">
+          <div style="font-size:10px;font-weight:700;color:var(--muted);width:18px;text-align:right">${i+1}</div>
+          <img src="${thumb}" referrerpolicy="no-referrer" alt="" loading="lazy"
+            style="width:40px;height:40px;object-fit:cover;border-radius:8px;flex-shrink:0;background:var(--surface2);"
+            onerror="this.style.background='var(--surface2)';this.style.opacity='0.3'">
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:700;font-size:11px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.game}</div>
+            <div style="height:3px;background:var(--border);border-radius:2px;margin-top:4px;overflow:hidden">
+              <div style="width:${barW}%;height:100%;background:var(--accent);border-radius:2px;transition:width .4s"></div>
+            </div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;">
+            <div style="font-size:10px;color:var(--muted)">${r.aparate} ap.</div>
+            <div style="font-size:11px;font-weight:700;color:${ggrC}">${fmt(r.ggr)} RON</div>
+          </div>
+        </div>`;
+    }).join('');
+  } catch(e) { console.error('loadTop10Games:', e); }
+}
+
 function cellCls(v,max){if(!max)return'';const p=v/max;if(v<0)return p<-0.6?'cell-neg-3':p<-0.3?'cell-neg-2':'cell-neg-1';return p>0.7?'cell-pos-3':p>0.35?'cell-pos-2':p>0.1?'cell-pos-1':'';}
 function showLoader(v){document.getElementById('loader').classList.toggle('show',v);}
 function round2(v){return Math.round(v*100)/100;}
@@ -1119,7 +1173,7 @@ async function loadAll(){
   if(!s||!e)return;
   showLoader(true);
   try{
-    await Promise.all([loadKPI(s,e),loadTrend(s,e),loadLocations(s,e),loadProviders(s,e),loadTypes(s,e),loadCabinets(s,e),loadCalendars(s,e),loadMachines()]);
+    await Promise.all([loadKPI(s,e),loadTrend(s,e),loadLocations(s,e),loadProviders(s,e),loadTypes(s,e),loadCabinets(s,e),loadCalendars(s,e),loadMachines(),loadTop10Games()]);
     if (document.getElementById('view-rapoarte') && document.getElementById('view-rapoarte').classList.contains('active')) {
       const hh  = document.getElementById('rep-page-hh');
       const mg  = document.getElementById('rep-page-multigame');
@@ -1137,7 +1191,8 @@ async function loadAll(){
   finally{showLoader(false);}
   // Cardurile live se încarcă ÎNTOTDEAUNA, independent de erorile din Promise.all
   loadDashboardLiveCard();
-  if (!window._dashLiveInt) window._dashLiveInt = setInterval(loadDashboardLiveCard, 30000);
+  loadTop10Games();
+  if (!window._dashLiveInt) window._dashLiveInt = setInterval(() => { loadDashboardLiveCard(); loadTop10Games(); }, 30000);
 }
 
 async function loadDashboardLiveCard() {
@@ -2666,6 +2721,7 @@ window.loadMultigameReport = window.loadMultigame = async function() {
         <thead>
           <tr>
             <th style="${thS};padding-left:16px;width:28px">#</th>
+            <th style="${thS};width:52px"></th>
             <th style="${thS}">Joc</th>
             <th style="${thR}">Ap.</th>
             <th style="${thR}">% Vol.</th>
@@ -2681,11 +2737,17 @@ window.loadMultigameReport = window.loadMultigame = async function() {
             const edgeC  = r.house_edge >= 0 ? 'var(--green)' : 'var(--red)';
             const barPct = maxBet > 0 ? Math.round(r.bet / maxBet * 100) : 0;
             const td     = `padding:9px 8px;`;
+            const thumb  = gameThumbUrl(r.game);
             return `<tr style="border-bottom:1px solid var(--border)"
               onmouseenter="this.style.background='var(--surface2)'"
               onmouseleave="this.style.background=''">
               <td style="${td}padding-left:16px;color:var(--muted);font-weight:700;font-size:10px">${i+1}</td>
-              <td style="${td}min-width:180px">
+              <td style="${td}width:52px">
+                <img src="${thumb}" referrerpolicy="no-referrer" alt="" loading="lazy"
+                  style="width:44px;height:44px;object-fit:cover;border-radius:6px;background:var(--surface2);"
+                  onerror="this.style.display='none'">
+              </td>
+              <td style="${td}min-width:160px">
                 <div style="font-weight:700;color:var(--text)">${r.game}</div>
                 <div style="height:3px;background:var(--border);border-radius:2px;margin-top:5px;overflow:hidden">
                   <div style="width:${barPct}%;height:100%;background:var(--accent);border-radius:2px;transition:width .4s"></div>
