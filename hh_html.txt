@@ -1,0 +1,115 @@
+
+          <div id="rep-tab-hh" class="rep-tab-panel" style="display:block;">
+
+      <section class="card" style="margin-top: 0; border-top-left-radius: 0;">
+        <div class="filter-bar" style="border-bottom: 1px solid var(--border); padding-bottom: 16px; margin-bottom: 24px; display:flex; justify-content:space-between; align-items:center;">
+          <select id="hh-loc-select" class="glass-select" onchange="loadHhReport()"><option value="all">Toate locațiile</option><option value="3">Depozit</option><option value="5">Craiova</option><option value="1">Pitesti</option><option value="6">Ploiesti Centru</option><option value="7">Ploiesti Nord</option><option value="4">Valcea</option></select>
+          <div id="hh-alert-box" style="padding:6px 12px; border-radius:12px; font-weight:700; font-size:12px; display:none;"></div>
+        </div>
+
+        <!-- NEW HH SMART ANALYTICS -->
+        <div id="hh-smart-insights" style="padding:16px 20px; border-radius:12px; margin-bottom:24px; font-weight:700; font-size:14px; background:rgba(0,0,0,0.2); border:1px solid var(--border);"></div>
+
+        <!-- KPI Cards -->
+        <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:16px; margin-bottom: 24px;">
+          <div class="kpi-card">
+            <div class="kpi-label">Total Zile cu HH</div>
+            <div class="kpi-value" id="hh-kpi-zile">0</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Media IN / Zi (cu HH)</div>
+            <div class="kpi-value cell-pos-3" id="hh-kpi-in-hh" style="padding:4px 8px; border-radius:4px; display:inline-block;">0</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Media IN / Zi (fără HH)</div>
+            <div class="kpi-value" id="hh-kpi-in-nohh">0</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Efect Net Estimat</div>
+            <div class="kpi-value" id="hh-kpi-efect">0%</div>
+          </div>
+        </div>
+
+
+
+        
+        <!-- Charts Row -->
+        <div style="display:flex; gap:24px; margin-bottom: 32px;">
+          <div class="chart-card" style="flex: 2;">
+            <div class="chart-title">Evoluție GGR vs. Cost HH (pe zile)</div>
+            <div class="canvas-wrap" style="height: 320px;"><canvas id="hh-evo-chart"></canvas></div>
+          </div>
+          <div class="chart-card" style="flex: 1;">
+            <div class="chart-title">Corelație Cost HH / Total IN (Scatter)</div>
+            <div class="canvas-wrap" style="height: 320px;"><canvas id="hh-scatter-chart"></canvas></div>
+          </div>
+        </div>
+
+        <!-- ── ANALIZA AVANSATA HAPPY HOUR ── -->
+        <div style="margin-top:16px; margin-bottom:24px;">
+          <h1 style="font-size:18px; font-weight:800; color:var(--text); margin-bottom:4px;">Analiză Avansată Happy Hour (HH vs Non-HH)</h1>
+          <p style="font-size:12px; color:var(--muted);">Comparatie de rentabilitate si dependenta aparatelor</p>
+        </div>
+        
+        <div id="hh-smart-insight" style="display:none; padding:16px 20px; border:1px solid var(--border); border-radius:var(--radius); margin-bottom:20px; font-size:13px; font-weight:600;"></div>
+        
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-bottom:40px;">
+          <section class="card" style="padding:0; overflow:hidden;">
+            <div style="padding:14px 20px; border-bottom:1px solid var(--border);">
+              <span style="font-size:11px; font-weight:700; color:var(--text); text-transform:uppercase; letter-spacing:.05em;">Eficiență Volum (HH vs Normal)</span>
+            </div>
+            <table class="data-table">
+              <thead><tr>
+                <th>Indicator</th><th class="num">În timpul HH</th><th class="num">Normal (fără HH)</th><th class="num">Diferență</th>
+              </tr></thead>
+              <tbody id="hh-vol-body">
+                <tr><td colspan="4" style="text-align:center; padding:24px; color:var(--muted)">Se încarcă analiza...</td></tr>
+              </tbody>
+            </table>
+          </section>
+          
+          <section class="card" style="padding:0; overflow:hidden;">
+            <div style="padding:14px 20px; border-bottom:1px solid var(--border);">
+              <span style="font-size:11px; font-weight:700; color:var(--text); text-transform:uppercase; letter-spacing:.05em;">Aparate Critice (&gt;60% din IN doar în HH)</span>
+            </div>
+            <table class="data-table">
+              <thead><tr>
+                <th>Aparat</th><th class="num">Dependență HH</th><th class="num">IN Total / Perioadă</th>
+              </tr></thead>
+              <tbody id="hh-dep-body">
+                <tr><td colspan="3" style="text-align:center; padding:24px; color:var(--muted)">Se încarcă analiza...</td></tr>
+              </tbody>
+            </table>
+          </section>
+          
+          <section class="card" style="padding:0; overflow:hidden; grid-column: 1 / -1;">
+            <div style="padding:14px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:11px; font-weight:700; color:var(--text); text-transform:uppercase; letter-spacing:.05em;">Jucători Activi pe Timpul Happy Hour</span>
+            </div>
+            <table class="data-table">
+              <thead><tr>
+                <th>Jucător</th><th>Telefon</th><th class="num">Sesiuni (în orele HH)</th><th class="num">Ultima Sesiune HH</th>
+              </tr></thead>
+              <tbody id="hh-players-body">
+                <tr><td colspan="4" style="text-align:center; padding:24px; color:var(--muted)">Se încarcă jucătorii...</td></tr>
+              </tbody>
+            </table>
+          </section>
+        </div>
+
+        <!-- Data Table -->
+        <h3 style="font-size: 16px; margin-bottom: 16px; color: var(--muted); border-top: 1px solid var(--border); padding-top: 32px;">Istoric Happy Hour Detaliat</h3>
+        <div class="table-scroll">
+          <table class="data-table">
+            <thead><tr>
+              <th>Dată</th><th>Locație</th><th class="num">Cost HH</th><th class="num">Total IN</th><th class="num">Total Bet</th><th class="num">GGR</th>
+            </tr></thead>
+            <tbody id="body-rep-hh"></tbody>
+          </table>
+        </div>
+        <div id="pg-rep-hh" class="pagination-wrapper"></div>
+
+
+            </section></div>
+            
+            

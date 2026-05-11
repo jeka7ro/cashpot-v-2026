@@ -1,0 +1,34 @@
+/* ─── Dashboard List & Items ──────────────────────────────────────────────── */
+.dash-list { display:flex; flex-direction:column; height:100%; overflow-y:auto; padding:0; margin:0; }
+.dash-item { padding:12px 0; background:transparent; border-bottom:1px solid var(--border); transition:all 0.2s; cursor:pointer; }
+.dash-item:last-child { border-bottom: none; }
+.dash-item:hover { background:rgba(255,255,255,0.03); transform:translateX(4px); }
+.dash-item-row { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.dash-item-main { flex:1; min-width:0; }
+.dash-item-name { font-size:12px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dash-item-loc { font-size:10px; color:var(--muted); font-weight:500; }
+.dash-item-sub { font-size:9px; color:var(--muted); margin-top:2px; }
+.dash-item-side { text-align:right; flex-shrink:0; }
+.dash-item-val { font-size:13px; font-weight:700; color:var(--accent); }
+.dash-item-val .unit { font-size:9px; opacity:0.7; }
+.dash-item-est { font-size:9px; color:var(--muted); margin-top:2px; }
+.dash-item-est .sep { margin:0 4px; opacity:0.3; }
+.dash-item-est .est-label { color:var(--green); font-weight:600; }
+
+.empty-state { text-align:center; padding:40px 20px; color:var(--muted); font-size:12px; }
+.pulse-dot { width:8px; height:8px; border-radius:50%; display:inline-block; animation:pulse 2s infinite; vertical-align:middle; margin-right:6px; }
+
+/* ─── Calendar Standard Styles ─────────────────────────────────────────── */
+.calendar-section { background:var(--surface); border:1px solid var(--border); border-radius:20px; overflow:hidden; }
+.calendar-grid { display:grid; gap:1px; background:var(--border); border-top:1px solid var(--border); }
+.cal-day-header { background:var(--surface2); color:var(--muted); font-size:10px; font-weight:700; text-align:center; padding:8px 0; text-transform:uppercase; }
+.cal-day { background:var(--surface); min-height:80px; padding:10px; display:flex; flex-direction:column; gap:4px; transition:all 0.2s; }
+.cal-day:hover:not(.empty) { background:var(--surface2); z-index:2; }
+.cal-day-num { font-size:14px; font-weight:800; color:var(--text); }
+.cal-day-val { font-size:12px; font-weight:700; margin-top:auto; }
+.cal-day-metrics { font-size:9px; color:var(--muted); line-height:1.2; }
+
+/* ─── Global Refinements ───────────────────────────────────────────────── */
+.glass-panel, .tables-section, .kpi-card { border-radius: 20px !important; }
+.data-table { width:100%; border-collapse:collapse; }
+.data-table td, .data-table th { padding: 12px; border-bottom: 1px solid var(--border); }
