@@ -2806,7 +2806,7 @@ window._renderPlayerDetails = async function(pid) {
     }
     renderTablePaginated(pgBodyId);
     
-    // Charts Data
+    // Charts Data — use s.counted to avoid double-counting same (machine, day) in daily/hour charts
     let machStats = {};
     let dayStats = {};
     let hourStats = new Array(24).fill(0).map(()=>({in:0, bet:0, ggr:0}));
@@ -2817,28 +2817,34 @@ window._renderPlayerDetails = async function(pid) {
       const sIn = s.in || 0;
       const sBet = s.bet || 0;
       
-      const prodMix = (s.producator || '') + ' ' + (s.mix || '');
-      const mach = prodMix.trim().length > 2 ? `${prodMix.trim()}` : (s.serial_nr || 'Necunoscut');
+      const prodMix = (s.mix || s.producator || '');
+      const mach = prodMix.trim().length > 2 ? prodMix.trim() : (s.serial_nr || 'Necunoscut');
       if (!machStats[mach]) machStats[mach] = 0;
-      machStats[mach] += Math.abs(ggr) + sIn; // activity metric
+      machStats[mach] += sIn; // activity metric = IN on machine days
       
       const day = s.created_at.split(' ')[0].substring(5); // MM-DD
-      if (!dayStats[day]) dayStats[day] = { in:0, bet:0, ggr:0 };
-      dayStats[day].in += sIn;
-      dayStats[day].bet += sBet;
-      dayStats[day].ggr += ggr;
-      
-      const hr = new Date(s.created_at).getHours();
-      if (!isNaN(hr)) {
-        hourStats[hr].in += sIn;
-        hourStats[hr].bet += sBet;
-        hourStats[hr].ggr += ggr;
+      // Only count unique (machine, day) once in charts to avoid spikes
+      if (s.counted !== false) {
+        if (!dayStats[day]) dayStats[day] = { in:0, bet:0, ggr:0 };
+        dayStats[day].in  += sIn;
+        dayStats[day].bet += sBet;
+        dayStats[day].ggr += ggr;
+        
+        const hr = new Date(s.created_at).getHours();
+        if (!isNaN(hr)) {
+          hourStats[hr].in  += sIn;
+          hourStats[hr].bet += sBet;
+          hourStats[hr].ggr += ggr;
+        }
+        
+        totalIn  += sIn;
+        totalOut += (s.out || 0);
+        totalBet += sBet;
+        totalGGR += ggr;
+      } else {
+        // Still count the day as active even if values are deduplicated
+        if (!dayStats[day]) dayStats[day] = { in:0, bet:0, ggr:0 };
       }
-      
-      totalIn += sIn;
-      totalOut += (s.out || 0);
-      totalBet += sBet;
-      totalGGR += ggr;
     });
     
     // Generate AI Analysis String
@@ -2857,7 +2863,7 @@ window._renderPlayerDetails = async function(pid) {
     let aiText = `Jucătorul are un comportament stabil, fiind activ pe parcursul a <strong>${activeDays} zile</strong> din perioada selectată. `;
     aiText += `Perioada preferată pentru vizite este <strong>${timePref}</strong>. `;
     if (topMach !== 'N/A') aiText += `Aparatul favorit este <strong>${topMach}</strong>. `;
-    aiText += `Rulajul total (Bet) pe aparatele jucate este de <strong>${fmt(totalBet)} RON</strong>. `;
+    aiText += `IN total al aparatelor în zilele jucate este de <strong>${fmt(totalIn)} RON</strong>. `;
     aiText += `GGR-ul cumulat al aparatelor în zilele jucate de el este de <strong>${fmt(totalGGR)} RON</strong>.`;
     
     document.getElementById('pd-ai-analysis').innerHTML = aiText;
