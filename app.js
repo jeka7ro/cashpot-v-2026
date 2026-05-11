@@ -2763,12 +2763,12 @@ window._renderPlayerDetails = async function(pid) {
   pd.style.display = 'block';
   
   document.getElementById('pd-name').textContent = 'Se încarcă...';
-  document.getElementById('pd-history-body').innerHTML = '<tr><td colspan="6" style="text-align:center;">Se încarcă datele...</td></tr>';
+  document.getElementById('body-pd-history').innerHTML = '<tr><td colspan="8" style="text-align:center;">Se încarcă datele...</td></tr>';
   
   try {
     const res = await api('/api/players/' + pid);
     if (!res || !res.sessions) {
-      document.getElementById('pd-history-body').innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--red);">Eroare la preluarea datelor jucătorului.</td></tr>';
+      document.getElementById('body-pd-history').innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--red);">Eroare la preluarea datelor jucătorului.</td></tr>';
       return;
     }
     
