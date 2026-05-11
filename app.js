@@ -1165,7 +1165,7 @@ async function loadDashboardLiveCard() {
           const bet = p.bet_ron || 0;
           const est_in_str = (p.est_in !== undefined) ? fmt(p.est_in) : '—';
           html += `
-            <div style="border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:4px; cursor:pointer;" onclick="openPlayerDetails(${p.player_id||''})">
+            <div style="border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:4px; cursor:pointer;" onclick="openPlayerDetails(${p.player_id_live||''})">
               <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2px;">
                 <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:65%;">
                   <strong style="font-size:12px; color:var(--accent);">${i+1}. ${n}</strong>

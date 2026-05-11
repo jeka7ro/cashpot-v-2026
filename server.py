@@ -1466,7 +1466,7 @@ def api_players():
         GROUP BY p.id, p.first_name, p.last_name, p.phone, p.points, p.total_bets, p.avg_bet, l.display_code, l.code
         ORDER BY total_interactiuni DESC
         LIMIT 500
-    ''', [start, end_dt] + lp)
+    ''', [start, end_dt, start, end_dt] + lp)
     
     for r in rows:
         if r.get('ultima_vizita'):
