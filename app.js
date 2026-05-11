@@ -537,7 +537,7 @@ function tBadge(curr, prev) {
   const pct = ((curr - prev) / prev) * 100;
   const c = pct >= 0 ? 'up' : 'down';
   const a = pct >= 0 ? '↑' : '↓';
-  return `<span class="kpi-trend ${c}" style="font-size:9px; padding:2px 4px; margin-left:6px; vertical-align:middle">${a}${Math.abs(pct).toFixed(1)}%</span>`;
+  return `<div style="margin-top:4px; text-align:right;"><span class="kpi-trend ${c}" style="font-size:9px; padding:2px 4px;">${a}${Math.abs(pct).toFixed(1)}%</span></div>`;
 }
 // ─── API Loaders ──────────────────────────────────────────────────────────────
 async function loadFilters(){
@@ -826,7 +826,7 @@ async function loadLocations(s,e){
       <td><span class="drill-link" onclick="drillTo('location',${r.id},'${(r.locatie||'').replace(/'/g,"\\'")}')">${r.locatie||'—'}</span></td>
       <td style="text-align:center">${r.buc}</td><td style="text-align:center">${r.zile}</td><td class="num">${clientiVal}</td>
       <td class="num">${fmt(r.total_in)}${inB}</td>
-      <td class="num ${cc}">${fmt(r.ggr)}</td><td class="num" style="text-align:right">${ggrB}</td>
+      <td class="num ${cc}">${fmt(r.ggr)}${ggrB}</td>
       <td class="num">${fmtE(r.ggr)}</td>
       <td class="num">${fmt(r.jackpot)}</td><td class="num">${fmt(r.hh)}</td><td class="num">${fmt(r.cashback)}</td>
       <td class="num">${fmt(r.games)}</td><td class="num">${pill(r.hold_pct)}</td><td class="num">${bonusCost(r.bonus_cost_pct||0)}</td>
@@ -873,8 +873,7 @@ async function loadLocations(s,e){
     <td style="text-align:center">—</td>
     <td class="num">${footerClienti}</td>
     <td class="num">${fmt(tIn)}${totalInBadge}</td>
-    <td class="num">${fmt(tGgr)}</td>
-    <td class="num" style="text-align:right">${totalGgrBadge}</td>
+    <td class="num">${fmt(tGgr)}${totalGgrBadge}</td>
     <td class="num">${fmtE(tGgr)}</td>
     <td class="num">${fmt(tJp)}</td>
     <td class="num">${fmt(tHh)}</td>
@@ -940,7 +939,7 @@ async function loadProviders(s,e){
       <td><span class="drill-link" onclick="drillTo('provider',${r.id},'${(r.provider||'').replace(/'/g,"\\'")}')"><img src="${getProviderLogo(r.provider)}" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(r.provider||'P')}&background=random&color=fff&rounded=true'" class="prov-logo" alt="icon"> ${r.provider||'—'}</span></td>
       <td>${r.buc}</td><td>${r.zile}</td>
       <td class="num">${fmt(r.total_in)}${inB}</td>
-      <td class="num ${cc}">${fmt(r.ggr)}</td><td class="num" style="text-align:right">${ggrB}</td>
+      <td class="num ${cc}">${fmt(r.ggr)}${ggrB}</td>
       <td class="num">${fmtE(r.ggr)}</td>
       <td class="num">${fmt(r.jackpot)}</td><td class="num">${fmt(r.cashback)}</td>
       <td class="num">${fmt(r.games)}</td><td class="num">${pill(r.hold_pct)}</td><td class="num">${bonusCost(r.bonus_cost_pct||0)}</td>
@@ -999,7 +998,7 @@ async function loadTypes(s,e){
       <td>${i+1}</td>
       <td><strong>${r.provider||'—'}</strong></td><td>${r.cabinet||'—'}</td><td><img src="/slot_icon.png" class="slot-icon" alt="icon"> ${r.tip_slot||'—'}</td><td>${r.buc}</td>
       <td class="num">${fmt(r.total_in)}${inB}</td>
-      <td class="num ${cc}">${fmt(r.ggr)}</td><td class="num" style="text-align:right">${ggrB}</td>
+      <td class="num ${cc}">${fmt(r.ggr)}${ggrB}</td>
       <td class="num">${fmtE(r.ggr)}</td>
       <td class="num">${fmt(r.games)}</td><td class="num">${pill(r.hold_pct)}</td><td class="num">${bonusCost(r.bonus_cost_pct||0)}</td>
     </tr>`;
@@ -1027,7 +1026,7 @@ async function loadCabinets(s,e){
       <td><strong>${r.provider||'Necunoscut'}</strong></td><td><span class="drill-link" onclick="drillTo('cabinet',0,'${(r.cabinet||'').replace(/'/g,"\\'")}')"><img src="/slot_icon.png" class="slot-icon" alt="icon"> ${r.cabinet||'—'}</span></td>
       <td>${r.buc}</td>
       <td class="num">${fmt(r.total_in)}${inB}</td>
-      <td class="num ${cc}">${fmt(r.ggr)}</td><td class="num" style="text-align:right">${ggrB}</td>
+      <td class="num ${cc}">${fmt(r.ggr)}${ggrB}</td>
       <td class="num">${fmtE(r.ggr)}</td>
       <td class="num">${fmt(r.games)}</td><td class="num">${pill(r.hold_pct)}</td><td class="num">${bonusCost(r.bonus_cost_pct||0)}</td>
     </tr>`;
@@ -1097,7 +1096,7 @@ async function loadMachines(){
         <td><span class="drill-link" onclick="goToMultigame('${(r.mix||'').replace(/'/g,"\\'")}')">${r.mix||'—'}</span></td>
         <td>${r.locatie||'—'}</td><td>${r.zile}</td>
         <td class="num">${fmt(r.total_in)}${inB}</td><td class="num">${fmt(r.in_zi)}</td>
-        <td class="num ${cc}">${fmt(r.ggr)}</td><td class="num" style="text-align:right">${ggrB}</td>
+        <td class="num ${cc}">${fmt(r.ggr)}${ggrB}</td>
         <td class="num">${fmtE(r.ggr)}</td>
         <td class="num">${fmt(r.jackpot)}</td><td class="num">${fmt(r.hh)}</td><td class="num">${fmt(r.cashback)}</td>
         <td class="num">${fmt(r.games)}</td><td class="num">${pill(r.hold_pct)}</td><td class="num">${bonusCost(r.bonus_cost_pct||0)}</td>
@@ -1166,7 +1165,7 @@ async function loadDashboardLiveCard() {
           const bet = p.bet_ron || 0;
           const est_in_str = (p.est_in !== undefined) ? fmt(p.est_in) : '—';
           html += `
-            <div style="border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:4px; cursor:pointer;" onclick="window.location.hash='#rapoarte/clienti?player=${p.player_id||''}'">
+            <div style="border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:4px; cursor:pointer;" onclick="openPlayerDetails(${p.player_id||''})">
               <div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2px;">
                 <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:65%;">
                   <strong style="font-size:12px; color:var(--accent);">${i+1}. ${n}</strong>
@@ -3199,7 +3198,12 @@ function logout(callApi = true) {
 // ─── ADMIN UTILIZATORI ────────────────────────────────────────────────────────
 async function loadAdminUtilizatori() {
   try {
-    allUsers = await apiAuth('/api/users');
+    const [usersRes, invRes] = await Promise.all([
+      apiAuth('/api/users'),
+      apiAuth('/api/invitations').catch(e => [])
+    ]);
+    allUsers = usersRes || [];
+    window.allInvitations = Array.isArray(invRes) ? invRes : [];
     renderUtilizatori();
   } catch(e) { console.error(e); }
 }
@@ -3209,12 +3213,45 @@ function renderUtilizatori() {
     tableStates['admin-utilizatori'] = { page: 1, limit: 20, rows: [] };
   }
   
-  tableStates['admin-utilizatori'].rows = allUsers.map((u, i) => {
-    const initials = u.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-    return `
+  let rows = [];
+  let index = 1;
+  
+  (window.allInvitations || []).forEach(inv => {
+    rows.push(`
+      <tr style="background: rgba(245,158,11,0.05);">
+        <td style="padding-left:16px;"><input type="checkbox" class="row-checkbox"></td>
+        <td>${index++}</td>
+        <td>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div style="width:32px; height:32px; border-radius:50%; background:var(--orange); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:12px;">⏳</div>
+            <div>
+              <strong style="color:var(--orange)">Invitație în așteptare</strong>
+              <div style="font-size:10px; color:var(--muted)">Generat: ${new Date(inv.created_at).toLocaleDateString('ro-RO')}</div>
+            </div>
+          </div>
+        </td>
+        <td>${inv.email}</td>
+        <td>—</td>
+        <td><span class="badge" style="background:var(--surface2)">${inv.role}</span></td>
+        <td>Limitat</td>
+        <td style="text-align:right; padding-right:16px;">
+          <div style="display:flex; gap:8px; justify-content:flex-end;">
+            <button class="btn-primary" style="padding:4px 8px; font-size:10px;" onclick="copyInv('${inv.code}')" title="Copiază Link">Copiază Link</button>
+            <button class="tahoe-icon-btn" onclick="deleteInv('${inv.code}')" title="Șterge Invitația" style="color:#ef4444; border-color:rgba(239,68,68,0.2);">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `);
+  });
+
+  (allUsers || []).forEach((u) => {
+    const initials = (u.name || 'U').split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+    rows.push(`
       <tr>
         <td style="padding-left:16px;"><input type="checkbox" class="row-checkbox"></td>
-        <td>${i+1}</td>
+        <td>${index++}</td>
         <td>
           <div style="display:flex;align-items:center;gap:12px;">
             <div style="width:32px; height:32px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:12px;">${initials}</div>
@@ -3238,9 +3275,24 @@ function renderUtilizatori() {
           </div>
         </td>
       </tr>
-    `;
+    `);
   });
+  
+  tableStates['admin-utilizatori'].rows = rows;
   renderTablePaginated('admin-utilizatori');
+}
+
+window.copyInv = function(code) {
+  const link = window.location.origin + window.location.pathname + '#invite/' + code;
+  navigator.clipboard.writeText(link).then(() => alert('Link copiat!'));
+}
+
+window.deleteInv = async function(code) {
+  if (!confirm('Ștergi această invitație?')) return;
+  try {
+    await apiAuth('/api/invitations/' + code, {method: 'DELETE'});
+    loadAdminUtilizatori();
+  } catch(e) {}
 }
 
 function openUserModal() {

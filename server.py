@@ -1825,10 +1825,33 @@ def create_invitation():
     conn.close()
     return jsonify({"success": True, "code": code})
 
-@app.route('/api/invitations/<code>', methods=['GET'])
-def check_invitation(code):
+@app.route('/api/invitations', methods=['GET'])
+def list_invitations():
+    user = require_auth()
+    if not user or user['role'] != 'Super Admin': return jsonify({"error": "Unauthorized"}), 401
     conn = cp2_db.get_db()
     c = conn.cursor()
+    c.execute("SELECT code, email, role, permissions, created_at FROM invitations")
+    rows = c.fetchall()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route('/api/invitations/<code>', methods=['GET', 'DELETE'])
+def check_invitation(code):
+    user = None
+    if request.method == 'DELETE':
+        user = require_auth()
+        if not user or user['role'] != 'Super Admin': return jsonify({"error": "Unauthorized"}), 401
+        
+    conn = cp2_db.get_db()
+    c = conn.cursor()
+    
+    if request.method == 'DELETE':
+        c.execute("DELETE FROM invitations WHERE code = ?", (code,))
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True})
+        
     c.execute("SELECT * FROM invitations WHERE code=? AND used=0", (code,))
     inv = c.fetchone()
     conn.close()
