@@ -2772,29 +2772,32 @@ window._renderPlayerDetails = async function(pid) {
     document.getElementById('pd-points').textContent = fmt(p.points, 2);
     
     // History Table
-    const tb = document.getElementById('pd-history-body');
+    const pgBodyId = 'pd-history';
+    if (!tableStates[pgBodyId]) tableStates[pgBodyId] = { page: 1, limit: 10, rows: [] };
+    
     if (res.sessions.length === 0) {
-      tb.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--muted);">Nicio sesiune recentă de joc.</td></tr>';
+      tableStates[pgBodyId].rows = ['<tr><td colspan="8" style="text-align:center; color:var(--muted);">Nicio sesiune recentă de joc.</td></tr>'];
     } else {
-      tb.innerHTML = res.sessions.map((s, idx) => {
+      tableStates[pgBodyId].rows = res.sessions.map((s, idx) => {
         const mixName = s.mix ? s.mix.substring(0,25) : 'Mix Necunoscut';
         const prod = s.producator ? s.producator.substring(0,10) : '';
         return `
-        <tr style="border-bottom:1px solid var(--border);" onmouseenter="this.style.background='var(--surface2)'" onmouseleave="this.style.background=''">
-          <td style="padding:10px 16px;"><input type="checkbox" class="row-checkbox"></td>
-          <td style="padding:10px 16px;">${idx+1}</td>
-          <td style="padding:10px 16px;">${s.created_at.substring(0,16)}</td>
-          <td style="padding:10px 16px;">${s.locatie || '—'}</td>
-          <td style="padding:10px 16px;">
+        <tr>
+          <td style="padding-left:16px; width:40px;"><input type="checkbox" class="row-checkbox"></td>
+          <td style="width:40px;">${idx+1}</td>
+          <td>${s.created_at.substring(0,16)}</td>
+          <td>${s.locatie || '—'}</td>
+          <td>
             <div style="font-weight:700; color:var(--text);">${s.serial_nr || '—'}</div>
             <div style="font-size:10px; color:var(--muted);">${prod} ${mixName}</div>
           </td>
-          <td style="padding:10px 16px; text-align:right; font-weight:700; color:var(--success);">${fmt(s.in)}</td>
-          <td style="padding:10px 16px; text-align:right;">${fmt(s.out)}</td>
-          <td style="padding:10px 16px; text-align:right; font-weight:800; color:${s.ggr < 0 ? 'var(--danger)' : 'var(--success)'}">${fmt(s.ggr)}</td>
+          <td class="num" style="font-weight:700; color:var(--success);">${fmt(s.in)}</td>
+          <td class="num">${fmt(s.out)}</td>
+          <td class="num" style="font-weight:800; color:${s.ggr < 0 ? 'var(--danger)' : 'var(--success)'}">${fmt(s.ggr)}</td>
         </tr>
-      `}).join('');
+      `});
     }
+    renderTablePaginated(pgBodyId);
     
     // Charts Data
     let machStats = {};

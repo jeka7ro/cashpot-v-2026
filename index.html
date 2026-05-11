@@ -646,10 +646,12 @@
             <div id="rep-page-clienti" class="rep-page" style="display:none;">
           <div id="clienti-main-view">
             <!-- Floating Search Bar -->
-            <div style="display:flex; align-items:center; margin-bottom:16px; position:relative;">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute; left:16px; color:var(--muted); pointer-events:none;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-              <input type="text" id="clienti-search" placeholder="Caută jucători (nume, telefon)..." style="width:100%; max-width:320px; padding:10px 16px 10px 42px; font-size:13px; border-radius:9999px; background:rgba(255,255,255,0.05); border:1px solid var(--border); color:var(--text); outline:none; backdrop-filter:blur(10px); box-shadow:0 4px 12px rgba(0,0,0,0.1); transition:all 0.2s;" onfocus="this.style.background='rgba(255,255,255,0.1)'; this.style.borderColor='var(--accent)';" onblur="this.style.background='rgba(255,255,255,0.05)'; this.style.borderColor='var(--border)';" oninput="filterClientiTable(this.value)">
-              <span id="clienti-search-counter" style="display:none; margin-left:12px; height:24px; padding:0 12px; border-radius:9999px; font-size:11px; font-weight:700; background:var(--accent); color:#000; align-items:center; justify-content:center;"></span>
+            <div style="margin-bottom:16px;">
+              <div style="position:relative; max-width:320px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute; left:16px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" id="clienti-search" placeholder="Caută jucători (nume, telefon)..." style="width:100%; padding:10px 100px 10px 42px; font-size:13px; border-radius:9999px; background:rgba(255,255,255,0.05); border:1px solid var(--border); color:var(--text); outline:none; backdrop-filter:blur(10px); box-shadow:0 4px 12px rgba(0,0,0,0.1); transition:all 0.2s;" onfocus="this.style.background='rgba(255,255,255,0.1)'; this.style.borderColor='var(--accent)';" onblur="this.style.background='rgba(255,255,255,0.05)'; this.style.borderColor='var(--border)';" oninput="filterClientiTable(this.value)">
+                <span id="clienti-search-counter" style="display:none; position:absolute; right:6px; top:50%; transform:translateY(-50%); height:24px; padding:0 12px; border-radius:9999px; font-size:11px; font-weight:700; background:var(--accent); color:#ffffff; align-items:center; justify-content:center; pointer-events:none;"></span>
+              </div>
             </div>
 
             <section class="card" style="margin-top: 0; border-top-left-radius: 0;">
@@ -721,8 +723,8 @@
 
               <div class="glass-panel" style="border: 1px solid var(--border); border-radius: 12px; overflow:hidden;">
                 <div style="padding:16px; border-bottom:1px solid var(--border); font-weight:700; font-size:14px; background: var(--surface2);">Istoric Sesiuni Jucător</div>
-                <div style="overflow-x:auto;">
-                  <table style="width:100%; border-collapse:collapse; font-size:11px;">
+                <div class="table-scroll">
+                  <table class="data-table" style="width:100%; border-collapse:collapse; font-size:11px;">
                     <thead>
                       <tr>
                         <th style="padding:10px 16px; width:40px;"><input type="checkbox"></th>
@@ -735,9 +737,10 @@
                         <th style="padding:10px 16px; text-align:right; border-bottom:1px solid var(--border); color:var(--muted);">GGR (In - Out)</th>
                       </tr>
                     </thead>
-                    <tbody id="pd-history-body"></tbody>
+                    <tbody id="body-pd-history"></tbody>
                   </table>
                 </div>
+                <div id="pg-pd-history" class="pagination-wrapper" style="border-top:1px solid var(--border); padding:12px 20px; display:flex; justify-content:space-between; align-items:center; background:var(--surface2);"></div>
               </div>
             </div>
           </section>
