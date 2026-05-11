@@ -2711,11 +2711,23 @@ window.loadMultigame = async function() {
 };
 
 window.filterClientiTable = function(q) {
-  q = q.toLowerCase();
-  document.querySelectorAll('#body-rep-clienti tr').forEach(tr => {
-    const text = tr.innerText.toLowerCase();
-    tr.style.display = text.includes(q) ? '' : 'none';
-  });
+  const norm = str => (str||'').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  q = norm(q);
+  const st = tableStates['rep-clienti'];
+  if (!st || !st.allRows) return;
+  
+  if (!q) {
+    st.rows = [...st.allRows];
+    document.getElementById('clienti-search-counter').style.display = 'none';
+  } else {
+    st.rows = st.allRows.filter(r => norm(r).includes(q));
+    const counter = document.getElementById('clienti-search-counter');
+    counter.textContent = `${st.rows.length} rezultate`;
+    counter.style.display = 'flex';
+  }
+  
+  st.page = 1;
+  renderTablePaginated('rep-clienti');
 };
 
 window.closePlayerDashboard = function() {
@@ -2763,7 +2775,9 @@ window.openPlayerDetails = async function(pid) {
     
     // Charts Data
     let machStats = {};
+    let dayStats = {};
     let hourStats = new Array(24).fill(0);
+    let totalIn = 0; let totalOut = 0; let totalGGR = 0;
     
     res.sessions.forEach(s => {
       const ggr = s.ggr || 0;
@@ -2771,9 +2785,39 @@ window.openPlayerDetails = async function(pid) {
       if (!machStats[mach]) machStats[mach] = 0;
       machStats[mach] += Math.abs(ggr) + (s.in || 0); // activity metric
       
+      const day = s.created_at.split(' ')[0].substring(5); // MM-DD
+      if (!dayStats[day]) dayStats[day] = 0;
+      dayStats[day]++;
+      
       const hr = new Date(s.created_at).getHours();
       if (!isNaN(hr)) hourStats[hr]++;
+      
+      totalIn += (s.in || 0);
+      totalOut += (s.out || 0);
+      totalGGR += ggr;
     });
+    
+    // Generate AI Analysis String
+    const sortedMachs = Object.keys(machStats).sort((a,b) => machStats[b] - machStats[a]);
+    const topMach = sortedMachs[0] || 'N/A';
+    
+    const peakHour = hourStats.indexOf(Math.max(...hourStats));
+    let timePref = 'Necunoscut';
+    if (peakHour >= 6 && peakHour < 12) timePref = 'Dimineața (06:00 - 12:00)';
+    else if (peakHour >= 12 && peakHour < 18) timePref = 'Prânz (12:00 - 18:00)';
+    else if (peakHour >= 18 && peakHour < 24) timePref = 'Seara (18:00 - 00:00)';
+    else timePref = 'Noaptea (00:00 - 06:00)';
+    
+    const activeDays = Object.keys(dayStats).length;
+    const avgInPerSession = res.sessions.length ? (totalIn / res.sessions.length).toFixed(0) : 0;
+    
+    let aiText = `Jucătorul are un comportament stabil, fiind activ pe parcursul a <strong>${activeDays} zile</strong> din perioada selectată. `;
+    aiText += `Perioada preferată pentru vizite este <strong>${timePref}</strong>. `;
+    if (topMach !== 'N/A') aiText += `Aparatul/Mixul favorit este în mod clar <strong>${topMach}</strong>. `;
+    aiText += `În medie, generează intrări de <strong>${fmt(avgInPerSession)}</strong> per sesiune. `;
+    aiText += `GGR-ul cumulat din aceste sesiuni este de <strong>${fmt(totalGGR)}</strong>, indicând un profil de jucător ${totalGGR > 0 ? 'profitabil pentru locație' : 'cu noroc, pe minus pentru locație'}.`;
+    
+    document.getElementById('pd-ai-analysis').innerHTML = aiText;
     
     // Render Mix Chart
     const mixCtx = document.getElementById('pd-mix-chart').getContext('2d');
@@ -2793,11 +2837,15 @@ window.openPlayerDetails = async function(pid) {
     // Render Time Chart
     const timeCtx = document.getElementById('pd-time-chart').getContext('2d');
     if (window.pdTimeChart) window.pdTimeChart.destroy();
+    
+    const dayLabels = Object.keys(dayStats).sort();
+    const dayData = dayLabels.map(k => dayStats[k]);
+    
     window.pdTimeChart = new Chart(timeCtx, {
       type: 'bar',
       data: {
-        labels: Array.from({length:24}, (_,i) => i+':00'),
-        datasets: [{ label:'Sesiuni / Oră', data: hourStats, backgroundColor: 'rgba(59,130,246,0.6)', borderRadius:4 }]
+        labels: dayLabels.length ? dayLabels : ['Fără date'],
+        datasets: [{ label:'Sesiuni / Zi', data: dayData, backgroundColor: 'rgba(59,130,246,0.6)', borderRadius:4 }]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
@@ -2829,10 +2877,12 @@ window.loadClientiReport = async function() {
   showLoader(true);
   try {
     const data = await api(`/api/players?${p}`);
-    if (!tableStates['rep-clienti']) tableStates['rep-clienti'] = { page: 1, limit: 20, rows: [] };
+    if (!tableStates['rep-clienti']) tableStates['rep-clienti'] = { page: 1, limit: 20, rows: [], allRows: [] };
     
-    tableStates['rep-clienti'].rows = data.map((r, i) => `
+    const htmlRows = data.map((r, i) => `
       <tr>
+        <td style="padding-left:16px; width:40px;"><input type="checkbox" class="row-checkbox"></td>
+        <td style="width:40px;">${i+1}</td>
         <td style="text-align:left; cursor:pointer;" onclick="openPlayerDetails(${r.id})">
           <div style="font-weight:700;color:var(--accent); text-decoration:underline;">${r.first_name || 'N/A'} ${r.last_name || ''}</div>
           <div style="font-size:10px;color:var(--muted)">ID: ${r.id}</div>
@@ -2850,6 +2900,18 @@ window.loadClientiReport = async function() {
         <td class="num">${fmt(r.avg_bet || 0, 2)}</td>
       </tr>
     `);
+    
+    tableStates['rep-clienti'].allRows = htmlRows;
+    
+    // Apply existing search filter if any
+    const searchVal = document.getElementById('clienti-search').value;
+    if (searchVal) {
+      const norm = str => (str||'').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      tableStates['rep-clienti'].rows = htmlRows.filter(r => norm(r).includes(norm(searchVal)));
+    } else {
+      tableStates['rep-clienti'].rows = [...htmlRows];
+    }
+    
     renderTablePaginated('rep-clienti');
   } catch(err) {
     console.error('loadClientiReport error:', err);

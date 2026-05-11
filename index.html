@@ -644,14 +644,17 @@
             </div><!-- /rep-page-hh -->
             
             <div id="rep-page-clienti" class="rep-page" style="display:none;">
-          <section class="card" style="margin-top: 0; border-top-left-radius: 0;">
-            <div id="clienti-main-view">
-              <div style="padding:14px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;">
+          <div id="clienti-main-view">
+            <!-- Floating Search Bar -->
+            <div style="display:flex; align-items:center; margin-bottom:16px; position:relative;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute; left:16px; color:var(--muted); pointer-events:none;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input type="text" id="clienti-search" placeholder="Caută jucători (nume, telefon)..." style="width:100%; max-width:320px; padding:10px 16px 10px 42px; font-size:13px; border-radius:9999px; background:rgba(255,255,255,0.05); border:1px solid var(--border); color:var(--text); outline:none; backdrop-filter:blur(10px); box-shadow:0 4px 12px rgba(0,0,0,0.1); transition:all 0.2s;" onfocus="this.style.background='rgba(255,255,255,0.1)'; this.style.borderColor='var(--accent)';" onblur="this.style.background='rgba(255,255,255,0.05)'; this.style.borderColor='var(--border)';" oninput="filterClientiTable(this.value)">
+              <span id="clienti-search-counter" style="display:none; margin-left:12px; height:24px; padding:0 12px; border-radius:9999px; font-size:11px; font-weight:700; background:var(--accent); color:#000; align-items:center; justify-content:center;"></span>
+            </div>
+
+            <section class="card" style="margin-top: 0; border-top-left-radius: 0;">
+              <div style="padding:14px 20px; border-bottom:1px solid var(--border);">
                 <span style="font-size:11px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.05em">Lista Jucători Activi (Card)</span>
-                <div style="position:relative; width:300px;">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--muted);"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                  <input type="text" id="clienti-search" placeholder="Caută jucător (nume, telefon)..." style="width:100%; padding:8px 8px 8px 32px; font-size:12px; border-radius:12px; background:var(--surface2); border:1px solid var(--border); color:var(--text); outline:none;" oninput="filterClientiTable(this.value)">
-                </div>
               </div>
               <div class="table-scroll">
                 <table class="data-table">
@@ -686,6 +689,17 @@
                 <div style="text-align:right;">
                   <div style="font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1px;">Total Puncte</div>
                   <div id="pd-points" style="font-size:24px; font-weight:900; color:var(--accent);">0</div>
+                </div>
+              </div>
+
+              <!-- AI Profile Analysis -->
+              <div class="glass-panel" style="margin-bottom:24px; padding:20px; border:1px solid var(--border); border-radius:12px; background:linear-gradient(135deg, rgba(234,179,8,0.1) 0%, rgba(0,0,0,0) 100%);">
+                <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                  <h3 style="margin:0; font-size:12px; font-weight:800; color:var(--accent); text-transform:uppercase; letter-spacing:1px;">Analiză Comportamentală Jucător</h3>
+                </div>
+                <div id="pd-ai-analysis" style="font-size:13px; line-height:1.6; color:var(--text);">
+                  Se generează profilul jucătorului...
                 </div>
               </div>
 
