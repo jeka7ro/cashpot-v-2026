@@ -67,7 +67,7 @@ async function loadTop10Games() {
             style="width:40px;height:40px;object-fit:cover;border-radius:8px;flex-shrink:0;background:var(--surface2);"
             onerror="this.style.background='var(--surface2)';this.style.opacity='0.3'">
           <div style="flex:1;min-width:0;">
-            <div style="font-weight:700;font-size:11px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${r.game}</div>
+            <div style="font-weight:700;font-size:11px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;" onclick="openGameDetails('${(r.game||'').replace(/'/g,"\\'")}')">${r.game}</div>
             <div style="height:3px;background:var(--border);border-radius:2px;margin-top:4px;overflow:hidden">
               <div style="width:${barW}%;height:100%;background:var(--accent);border-radius:2px;transition:width .4s"></div>
             </div>
@@ -100,7 +100,7 @@ function renderTop3Avatars(data) {
           onerror="this.style.opacity='0.3'">
         <div style="flex:1; min-width:0;">
           <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">Top ${i+1} Performer</div>
-          <div style="font-size:14px; font-weight:800; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:4px;">${r.game}</div>
+          <div style="font-size:14px; font-weight:800; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:4px; cursor:pointer; text-decoration:underline;" onclick="openGameDetails('${(r.game||'').replace(/'/g,"\\'")}')">${r.game}</div>
           <div style="display:flex; gap:12px; align-items:baseline;">
             <span style="font-size:12px; font-weight:700; color:var(--accent);">${fmt(r.ggr)} RON</span>
             <span style="font-size:10px; color:var(--muted);">${r.aparate} aparate</span>
@@ -1178,7 +1178,7 @@ async function loadMachines(){
       return`<tr>
         <td>${i+1}</td>
         <td>
-          <div style="display:flex; align-items:center; gap:8px;">
+          <div style="display:flex; align-items:center; gap:8px; cursor:pointer;" onclick="openGameDetails('${(r.last_game_name || r.game_name || '').replace(/'/g,"\\'")}')">
             <img src="${thumb}" referrerpolicy="no-referrer" style="width:24px; height:24px; border-radius:50%; object-fit:cover; background:var(--surface2);" onerror="this.style.display='none'">
             <span>${r.serial_nr||'—'}</span>
           </div>
@@ -1267,7 +1267,7 @@ async function loadDashboardLiveCard() {
                 <span style="color:#10b981; font-weight:700;">Est. IN: ${est_in_str}</span>
               </div>
               <div style="font-size:10px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                <strong style="color:var(--text);">#${p.pozitie || p.machine_id || '—'}</strong> (SN: ${p.serial_nr || '—'}) &bull; ${p.joc_activ || 'Necunoscut'}
+                <strong style="color:var(--text);">#${p.pozitie || p.machine_id || '—'}</strong> (SN: ${p.serial_nr || '—'}) &bull; <span style="cursor:pointer; text-decoration:underline; text-decoration-style:dotted;" onclick="event.stopPropagation(); openGameDetails('${(p.joc_activ||'').replace(/'/g,"\\'")}')">${p.joc_activ || 'Necunoscut'}</span>
               </div>
             </div>
           `;
@@ -1398,7 +1398,17 @@ window.addEventListener('hashchange', () => {
           loadClientiReport();
         }
       }
-      else if (subHash === 'multigame') { window.loadMultigameReport ? loadMultigameReport() : loadMultigame(); }
+      else if (subHash === 'multigame') {
+        if (parts[2] === 'game' && parts[3]) {
+          _renderGameDetails(decodeURIComponent(parts[3]));
+        } else {
+          const gdView = document.getElementById('view-game-details');
+          if(gdView) gdView.style.display = 'none';
+          const mgPage = document.getElementById('rep-page-multigame');
+          if(mgPage) mgPage.style.display = 'block';
+          window.loadMultigameReport ? loadMultigameReport() : loadMultigame(); 
+        }
+      }
       else if (subHash === 'cashout') loadRapoarteCashout();
     } else {
       window.location.hash = 'rapoarte/ore';
@@ -2786,7 +2796,7 @@ window.loadMultigameReport = window.loadMultigame = async function() {
                   onerror="this.style.display='none'">
               </td>
               <td style="${td}min-width:160px">
-                <div style="font-weight:700;color:var(--text)">${r.game}</div>
+                <div style="font-weight:700;color:var(--text);cursor:pointer;text-decoration:underline;text-decoration-style:dotted;" onclick="openGameDetails('${(r.game||'').replace(/'/g,"\\'")}')">${r.game}</div>
                 <div style="height:3px;background:var(--border);border-radius:2px;margin-top:5px;overflow:hidden">
                   <div style="width:${barPct}%;height:100%;background:var(--accent);border-radius:2px;transition:width .4s"></div>
                 </div>
@@ -2851,6 +2861,74 @@ window.closePlayerDashboard = function() {
 window.openPlayerDetails = function(pid) {
   window.location.hash = 'rapoarte/clienti/' + pid;
 };
+
+window.openGameDetails = function(gameName) {
+  window.location.hash = 'rapoarte/multigame/game/' + encodeURIComponent(gameName);
+};
+
+window.closeGameDetails = function() {
+  window.location.hash = 'rapoarte/multigame';
+};
+
+window._renderGameDetails = async function(gameName) {
+  const gd = document.getElementById('view-game-details');
+  const mg = document.getElementById('rep-page-multigame');
+  if(!gd || !mg) return;
+  
+  mg.style.display = 'none';
+  gd.style.display = 'block';
+  
+  document.getElementById('gd-name').textContent = gameName;
+  document.getElementById('gd-thumb').src = gameThumbUrl(gameName);
+  document.getElementById('gd-stats-grid').innerHTML = '<div style="grid-column:1/-1; padding:20px; color:var(--muted);">Se încarcă datele...</div>';
+  document.getElementById('body-gd-machines').innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px; color:var(--muted);">Se caută aparate...</td></tr>';
+  
+  try {
+    const {s, e} = getPeriod();
+    const res = await api(`/api/multigame/details?game_name=${encodeURIComponent(gameName)}&start=${s}&end=${e}`);
+    
+    if(!res || res.error) {
+        document.getElementById('gd-stats-grid').innerHTML = `<div style="grid-column:1/-1; padding:20px; color:var(--red);">${res.error || 'Eroare la preluarea datelor'}</div>`;
+        return;
+    }
+    
+    const stats = res.stats || {};
+    document.getElementById('gd-stats-grid').innerHTML = `
+        <div class="kpi-card" style="padding:12px; border:1px solid var(--border); border-radius:8px;">
+            <div style="font-size:9px; color:var(--muted); text-transform:uppercase;">Volume Index</div>
+            <div style="font-size:16px; font-weight:800; color:var(--text);">${fmtK(stats.total_bet)}</div>
+        </div>
+        <div class="kpi-card" style="padding:12px; border:1px solid var(--border); border-radius:8px;">
+            <div style="font-size:9px; color:var(--muted); text-transform:uppercase;">GGR Index</div>
+            <div style="font-size:16px; font-weight:800; color:${(stats.ggr||0)>=0 ? 'var(--green)' : 'var(--red)'};">${fmtK(stats.ggr)}</div>
+        </div>
+        <div class="kpi-card" style="padding:12px; border:1px solid var(--border); border-radius:8px;">
+            <div style="font-size:9px; color:var(--muted); text-transform:uppercase;">House Edge</div>
+            <div style="font-size:16px; font-weight:800; color:var(--accent);">${(stats.house_edge_pct||0).toFixed(2)}%</div>
+        </div>
+        <div class="kpi-card" style="padding:12px; border:1px solid var(--border); border-radius:8px;">
+            <div style="font-size:9px; color:var(--muted); text-transform:uppercase;">Runde</div>
+            <div style="font-size:16px; font-weight:800; color:var(--text);">${fmtK(stats.total_games)}</div>
+        </div>
+    `;
+    
+    const machs = res.machines || [];
+    document.getElementById('gd-mach-count').textContent = `${machs.length} aparate`;
+    document.getElementById('body-gd-machines').innerHTML = machs.map((m, i) => `
+        <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:12px 24px; color:var(--muted); font-weight:700;">${i+1}</td>
+            <td style="padding:12px 16px; font-weight:700; color:var(--text);">${m.serial_nr}</td>
+            <td style="padding:12px 16px; color:var(--muted);">${m.location_name}</td>
+            <td style="padding:12px 16px; color:var(--muted);">${m.cabinet} <span style="font-size:9px; opacity:0.6;">(${m.manufacturer})</span></td>
+            <td style="padding:12px 24px; text-align:right;"><span style="font-size:10px; background:var(--accent); color:#000; padding:4px 10px; border-radius:12px; font-weight:700;">${m.active_mix || '—'}</span></td>
+        </tr>
+    `).join('') || '<tr><td colspan="5" style="text-align:center; padding:40px; color:var(--muted);">Niciun aparat găsit pentru acest joc în perioada selectată.</td></tr>';
+    
+  } catch(err) {
+    console.error('_renderGameDetails error:', err);
+  }
+};
+
 
 window._renderPlayerDetails = async function(pid) {
   document.getElementById('clienti-main-view').style.display = 'none';

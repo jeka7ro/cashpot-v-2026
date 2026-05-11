@@ -1139,6 +1139,67 @@ def multigame():
     except Exception as ex:
         return jsonify({'error': str(ex)}), 500
 
+@app.route('/api/multigame/details')
+def multigame_details():
+    try:
+        game_name = request.args.get('game_name', '')
+        if not game_name: return jsonify({'error': 'Missing game_name'}), 400
+        
+        start, end = period_params(request)
+        if not start: start = dt.date.today().strftime('%Y-%m-%d')
+        if not end:   end   = start
+        
+        s_dt = dt.datetime.strptime(start, '%Y-%m-%d')
+        e_dt = dt.datetime.strptime(end,   '%Y-%m-%d')
+        start_ts = start + ' 08:00:00'
+        end_ts = (e_dt + dt.timedelta(days=1)).strftime('%Y-%m-%d') + ' 08:00:00'
+
+        # 1. Overall stats for this game
+        stats = qry("""
+            SELECT
+                COUNT(DISTINCT mgs.machine_id) as aparate,
+                ROUND(SUM(mgs.c_52_bet) / 100, 0) as total_bet,
+                ROUND(SUM(mgs.c_52_win) / 100, 0) as total_win,
+                SUM(mgs.c_52_games) as total_games,
+                ROUND((SUM(mgs.c_52_bet) - SUM(mgs.c_52_win)) / 100, 0) as ggr,
+                ROUND(
+                    CASE WHEN SUM(mgs.c_52_bet) > 0
+                    THEN (1 - SUM(mgs.c_52_win)/SUM(mgs.c_52_bet))*100
+                    ELSE NULL END, 2
+                ) as house_edge_pct
+            FROM machine_audit_games_g_s mgs
+            LEFT JOIN machine_games mg ON mgs.machine_game_id = mg.id
+            WHERE (mg.name = %s OR mgs.sas_game_name = %s)
+              AND mgs.created_at >= %s AND mgs.created_at < %s
+        """, [game_name, game_name, start_ts, end_ts])
+        
+        # 2. List of machines having this game
+        # We need to find which machines currently have this game or played it in period
+        machines = qry("""
+            SELECT DISTINCT
+                m.id, m.serial_nr, l.name as location_name,
+                mt.name as cabinet, mm.name as manufacturer,
+                m.mix as active_mix
+            FROM machine_audit_games_g_s mgs
+            JOIN machines m ON mgs.machine_id = m.id
+            JOIN locations l ON m.location_id = l.id
+            JOIN machine_types mt ON m.machine_type_id = mt.id
+            JOIN machine_manufacturers mm ON mt.manufacturer_id = mm.id
+            LEFT JOIN machine_games mg ON mgs.machine_game_id = mg.id
+            WHERE (mg.name = %s OR mgs.sas_game_name = %s)
+              AND mgs.created_at >= %s AND mgs.created_at < %s
+            ORDER BY l.name, m.serial_nr
+        """, [game_name, game_name, start_ts, end_ts])
+
+        return jsonify({
+            'game': game_name,
+            'stats': stats[0] if stats else {},
+            'machines': machines
+        })
+    except Exception as ex:
+        return jsonify({'error': str(ex)}), 500
+
+
 # ─── HH Advanced Analysis (from Prompt) ──────────────────────────────────────
 @app.route('/api/hh_advanced')
 def hh_advanced():

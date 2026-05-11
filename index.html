@@ -803,6 +803,51 @@
                 <div id="pg-pd-history" class="pagination-wrapper" style="border-top:1px solid var(--border); padding:12px 20px; display:flex; justify-content:space-between; align-items:center; background:var(--surface2);"></div>
               </div>
             </div>
+
+            <!-- GAME DETAILS FULL PAGE -->
+            <div id="view-game-details" style="display:none; animation: fadeIn 0.3s ease; padding: 24px;">
+                <div style="display:flex; align-items:center; gap:16px; margin-bottom:24px;">
+                    <button class="premium-btn" onclick="closeGameDetails()" style="padding:8px 16px; background:var(--surface2); color:var(--text); border:1px solid var(--border);">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> Înapoi
+                    </button>
+                    <h1 id="gd-name" style="font-size:24px; font-weight:900; margin:0; color:var(--text);">Joc Detalii</h1>
+                </div>
+
+                <div style="display:grid; grid-template-columns: 320px 1fr; gap:24px;">
+                    <!-- LEFT: Game Info & KPI -->
+                    <div style="display:flex; flex-direction:column; gap:24px;">
+                        <div class="glass-panel" style="padding:24px; text-align:center; border:1px solid var(--border); border-radius:12px;">
+                            <img id="gd-thumb" src="" referrerpolicy="no-referrer" style="width:200px; height:200px; border-radius:24px; object-fit:cover; box-shadow: 0 16px 32px rgba(0,0,0,0.4); margin-bottom:20px; background:var(--surface2);" onerror="this.style.opacity='0.3'">
+                            <div id="gd-stats-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                                <!-- KPIs will be injected here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- RIGHT: Machines List -->
+                    <div class="glass-panel" style="padding:0; overflow:hidden; border:1px solid var(--border); border-radius:12px;">
+                        <div style="padding:16px 24px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:var(--surface2);">
+                            <span style="font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:1px; color:var(--muted);">Distribuție pe Aparate / Locații</span>
+                            <span id="gd-mach-count" style="font-size:11px; font-weight:700; color:var(--accent);">0 aparate</span>
+                        </div>
+                        <div style="max-height: calc(100vh - 250px); overflow-y:auto;">
+                            <table class="data-table" style="width:100%; border-collapse:collapse; font-size:11px;">
+                                <thead>
+                                    <tr>
+                                        <th style="padding:10px 24px; text-align:left; color:var(--muted);">#</th>
+                                        <th style="padding:10px 16px; text-align:left; color:var(--muted);">SERIE APARAT</th>
+                                        <th style="padding:10px 16px; text-align:left; color:var(--muted);">LOCAȚIE</th>
+                                        <th style="padding:10px 16px; text-align:left; color:var(--muted);">CABINET / PRODUCĂTOR</th>
+                                        <th style="padding:10px 24px; text-align:right; color:var(--muted);">MIX ACTIV</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="body-gd-machines"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
           </section>
         </div>
 
