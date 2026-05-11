@@ -2858,14 +2858,14 @@ window._renderPlayerDetails = async function(pid) {
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: {color:'#94a3b8'} } } }
     });
     
-    // Render Time Chart
-    const timeCtx = document.getElementById('pd-time-chart').getContext('2d');
-    if (window.pdTimeChart) window.pdTimeChart.destroy();
+    // Render Days Chart
+    const daysCtx = document.getElementById('pd-days-chart').getContext('2d');
+    if (window.pdDaysChart) window.pdDaysChart.destroy();
     
     const dayLabels = Object.keys(dayStats).sort();
     const dayData = dayLabels.map(k => dayStats[k]);
     
-    window.pdTimeChart = new Chart(timeCtx, {
+    window.pdDaysChart = new Chart(daysCtx, {
       type: 'bar',
       data: {
         labels: dayLabels.length ? dayLabels : ['Fără date'],
@@ -2875,7 +2875,27 @@ window._renderPlayerDetails = async function(pid) {
         responsive: true, maintainAspectRatio: false,
         plugins: { legend: {display:false} },
         scales: {
-          x: { grid:{display:false}, ticks:{color:'#64748b'} },
+          x: { grid:{display:false}, ticks:{color:'#64748b', font:{size:10}} },
+          y: { grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#64748b', stepSize:1} }
+        }
+      }
+    });
+
+    // Render Hours Chart
+    const hoursCtx = document.getElementById('pd-hours-chart').getContext('2d');
+    if (window.pdHoursChart) window.pdHoursChart.destroy();
+    
+    window.pdHoursChart = new Chart(hoursCtx, {
+      type: 'bar',
+      data: {
+        labels: Array.from({length:24}, (_,i) => i+':00'),
+        datasets: [{ label:'Sesiuni / Oră', data: hourStats, backgroundColor: 'rgba(16,185,129,0.6)', borderRadius:4 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: {display:false} },
+        scales: {
+          x: { grid:{display:false}, ticks:{color:'#64748b', font:{size:10}} },
           y: { grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#64748b', stepSize:1} }
         }
       }
