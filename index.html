@@ -646,30 +646,81 @@
             
             <div id="rep-page-clienti" class="rep-page" style="display:none;">
           <section class="card" style="margin-top: 0; border-top-left-radius: 0;">
+            <div id="clienti-main-view">
+              <div style="padding:14px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;">
+                <span style="font-size:11px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.05em">Lista Jucători Activi (Card)</span>
+                <div style="position:relative; width:300px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--muted);"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                  <input type="text" id="clienti-search" placeholder="Caută jucător (nume, telefon)..." style="width:100%; padding:8px 8px 8px 32px; font-size:12px; border-radius:12px; background:var(--surface2); border:1px solid var(--border); color:var(--text); outline:none;" oninput="filterClientiTable(this.value)">
+                </div>
+              </div>
+              <div class="table-scroll">
+                <table class="data-table">
+                  <thead><tr>
+                    <th>Nume Jucător</th>
+                    <th>Telefon</th>
+                    <th>Locație Preferată</th>
+                    <th class="num">Ultima Vizită</th>
+                    <th class="num">Zile Active</th>
+                    <th class="num">Vizite/Zi</th>
+                    <th class="num">Timp Preferat</th>
+                    <th class="num">Total IN</th>
+                    <th class="num">Media IN / Zi</th>
+                    <th class="num">Puncte</th>
+                    <th class="num">Total Pariuri</th>
+                    <th class="num">Pariu Mediu</th>
+                  </tr></thead>
+                  <tbody id="body-rep-clienti"></tbody>
+                </table>
+              </div>
+              <div id="pg-rep-clienti" class="pagination-wrapper" style="border-top:1px solid var(--border); padding:12px 20px; display:flex; justify-content:space-between; align-items:center; background:var(--surface2);"></div>
+            </div>
 
-            <div style="padding:0px 20px 16px 20px; border-bottom:1px solid var(--border);">
-              <span style="font-size:11px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.05em">Lista Jucători Activi (Card)</span>
+            <!-- PLAYER FULL PAGE DASHBOARD -->
+            <div id="player-dashboard-view" style="display:none; animation: fadeIn 0.3s ease; padding: 24px;">
+              <div style="display:flex; align-items:center; gap:16px; margin-bottom:24px;">
+                <button class="premium-btn" onclick="closePlayerDashboard()" style="padding:8px 16px; background:var(--surface2); color:var(--text); border: 1px solid var(--border);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> Înapoi la Jucători</button>
+                <div style="flex:1;">
+                  <h2 id="pd-name" style="margin:0; font-size:24px; font-weight:800; color:var(--text);">Nume Jucător</h2>
+                  <div id="pd-meta" style="font-size:12px; color:var(--muted);">ID: — &bull; Tel: —</div>
+                </div>
+                <div style="text-align:right;">
+                  <div style="font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1px;">Total Puncte</div>
+                  <div id="pd-points" style="font-size:24px; font-weight:900; color:var(--accent);">0</div>
+                </div>
+              </div>
+
+              <!-- Charts Row -->
+              <div style="display:grid; grid-template-columns:1fr 2fr; gap:24px; margin-bottom:24px;">
+                <div class="glass-panel" style="padding:20px; border: 1px solid var(--border); border-radius: 12px;">
+                  <h3 style="margin-top:0; margin-bottom:16px; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:1px;">Preferințe Mixuri/Aparate</h3>
+                  <div style="height:250px; position:relative;"><canvas id="pd-mix-chart"></canvas></div>
+                </div>
+                <div class="glass-panel" style="padding:20px; border: 1px solid var(--border); border-radius: 12px;">
+                  <h3 style="margin-top:0; margin-bottom:16px; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:1px;">Activitate pe Ore / Zile</h3>
+                  <div style="height:250px; position:relative;"><canvas id="pd-time-chart"></canvas></div>
+                </div>
+              </div>
+
+              <div class="glass-panel" style="border: 1px solid var(--border); border-radius: 12px; overflow:hidden;">
+                <div style="padding:16px; border-bottom:1px solid var(--border); font-weight:700; font-size:14px; background: var(--surface2);">Istoric Sesiuni Jucător</div>
+                <div style="overflow-x:auto;">
+                  <table style="width:100%; border-collapse:collapse; font-size:11px;">
+                    <thead>
+                      <tr>
+                        <th style="padding:10px 16px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted);">DATA & ORA</th>
+                        <th style="padding:10px 16px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted);">LOCAȚIE</th>
+                        <th style="padding:10px 16px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted);">APARAT (SN)</th>
+                        <th style="padding:10px 16px; text-align:right; border-bottom:1px solid var(--border); color:var(--muted);">IN</th>
+                        <th style="padding:10px 16px; text-align:right; border-bottom:1px solid var(--border); color:var(--muted);">OUT</th>
+                        <th style="padding:10px 16px; text-align:right; border-bottom:1px solid var(--border); color:var(--muted);">GGR (In - Out)</th>
+                      </tr>
+                    </thead>
+                    <tbody id="pd-history-body"></tbody>
+                  </table>
+                </div>
+              </div>
             </div>
-            <div class="table-scroll">
-              <table class="data-table">
-                <thead><tr>
-                  <th>Nume Jucător</th>
-                  <th>Telefon</th>
-                  <th>Locație Preferată</th>
-                  <th class="num">Ultima Vizită</th>
-                  <th class="num">Zile Active</th>
-                  <th class="num">Vizite/Zi</th>
-                  <th class="num">Timp Preferat</th>
-                  <th class="num">Total IN</th>
-                  <th class="num">Media IN / Zi</th>
-                  <th class="num">Puncte</th>
-                  <th class="num">Total Pariuri</th>
-                  <th class="num">Pariu Mediu</th>
-                </tr></thead>
-                <tbody id="body-rep-clienti"></tbody>
-              </table>
-            </div>
-            <div id="pg-rep-clienti" class="pagination-wrapper" style="border-top:1px solid var(--border); padding:12px 20px; display:flex; justify-content:space-between; align-items:center; background:var(--surface2);"></div>
           </section>
         </div>
 
