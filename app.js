@@ -1176,7 +1176,7 @@ async function loadDashboardLiveCard() {
                 <span style="color:#10b981; font-weight:700;">Est. IN: ${est_in_str}</span>
               </div>
               <div style="font-size:10px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                <strong style="color:var(--text);">#${p.aparat || '—'}</strong> (SN: ${p.serial_nr || '—'}) &bull; ${p.joc || 'Necunoscut'}
+                <strong style="color:var(--text);">#${p.pozitie || p.machine_id || '—'}</strong> (SN: ${p.serial_nr || '—'}) &bull; ${p.joc_activ || 'Necunoscut'}
               </div>
             </div>
           `;
@@ -1201,7 +1201,7 @@ async function loadDashboardLiveCard() {
             <div style="border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:8px;">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                 <strong style="font-size:12px; color:var(--accent); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${c.locatie || '—'}</strong>
-                <strong style="color:var(--danger); font-size:12px; white-space:nowrap;">${fmt(c.amount)} <span style="font-size:9px">RON</span></strong>
+                <strong style="color:var(--danger); font-size:12px; white-space:nowrap;">${fmt(Math.max(c.cashout_ron||0, c.jackpot_ron||0, c.hh_ron||0))} <span style="font-size:9px">RON</span></strong>
               </div>
               <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; color:var(--muted);">
                 <span>#${c.machine_id} &bull; ${d}</span>
@@ -2932,9 +2932,8 @@ window._renderPlayerDetails = async function(pid) {
 window.mktEvoChart = null;
 window.mktPieChart = null;
 window.loadMarketingReport = async function() {
-  const dts = document.getElementById('tl-range-display').textContent.split(' - ');
-  if(dts.length !== 2) return;
-  const s = formatDateForAPI(dts[0]), e = formatDateForAPI(dts[1]);
+  const {s, e} = getPeriod();
+  if(!s || !e) return;
   showLoader(true);
   try {
     const [dDaily, dLoc] = await Promise.all([

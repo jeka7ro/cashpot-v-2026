@@ -1258,6 +1258,10 @@ def hh_advanced():
     
     result = {}
     for lid, st in loc_stats.items():
+        # Skip locations with no real HH activity (less than 2 HH hours or < 100 RON cost)
+        if st['ore_hh']['count'] < 2 or st['ore_hh']['cost'] < 100:
+            continue
+        
         o_hh = max(1, st['ore_hh']['count'])
         o_no = max(1, st['ore_normale']['count'])
         
