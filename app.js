@@ -81,6 +81,35 @@ async function loadTop10Games() {
   } catch(e) { console.error('loadTop10Games:', e); }
 }
 
+// Render Top 3 Games as large circular avatars at the top of Multigame page
+function renderTop3Avatars(data) {
+  const el = document.getElementById('mg-top-avatars');
+  if (!el) return;
+  if (!data || !data.length) { el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  
+  const top3 = data.slice(0, 3);
+  el.innerHTML = top3.map((r, i) => {
+    const thumb = gameThumbUrl(r.game);
+    const color = i === 0 ? '#eab308' : i === 1 ? '#cbd5e1' : '#cd7f32'; // Gold, Silver, Bronze
+    return `
+      <div class="kpi-card" style="flex:1; display:flex; align-items:center; gap:16px; padding:16px; min-width:240px; position:relative; overflow:hidden;">
+        <div style="position:absolute; top:-10px; right:-10px; font-size:60px; font-weight:900; color:var(--accent); opacity:0.05; pointer-events:none;">${i+1}</div>
+        <img src="${thumb}" referrerpolicy="no-referrer" alt="" 
+          style="width:64px; height:64px; border-radius:50%; object-fit:cover; border:3px solid ${color}; background:var(--surface2);"
+          onerror="this.style.opacity='0.3'">
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">Top ${i+1} Performer</div>
+          <div style="font-size:14px; font-weight:800; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:4px;">${r.game}</div>
+          <div style="display:flex; gap:12px; align-items:baseline;">
+            <span style="font-size:12px; font-weight:700; color:var(--accent);">${fmt(r.ggr)} RON</span>
+            <span style="font-size:10px; color:var(--muted);">${r.aparate} aparate</span>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
 function cellCls(v,max){if(!max)return'';const p=v/max;if(v<0)return p<-0.6?'cell-neg-3':p<-0.3?'cell-neg-2':'cell-neg-1';return p>0.7?'cell-pos-3':p>0.35?'cell-pos-2':p>0.1?'cell-pos-1':'';}
 function showLoader(v){document.getElementById('loader').classList.toggle('show',v);}
 function round2(v){return Math.round(v*100)/100;}
@@ -1145,9 +1174,16 @@ async function loadMachines(){
       const currE = currExclData.find(x => x.serial_nr === r.serial_nr);
       const inB = c ? tBadge(currE?.total_in, prev?.total_in) : '';
       const ggrB = c ? tBadge(currE?.ggr, prev?.ggr) : '';
+      const thumb = gameThumbUrl(r.last_game_name || r.game_name);
       return`<tr>
         <td>${i+1}</td>
-        <td>${r.serial_nr||'—'}</td><td><strong>${r.provider||'—'}</strong></td><td>${r.cabinet||'—'}</td>
+        <td>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <img src="${thumb}" referrerpolicy="no-referrer" style="width:24px; height:24px; border-radius:50%; object-fit:cover; background:var(--surface2);" onerror="this.style.display='none'">
+            <span>${r.serial_nr||'—'}</span>
+          </div>
+        </td>
+        <td><strong>${r.provider||'—'}</strong></td><td>${r.cabinet||'—'}</td>
         <td><span class="drill-link" onclick="goToMultigame('${(r.mix||'').replace(/'/g,"\\'")}')">${r.mix||'—'}</span></td>
         <td>${r.locatie||'—'}</td><td>${r.zile}</td>
         <td class="num">${fmt(r.total_in)}${inB}</td><td class="num">${fmt(r.in_zi)}</td>
@@ -2710,6 +2746,8 @@ window.loadMultigameReport = window.loadMultigame = async function() {
       kpiCard('Runde Totale', fmtK(totGame), 'jocuri jucate', 'var(--accent)'),
     ].join('');
 
+    renderTop3Avatars(data);
+
     // Table
     const thS = `padding:10px 8px;text-align:left;font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;border-bottom:2px solid var(--border);background:var(--surface2)`;
     const thR = `padding:10px 8px;text-align:right;font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;border-bottom:2px solid var(--border);background:var(--surface2)`;
@@ -2744,7 +2782,7 @@ window.loadMultigameReport = window.loadMultigame = async function() {
               <td style="${td}padding-left:16px;color:var(--muted);font-weight:700;font-size:10px">${i+1}</td>
               <td style="${td}width:52px">
                 <img src="${thumb}" referrerpolicy="no-referrer" alt="" loading="lazy"
-                  style="width:44px;height:44px;object-fit:cover;border-radius:6px;background:var(--surface2);"
+                  style="width:40px;height:40px;object-fit:cover;border-radius:50%;background:var(--surface2);border:2px solid var(--border);"
                   onerror="this.style.display='none'">
               </td>
               <td style="${td}min-width:160px">
