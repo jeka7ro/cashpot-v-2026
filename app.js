@@ -1302,7 +1302,7 @@ window.addEventListener('hashchange', () => {
           loadClientiReport();
         }
       }
-      else if (subHash === 'multigame') loadMultigameReport();
+      else if (subHash === 'multigame') { window.loadMultigameReport ? loadMultigameReport() : loadMultigame(); }
       else if (subHash === 'cashout') loadRapoarteCashout();
     } else {
       window.location.hash = 'rapoarte/ore';
@@ -2601,7 +2601,7 @@ function startLiveTimer() {
 startLiveTimer();
 
 // ─── Multigame Report ─────────────────────────────────────────────────────────
-window.loadMultigame = async function() {
+window.loadMultigameReport = window.loadMultigame = async function() {
   let { s, e } = getPeriod();
   // Fallback: if dates are missing or wrong format, use today
   const dateRe = /^\d{4}-\d{2}-\d{2}$/;
@@ -3136,7 +3136,7 @@ window.loadRapoarteCashout = async function() {
       if (hh > 0) tip = 'Handpay';
       
       const val = Math.max(out, jp, hh);
-      const est_in_str = r.in_azi > 0 ? fmt(Math.max(0, r.in_azi - out)) : '?';
+      const est_in_str = r.est_in > 0 ? fmt(r.est_in) : '—';
       const cTime = r.c_time ? r.c_time.substring(11, 16) : '—';
       const cDate = r.c_date ? r.c_date.split('-').reverse().join('.') : '—';
       

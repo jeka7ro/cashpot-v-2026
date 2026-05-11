@@ -1394,36 +1394,81 @@ def api_player_details(pid):
     player = qry_one("SELECT id, first_name, last_name, phone, points/100 as points, total_bets/100 as total_bets, avg_bet/100 as avg_bet FROM players WHERE id = %s", [pid])
     if not player:
         return jsonify({'error': 'Player not found'}), 404
+
+    start = request.args.get('start')
+    end   = request.args.get('end')
+    
+    date_filter = ''
+    date_params = [pid]
+    if start and end:
+        date_filter = ' AND DATE(pcl.created_at) >= %s AND DATE(pcl.created_at) <= %s'
+        date_params = [pid, start, end]
         
-    # Sessions
-    sessions = qry('''
+    # Sessions - use per-hour audit to get approximate player session contribution
+    # We take the hour of the session start + the next hour (2h window)
+    sessions = qry(f'''
         SELECT 
-            pcl.created_at, 
+            pcl.created_at,
             REPLACE(COALESCE(l.display_code, l.code), ' E.S', '') as locatie,
             m.slot_machine_id as serial_nr,
+            m.id as machine_id,
             mm.name as producator,
             mt.name as mix,
-            (SELECT SUM(mas.`in`) FROM machine_audit_summaries mas WHERE mas.machine_id = m.id AND mas.date = DATE(pcl.created_at)) as `in`,
-            (SELECT SUM(mas.`out`) FROM machine_audit_summaries mas WHERE mas.machine_id = m.id AND mas.date = DATE(pcl.created_at)) as `out`,
-            (SELECT SUM(mas.`bet`) FROM machine_audit_summaries mas WHERE mas.machine_id = m.id AND mas.date = DATE(pcl.created_at)) as `bet`,
-            (SELECT SUM(mas.`in` - mas.`out`) FROM machine_audit_summaries mas WHERE mas.machine_id = m.id AND mas.date = DATE(pcl.created_at)) as `ggr`
+            mg.name as joc
         FROM player_card_logs pcl
         JOIN machines m ON m.id = JSON_UNQUOTE(JSON_EXTRACT(pcl.params, '$.machine_id'))
         LEFT JOIN machine_types mt ON m.machine_type_id = mt.id
         LEFT JOIN machine_manufacturers mm ON mt.manufacturer_id = mm.id
+        LEFT JOIN machine_games mg ON mg.id = (
+            SELECT rta.machine_game_id FROM machine_real_time_activities rta 
+            WHERE rta.machine_id = m.id ORDER BY rta.updated_at DESC LIMIT 1
+        )
         LEFT JOIN locations l ON pcl.location_id = l.id
         WHERE pcl.player_id = %s AND pcl.log_type = 2
+        {date_filter}
         ORDER BY pcl.created_at DESC
         LIMIT 100
-    ''', [pid])
+    ''', date_params)
     
+    # For each session, get IN/BET/GGR from per-hour table for that machine on that hour (+1h)
+    result_sessions = []
     for s in sessions:
-        if s.get('created_at'):
-            s['created_at'] = str(s['created_at'])
-            
+        machine_id = s['machine_id']
+        created_at = s['created_at']
+        session_date = created_at.date() if hasattr(created_at, 'date') else created_at
+        session_hour = created_at.hour if hasattr(created_at, 'hour') else 0
+        
+        # Get per-hour data for the session's hour window (session hour + next hour)
+        hour_data = qry('''
+            SELECT SUM(`in`) as s_in, SUM(`out`) as s_out, SUM(bet) as s_bet
+            FROM machine_audit_summary_per_hours
+            WHERE machine_id = %s
+              AND DATE(date) = %s
+              AND HOUR(date) BETWEEN %s AND %s
+        ''', [machine_id, str(session_date), session_hour, min(session_hour + 1, 23)])
+        
+        hd = hour_data[0] if hour_data else {}
+        s_in  = float(hd.get('s_in')  or 0)
+        s_out = float(hd.get('s_out') or 0)
+        s_bet = float(hd.get('s_bet') or 0)
+        
+        row = {
+            'created_at': str(created_at),
+            'locatie':    s['locatie'],
+            'serial_nr':  s['serial_nr'],
+            'producator': s['producator'],
+            'mix':        s['mix'],
+            'joc':        s['joc'],
+            'in':  round(s_in, 2),
+            'out': round(s_out, 2),
+            'bet': round(s_bet, 2),
+            'ggr': round(s_in - s_out, 2),
+        }
+        result_sessions.append(row)
+        
     return jsonify({
         'player': player,
-        'sessions': sessions
+        'sessions': result_sessions
     })
 
 @app.route('/api/players')
