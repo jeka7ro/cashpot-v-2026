@@ -1395,11 +1395,14 @@ def api_player_details(pid):
             pcl.created_at, 
             REPLACE(COALESCE(l.display_code, l.code), ' E.S', '') as locatie,
             m.slot_machine_id as serial_nr,
+            mt.manufacturer as producator,
+            mt.name as mix,
             (SELECT SUM(mas.`in`) FROM machine_audit_summaries mas WHERE mas.machine_id = m.id AND mas.date = DATE(pcl.created_at)) as `in`,
             (SELECT SUM(mas.`out`) FROM machine_audit_summaries mas WHERE mas.machine_id = m.id AND mas.date = DATE(pcl.created_at)) as `out`,
             (SELECT SUM(mas.`in` - mas.`out`) FROM machine_audit_summaries mas WHERE mas.machine_id = m.id AND mas.date = DATE(pcl.created_at)) as `ggr`
         FROM player_card_logs pcl
         JOIN machines m ON m.id = JSON_UNQUOTE(JSON_EXTRACT(pcl.params, '$.machine_id'))
+        LEFT JOIN machine_types mt ON m.machine_type_id = mt.id
         LEFT JOIN locations l ON pcl.location_id = l.id
         WHERE pcl.player_id = %s AND pcl.log_type = 2
         ORDER BY pcl.created_at DESC

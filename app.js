@@ -1298,7 +1298,14 @@ window.addEventListener('hashchange', () => {
       
       if (subHash === 'ore') loadHourlyReport();
       else if (subHash === 'hh') loadHhReport();
-      else if (subHash === 'clienti') loadClientiReport();
+      else if (subHash === 'clienti') {
+        if (parts[2]) {
+          _renderPlayerDetails(parts[2]);
+        } else {
+          if(window.closePlayerDashboard_UI) window.closePlayerDashboard_UI();
+          loadClientiReport();
+        }
+      }
       else if (subHash === 'multigame') loadMultigameReport();
       else if (subHash === 'cashout') loadRapoarteCashout();
     } else {
@@ -2730,12 +2737,20 @@ window.filterClientiTable = function(q) {
   renderTablePaginated('rep-clienti');
 };
 
-window.closePlayerDashboard = function() {
+window.closePlayerDashboard_UI = function() {
   document.getElementById('player-dashboard-view').style.display = 'none';
   document.getElementById('clienti-main-view').style.display = 'block';
 };
 
-window.openPlayerDetails = async function(pid) {
+window.closePlayerDashboard = function() {
+  window.location.hash = 'rapoarte/clienti';
+};
+
+window.openPlayerDetails = function(pid) {
+  window.location.hash = 'rapoarte/clienti/' + pid;
+};
+
+window._renderPlayerDetails = async function(pid) {
   document.getElementById('clienti-main-view').style.display = 'none';
   const pd = document.getElementById('player-dashboard-view');
   pd.style.display = 'block';
@@ -2759,18 +2774,26 @@ window.openPlayerDetails = async function(pid) {
     // History Table
     const tb = document.getElementById('pd-history-body');
     if (res.sessions.length === 0) {
-      tb.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--muted);">Nicio sesiune recentă de joc.</td></tr>';
+      tb.innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--muted);">Nicio sesiune recentă de joc.</td></tr>';
     } else {
-      tb.innerHTML = res.sessions.map(s => `
+      tb.innerHTML = res.sessions.map((s, idx) => {
+        const mixName = s.mix ? s.mix.substring(0,25) : 'Mix Necunoscut';
+        const prod = s.producator ? s.producator.substring(0,10) : '';
+        return `
         <tr style="border-bottom:1px solid var(--border);" onmouseenter="this.style.background='var(--surface2)'" onmouseleave="this.style.background=''">
+          <td style="padding:10px 16px;"><input type="checkbox" class="row-checkbox"></td>
+          <td style="padding:10px 16px;">${idx+1}</td>
           <td style="padding:10px 16px;">${s.created_at.substring(0,16)}</td>
           <td style="padding:10px 16px;">${s.locatie || '—'}</td>
-          <td style="padding:10px 16px;">${s.serial_nr || '—'}</td>
-          <td style="padding:10px 16px; text-align:right;">${fmt(s.in)}</td>
+          <td style="padding:10px 16px;">
+            <div style="font-weight:700; color:var(--text);">${s.serial_nr || '—'}</div>
+            <div style="font-size:10px; color:var(--muted);">${prod} ${mixName}</div>
+          </td>
+          <td style="padding:10px 16px; text-align:right; font-weight:700; color:var(--success);">${fmt(s.in)}</td>
           <td style="padding:10px 16px; text-align:right;">${fmt(s.out)}</td>
           <td style="padding:10px 16px; text-align:right; font-weight:800; color:${s.ggr < 0 ? 'var(--danger)' : 'var(--success)'}">${fmt(s.ggr)}</td>
         </tr>
-      `).join('');
+      `}).join('');
     }
     
     // Charts Data
@@ -2781,7 +2804,8 @@ window.openPlayerDetails = async function(pid) {
     
     res.sessions.forEach(s => {
       const ggr = s.ggr || 0;
-      const mach = s.serial_nr || 'Necunoscut';
+      const prodMix = (s.producator || '') + ' ' + (s.mix || '');
+      const mach = prodMix.trim().length > 2 ? `${prodMix.trim()} (SN: ${s.serial_nr})` : (s.serial_nr || 'Necunoscut');
       if (!machStats[mach]) machStats[mach] = 0;
       machStats[mach] += Math.abs(ggr) + (s.in || 0); // activity metric
       
