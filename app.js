@@ -81,7 +81,10 @@ function renderTablePaginated(key) {
   const pgWrap = document.getElementById('pg-' + key);
   
   // Attach sort listeners to TH elements if not already done
-  const thead = document.querySelector(`table:has(#body-${key}) thead`);
+  let thead = null;
+  if (tbody && tbody.closest('table')) {
+    thead = tbody.closest('table').querySelector('thead');
+  }
   if (thead && !thead.dataset.sortAttached) {
     thead.querySelectorAll('th').forEach((th, idx) => {
       th.style.cursor = 'pointer';
@@ -165,7 +168,8 @@ function renderTablePaginated(key) {
 }
 
 window.exportToExcel = function(key) {
-  const table = document.querySelector(`table:has(#body-${key})`);
+  const tbody = document.getElementById('body-' + key);
+  const table = tbody ? tbody.closest('table') : null;
   if (!table) return;
   // Clone table to remove ignore elements or change them before export if needed
   const wb = XLSX.utils.table_to_book(table, { sheet: "Data" });
@@ -185,8 +189,11 @@ window.sortTable = function(key, colIndex, th) {
   }
   
   // Update visual indicators
-  const thead = document.querySelector(`table:has(#body-${key}) thead`);
-  thead.querySelectorAll('th').forEach(t => t.textContent = t.textContent.replace(/ [▼▲]$/, ''));
+  const tbody = document.getElementById('body-' + key);
+  const thead = tbody && tbody.closest('table') ? tbody.closest('table').querySelector('thead') : null;
+  if(thead) {
+    thead.querySelectorAll('th').forEach(t => t.textContent = t.textContent.replace(/ [▼▲]$/, ''));
+  }
   th.textContent += st.sortDir === 'desc' ? ' ▼' : ' ▲';
   
   st.page = 1;
