@@ -498,7 +498,9 @@ function renderMonthCalendar(){
         htmlTip += `</table>`;
       }
       htmlTip += `<div style="margin-top:12px;"><button class="btn" style="width:100%; justify-content:center; padding:6px; font-size:11px; background:var(--accent); color:#fff; border:none; border-radius:6px; cursor:pointer;" onclick="window.openDayAnalysis('${k}');">📈 Vezi Analiza Zilei</button></div>`;
-      cell.addEventListener('mouseenter', (e) => {
+      let _ttHideTimer = null;
+      const _showTooltip = () => {
+        clearTimeout(_ttHideTimer);
         let tt = document.getElementById('global-tooltip');
         if (!tt) { tt = document.createElement('div'); tt.id = 'global-tooltip'; tt.className = 'custom-tooltip'; document.body.appendChild(tt); }
         tt.innerHTML = htmlTip;
@@ -509,8 +511,13 @@ function renderMonthCalendar(){
         if (left + 280 > window.innerWidth) left = window.innerWidth - 290;
         if (left < 10) left = 10;
         tt.style.left = left + 'px'; tt.style.top = top + 'px';
-      });
-      cell.addEventListener('mouseleave', () => { const tt = document.getElementById('global-tooltip'); if (tt) tt.style.display = 'none'; });
+        // Allow hovering over the tooltip itself without it disappearing
+        tt.onmouseenter = () => clearTimeout(_ttHideTimer);
+        tt.onmouseleave = () => { _ttHideTimer = setTimeout(() => { tt.style.display = 'none'; }, 100); };
+      };
+      const _hideTooltip = () => { _ttHideTimer = setTimeout(() => { const tt = document.getElementById('global-tooltip'); if (tt) tt.style.display = 'none'; }, 150); };
+      cell.addEventListener('mouseenter', _showTooltip);
+      cell.addEventListener('mouseleave', _hideTooltip);
     } else {
       cell.innerHTML=`<div class="cal-day-num">${d}</div>`;
       cell.style.cursor='pointer';
@@ -1954,6 +1961,7 @@ let daHourlyChart = null, daHhPie = null, daMachinesChart = null;
 let _daPrevView = '#dashboard';
 
 function closeDayAnalysisPage() {
+  const tp = document.querySelector('.timeline-presets'); if (tp) tp.style.display = '';
   document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
   // Restore previously active nav item
   document.querySelectorAll('.nav-item').forEach(a => a.classList.remove('active'));
@@ -2151,9 +2159,10 @@ window.openDayAnalysis = async function(dateStr) {
   _daPrevView = window.location.hash || '#dashboard';
   showLoader(true);
   try {
-    const [hourly, machines] = await Promise.all([
+    const [hourly, machines, smart] = await Promise.all([
       api(`/api/daily?res=hour&start=${dateStr}&end=${dateStr}${locParam()}`),
-      api(`/api/machines?start=${dateStr}&end=${dateStr}${locParam()}&provider_id=&cabinet_id=`)
+      api(`/api/machines?start=${dateStr}&end=${dateStr}${locParam()}&provider_id=&cabinet_id=`),
+      api(`/api/reports/day_smart?start=${dateStr}&end=${dateStr}${locParam()}`)
     ]);
 
     // ── Totale ──────────────────────────────────────────────────────────
@@ -2176,7 +2185,7 @@ window.openDayAnalysis = async function(dateStr) {
     const topWinners = machines.slice(0,5);
     const topLosers  = [...machines].reverse().slice(0,5);
 
-    // ── Switch to page view ──────────────────────────────────────────────
+    const tp = document.querySelector('.timeline-presets'); if (tp) tp.style.display = 'none';
     document.querySelectorAll('.view-panel').forEach(p=>p.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(a=>a.classList.remove('active'));
     document.getElementById('view-day-analysis').classList.add('active');
@@ -2197,6 +2206,32 @@ window.openDayAnalysis = async function(dateStr) {
         <div style="font-size:18px;font-weight:800;color:${k.color};line-height:1.2">${k.val}</div>
         ${k.sub?`<div style="font-size:10px;color:var(--muted);margin-top:3px">${k.sub}</div>`:''}
       </div>`).join('');
+
+    // ── Smart Client Stats ──────────────────────────────────────────────
+    let smartHtml = `
+      <div style="background:linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(139,92,246,0.1) 100%); border:1px solid rgba(139,92,246,0.3); border-radius:var(--radius); padding:20px; margin-bottom:24px; display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <div style="font-size:11px; font-weight:800; color:#8b5cf6; text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px;">✨ Smart Client Insights</div>
+          <div style="font-size:13px; color:var(--text); max-width:400px; line-height:1.4;">
+            Activitate loialitate: <strong>${smart.card_players}</strong> clienți cu card unici au jucat azi.
+          </div>
+        </div>
+        <div style="display:flex; gap:16px; text-align:right;">
+          <div><div style="font-size:10px; color:var(--muted); text-transform:uppercase;">Cashback Oferit</div><div style="font-size:16px; font-weight:800; color:var(--text);">${fmt(smart.cashback)} RON</div></div>
+          <div><div style="font-size:10px; color:var(--muted); text-transform:uppercase;">Câștig Roată</div><div style="font-size:16px; font-weight:800; color:var(--orange);">${fmt(smart.wheel)} RON</div></div>
+          <div><div style="font-size:10px; color:var(--muted); text-transform:uppercase;">Jackpoturi (Card)</div><div style="font-size:16px; font-weight:800; color:var(--green);">${fmt(smart.jackpots)} RON</div></div>
+        </div>
+      </div>
+    `;
+    
+    // Add it after KPI row
+    const kpiRow = document.getElementById('da-kpi-row');
+    if (!document.getElementById('da-smart-row')) {
+      const el = document.createElement('div');
+      el.id = 'da-smart-row';
+      kpiRow.parentNode.insertBefore(el, kpiRow.nextSibling);
+    }
+    document.getElementById('da-smart-row').innerHTML = smartHtml;
 
     // ── Verdict ─────────────────────────────────────────────────────────
     let verdictColor, verdictTitle, verdictText, maxHhSection='';
