@@ -496,7 +496,6 @@ def machines():
             mt.name                        AS mix,
             COALESCE(mct.name,'—')         AS cabinet,
             mas.machine_id                 AS id,
-            m.last_game_id                 AS game_id,
             COALESCE(l.display_code,l.code)AS locatie,
             mt.name                        AS tip_slot,
             COALESCE(NULLIF(mm.name,''), NULLIF(mt.manufacturer,''), 'Necunoscut') AS provider,

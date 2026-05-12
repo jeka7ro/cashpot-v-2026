@@ -477,7 +477,8 @@ function renderMonthCalendar(){
       let inColor = inPct >= 0 ? 'var(--success)' : 'var(--danger)';
       
       cell.innerHTML=`<div class="cal-day-num">${d}</div><div class="cal-day-val">${fmtK(ggr)}</div>`+
-        `<div class="cal-day-metrics">IN: ${fmtK(row.tin)} <span style="color:${inColor}; font-size:9px;">${inArr}${Math.abs(inPct).toFixed(1)}%</span><br>BET:${fmtK(row.bet)} &bull; HH:${fmtK(row.hh)}</div>`;
+        `<div class="cal-day-metrics">IN: ${fmtK(row.tin)} <span style="color:${inColor}; font-size:9px;">${inArr}${Math.abs(inPct).toFixed(1)}%</span><br>BET:${fmtK(row.bet)} &bull; HH:${fmtK(row.hh)}</div>`+
+        `<div class="cal-analyze-btn" title="Vezi Analiza Zilei" onclick="event.stopPropagation(); window.openDayAnalysis('${k}');">📈</div>`;
       
       let htmlTip = `
         <div class="tt-header">${k}</div>
@@ -496,7 +497,7 @@ function renderMonthCalendar(){
         });
         htmlTip += `</table>`;
       }
-      htmlTip += `<div style="margin-top:12px;"><button class="btn" style="width:100%; justify-content:center; padding:6px; font-size:11px; background:var(--accent); color:#fff; border:none; border-radius:6px; cursor:pointer;" onclick="document.getElementById('native-date-start').value='${k}'; document.getElementById('native-date-end').value='${k}'; document.getElementById('date-start').value='${k}'; document.getElementById('date-end').value='${k}'; document.getElementById('tl-range-display').textContent='${k} ➔ ${k}'; window.location.hash='analize';">📈 Vezi Analiza Zilei</button></div>`;
+      htmlTip += `<div style="margin-top:12px;"><button class="btn" style="width:100%; justify-content:center; padding:6px; font-size:11px; background:var(--accent); color:#fff; border:none; border-radius:6px; cursor:pointer;" onclick="window.openDayAnalysis('${k}');">📈 Vezi Analiza Zilei</button></div>`;
       cell.addEventListener('mouseenter', (e) => {
         let tt = document.getElementById('global-tooltip');
         if (!tt) { tt = document.createElement('div'); tt.id = 'global-tooltip'; tt.className = 'custom-tooltip'; document.body.appendChild(tt); }
