@@ -2,7 +2,7 @@ const API='http://localhost:5050';
 let trendChart=null,pieChart=null,barChart=null,cabChart=null;
 let filtersData={},dailyData={},calViewDate=new Date();
 let EUR_RATE=5.0;
-const CHART_COLORS=['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#14b8a6','#eab308','#ec4899','#64748b','#f97316'];
+const CHART_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#0ea5e9', '#d946ef'];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function fmt(v,d=0){if(v==null)return'—';const n=parseFloat(v);if(isNaN(n))return v;return new Intl.NumberFormat('ro-RO',{minimumFractionDigits:d,maximumFractionDigits:d}).format(n);}
@@ -28,21 +28,36 @@ function getProviderLogo(name) {
 }
 function bar(v,max){const w=Math.min(100,max?(Math.abs(v)/max)*100:0);const bg=v<0?'var(--red)':'var(--accent)';return`<div class="pct-bar" style="justify-content:flex-end"><div class="bar-track"><div class="bar-fill" style="width:${w}%;background:${bg}"></div></div></div>`;}
 
-// CDN Thumbnail helper — strips common suffixes and prefixes, converts spaces to underscores
-function gameThumbUrl(name) {
-  if (!name) return '';
-  let n = name.trim();
-  // Strip "BL " prefix (Bell Link)
-  if (n.startsWith('BL ')) n = n.substring(3);
-  // Strip common suffixes
-  const suffixes = [' Bell Link', ' Bell link', ' Progressive Jackpot', ' Cash H', ' Extreme Bell Link', ' Extreme', ' Cash', ' Plus'];
-  suffixes.forEach(s => {
-    if (n.toLowerCase().endsWith(s.toLowerCase())) {
-      n = n.substring(0, n.length - s.length);
+function gameThumbUrl(name, id) {
+  if (id && String(id).length > 20) {
+    // Standard UUID based image path from CDN
+    return `https://cdn.cashpot.ro/cashpot/t1/thumbnail_games/${id}.png`;
+  }
+  
+  // Try to lookup UUID by name
+  if (name && typeof GAME_UUIDS !== 'undefined') {
+    if (GAME_UUIDS[name]) return `https://cdn.cashpot.ro/cashpot/t1/thumbnail_games/${GAME_UUIDS[name]}.png`;
+    
+    // Fallback: the database sometimes returns duplicated/corrupted names like "20 Super Hot20 Super Hot" or "100 Burning Ho100 Burning Hot".
+    // Find the longest official game name that is contained within the corrupted text.
+    let longestMatch = null;
+    for (let key in GAME_UUIDS) {
+      if (name.includes(key) || key.includes(name)) {
+        if (!longestMatch || key.length > longestMatch.length) longestMatch = key;
+      }
     }
-  });
-  const fname = n.trim().replace(/\s+/g, '_');
-  return `https://cdn.cashpot.ro/cashpot/t1/thumbnail_games/${fname}.jpg`;
+    if (longestMatch && GAME_UUIDS[longestMatch]) {
+      return `https://cdn.cashpot.ro/cashpot/t1/thumbnail_games/${GAME_UUIDS[longestMatch]}.png`;
+    }
+  }
+
+  if (!name) return 'https://cdn.cashpot.ro/cashpot/t1/thumbnail_games/placeholder.png';
+  
+  let slug = name.toLowerCase()
+    .replace(/[^a-z0-9]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  return `https://cdn.cashpot.ro/cashpot/t1/thumbnail_games/${slug}.png`;
 }
 
 // Top 10 Games card loader for dashboard
@@ -56,25 +71,25 @@ async function loadTop10Games() {
     const top10 = data.slice(0, 10);
     const maxBet = Math.max(...top10.map(r => r.bet || 0));
     el.innerHTML = top10.map((r, i) => {
-      const thumb = gameThumbUrl(r.game);
-      const ggrC = (r.ggr || 0) >= 0 ? 'var(--green)' : 'var(--red)';
+      const thumb = gameThumbUrl(r.game, r.game_id);
+      const isNeg = (r.ggr || 0) < 0;
+      const ggrC = isNeg ? '#ef4444' : '#10b981';
       const barW = maxBet > 0 ? Math.round((r.bet || 0) / maxBet * 100) : 0;
       return `
-        <div style="display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid var(--border);"
-          onmouseenter="this.style.background='var(--surface2)'" onmouseleave="this.style.background=''">
-          <div style="font-size:10px;font-weight:700;color:var(--muted);width:18px;text-align:right">${i+1}</div>
-          <img src="${thumb}" referrerpolicy="no-referrer" alt="" loading="lazy"
-            style="width:40px;height:40px;object-fit:cover;border-radius:8px;flex-shrink:0;background:var(--surface2);"
-            onerror="this.style.background='var(--surface2)';this.style.opacity='0.3'">
-          <div style="flex:1;min-width:0;">
-            <div style="font-weight:700;font-size:11px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;text-decoration:underline;text-decoration-style:dotted;" onclick="openGameDetails('${(r.game||'').replace(/'/g,"\\'")}')">${r.game}</div>
-            <div style="height:3px;background:var(--border);border-radius:2px;margin-top:4px;overflow:hidden">
-              <div style="width:${barW}%;height:100%;background:var(--accent);border-radius:2px;transition:width .4s"></div>
-            </div>
+        <div style="flex-shrink:0; width:280px; height:120px; display:flex; align-items:center; gap:12px; padding:10px; border-radius:12px; background:var(--surface2); border:1px solid rgba(255,255,255,0.05); scroll-snap-align: start; cursor:pointer;" onclick="openGameDetails('${(cleanGameName(r.game)||'').replace(/'/g,"\\'")}', '${r.game_id||''}')">
+          <div style="position:relative; height:100px; width:100px; flex-shrink:0;">
+            <img src="${thumb}" referrerpolicy="no-referrer" alt="" loading="lazy"
+              style="width:100%; height:100%; object-fit:contain; border-radius:8px; background:var(--surface); border:1px solid rgba(255,255,255,0.1);"
+              onerror="this.src='https://cdn.cashpot.ro/cashpot/t1/thumbnail_games/placeholder.png'; this.style.opacity='0.3'">
           </div>
-          <div style="text-align:right;flex-shrink:0;">
-            <div style="font-size:10px;color:var(--muted)">${r.aparate} ap.</div>
-            <div style="font-size:11px;font-weight:700;color:${ggrC}">${fmt(r.ggr)} RON</div>
+          <div style="flex:1; min-width:0; display:flex; flex-direction:column; justify-content:space-between; height:100%; padding:2px 0;">
+            <div style="font-size:10px; color:var(--muted); font-weight:600; display:flex; justify-content:space-between;">
+              <span>LOCUL ${i+1}</span>
+              <span style="color:${ggrC};" title="GGR">GGR: ${fmt(r.ggr)}</span>
+            </div>
+            <div style="font-size:13px; font-weight:800; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${cleanGameName(r.game)}">${cleanGameName(r.game) || 'Necunoscut'}</div>
+            <div style="font-size:10px; color:var(--muted);"><i class="fas fa-desktop"></i> ${r.aparate} aparate</div>
+            <div style="font-size:14px; font-weight:900; color:var(--yellow);">${fmt(r.bet)} <span style="font-size:10px;">RON BET</span></div>
           </div>
         </div>`;
     }).join('');
@@ -90,7 +105,7 @@ function renderTop3Avatars(data) {
   
   const top3 = data.slice(0, 3);
   el.innerHTML = top3.map((r, i) => {
-    const thumb = gameThumbUrl(r.game);
+    const thumb = gameThumbUrl(r.game, r.game_id);
     const color = i === 0 ? '#eab308' : i === 1 ? '#cbd5e1' : '#cd7f32'; // Gold, Silver, Bronze
     return `
       <div class="kpi-card" style="flex:1; display:flex; align-items:center; gap:16px; padding:16px; min-width:240px; position:relative; overflow:hidden;">
@@ -100,7 +115,7 @@ function renderTop3Avatars(data) {
           onerror="this.style.opacity='0.3'">
         <div style="flex:1; min-width:0;">
           <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">Top ${i+1} Performer</div>
-          <div style="font-size:14px; font-weight:800; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:4px; cursor:pointer; text-decoration:underline;" onclick="openGameDetails('${(r.game||'').replace(/'/g,"\\'")}')">${r.game}</div>
+          <div style="font-size:14px; font-weight:800; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:4px; cursor:pointer; text-decoration:underline;" onclick="openGameDetails('${(cleanGameName(r.game)||'').replace(/'/g,"\\'")}', '${r.game_id||''}')">${cleanGameName(r.game)}</div>
           <div style="display:flex; gap:12px; align-items:baseline;">
             <span style="font-size:12px; font-weight:700; color:var(--accent);">${fmt(r.ggr)} RON</span>
             <span style="font-size:10px; color:var(--muted);">${r.aparate} aparate</span>
@@ -111,6 +126,14 @@ function renderTop3Avatars(data) {
 }
 
 function cellCls(v,max){if(!max)return'';const p=v/max;if(v<0)return p<-0.6?'cell-neg-3':p<-0.3?'cell-neg-2':'cell-neg-1';return p>0.7?'cell-pos-3':p>0.35?'cell-pos-2':p>0.1?'cell-pos-1':'';}
+function cleanGameName(name) {
+  if (!name) return name;
+  if (name.length % 2 === 0) {
+    const half = name.length / 2;
+    if (name.substring(0, half) === name.substring(half)) return name.substring(0, half);
+  }
+  return name;
+}
 function showLoader(v){document.getElementById('loader').classList.toggle('show',v);}
 function round2(v){return Math.round(v*100)/100;}
 function getExcluded(){try{return JSON.parse(localStorage.getItem('excluded_locs')||'[]');}catch{return[];}}
@@ -346,12 +369,51 @@ function autoSetTrend() {
 
 document.querySelectorAll('.preset-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
+    if (btn.tagName === 'SELECT') return;
     document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+    const sel = document.getElementById('preset-month-select');
+    if(sel) sel.value = '';
     btn.classList.add('active');applyPreset(btn.dataset.preset);
     autoSetTrend();
-    loadAll();
+    reloadCurrentView();
   });
 });
+
+window.selectPresetMonth = function(val) {
+  if(!val) return;
+  document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('preset-month-select').classList.add('active');
+  const [y, m] = val.split('-');
+  const s = new Date(y, m, 1);
+  const e = new Date(y, parseInt(m)+1, 0);
+  const today = new Date();
+  const end = e > today ? today : e;
+  
+  const yMd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  document.getElementById('native-date-start').value=yMd(s);
+  document.getElementById('native-date-end').value=yMd(end);
+  document.getElementById('date-start').value=yMd(s);
+  document.getElementById('date-end').value=yMd(end);
+  document.getElementById('tl-range-display').textContent=`${yMd(s)} ➔ ${yMd(end)}`;
+  
+  autoSetTrend();
+  reloadCurrentView();
+};
+
+function populateMonthDropdown() {
+  const sel = document.getElementById('preset-month-select');
+  if (!sel) return;
+  const today = new Date();
+  const MO_RO=['Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie'];
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+    const opt = document.createElement('option');
+    opt.value = `${d.getFullYear()}-${d.getMonth()}`;
+    opt.textContent = `${MO_RO[d.getMonth()]} ${d.getFullYear()}`;
+    sel.appendChild(opt);
+  }
+}
+populateMonthDropdown();
 
 ['native-date-start','native-date-end'].forEach(id=>{
   document.getElementById(id).addEventListener('change', ()=>{
@@ -363,7 +425,7 @@ document.querySelectorAll('.preset-btn').forEach(btn=>{
       document.getElementById('date-end').value = e;
       document.getElementById('tl-range-display').textContent=`${s} ➔ ${e}`;
       autoSetTrend();
-      loadAll();
+      reloadCurrentView();
     }
   });
 });
@@ -408,7 +470,7 @@ function renderMonthCalendar(){
         document.getElementById('date-end').value = k;
         document.getElementById('tl-range-display').textContent=`${k} ➔ ${k}`;
         autoSetTrend();
-        loadAll();
+        reloadCurrentView();
       };
       let inPct = countIn > 0 && row.tin > 0 ? ((row.tin / avgIn) - 1) * 100 : 0;
       let inArr = inPct >= 0 ? '↑' : '↓';
@@ -434,6 +496,7 @@ function renderMonthCalendar(){
         });
         htmlTip += `</table>`;
       }
+      htmlTip += `<div style="margin-top:12px;"><button class="btn" style="width:100%; justify-content:center; padding:6px; font-size:11px; background:var(--accent); color:#fff; border:none; border-radius:6px; cursor:pointer;" onclick="document.getElementById('native-date-start').value='${k}'; document.getElementById('native-date-end').value='${k}'; document.getElementById('date-start').value='${k}'; document.getElementById('date-end').value='${k}'; document.getElementById('tl-range-display').textContent='${k} ➔ ${k}'; window.location.hash='analize';">📈 Vezi Analiza Zilei</button></div>`;
       cell.addEventListener('mouseenter', (e) => {
         let tt = document.getElementById('global-tooltip');
         if (!tt) { tt = document.createElement('div'); tt.id = 'global-tooltip'; tt.className = 'custom-tooltip'; document.body.appendChild(tt); }
@@ -912,7 +975,7 @@ async function loadLocations(s,e){
       <td class="num">${fmt(r.total_in)}${inB}</td>
       <td class="num ${cc}">${fmt(r.ggr)}${ggrB}</td>
       <td class="num">${fmtE(r.ggr)}</td>
-      <td class="num">${fmt(r.jackpot)}</td><td class="num">${fmt(r.hh)}</td><td class="num">${fmt(r.cashback)}</td><td class="num">${fmt(r.roata||0)}</td>
+      <td class="num">${fmt(r.jackpot)}</td><td class="num">${fmt(r.hh)}</td><td class="num">${fmt(r.cashback)}</td><td class="num">${fmt(r.roata||0)}</td><td class="num" style="color:var(--blue)">${fmt(r.raffles||0)}</td>
       <td class="num">${fmt(r.games)}</td><td class="num">${pill(r.hold_pct)}</td><td class="num">${bonusCost(r.bonus_cost_pct||0)}</td>
     </tr>`;
   });
@@ -935,6 +998,7 @@ async function loadLocations(s,e){
   const avgBonusCost=tBet>0?round2(tMkt/tBet*100):0;
   const totalBuc = data.reduce((sum, r) => sum + (+r.buc||0), 0);
   const tRoata = data.reduce((sum, r) => sum + (+r.roata||0), 0);
+  const tRaffles = data.reduce((sum, r) => sum + (+r.raffles||0), 0);
   
   const elCard = document.getElementById('v-clienti-card');
   const elTot = document.getElementById('v-clienti-total');
@@ -962,6 +1026,7 @@ async function loadLocations(s,e){
     <td class="num">${fmt(tHh)}</td>
     <td class="num">${fmt(tCb)}</td>
     <td class="num">${fmt(tRoata)}</td>
+    <td class="num" style="color:var(--blue)">${fmt(tRaffles)}</td>
     <td class="num">${fmt(tGm)}</td>
     <td class="num">${pill(avgHold)}</td>
     <td class="num">${bonusCost(avgBonusCost)}</td>
@@ -1025,7 +1090,7 @@ async function loadProviders(s,e){
       <td class="num">${fmt(r.total_in)}${inB}</td>
       <td class="num ${cc}">${fmt(r.ggr)}${ggrB}</td>
       <td class="num">${fmtE(r.ggr)}</td>
-      <td class="num">${fmt(r.jackpot)}</td><td class="num">${fmt(r.cashback)}</td><td class="num">${fmt(r.roata||0)}</td>
+      <td class="num">${fmt(r.jackpot)}</td><td class="num">${fmt(r.cashback)}</td><td class="num">${fmt(r.roata||0)}</td><td class="num" style="color:var(--blue)">${fmt(r.raffles||0)}</td>
       <td class="num">${fmt(r.games)}</td><td class="num">${pill(r.hold_pct)}</td><td class="num">${bonusCost(r.bonus_cost_pct||0)}</td>
     </tr>`;
   });
@@ -1174,7 +1239,7 @@ async function loadMachines(){
       const currE = currExclData.find(x => x.serial_nr === r.serial_nr);
       const inB = c ? tBadge(currE?.total_in, prev?.total_in) : '';
       const ggrB = c ? tBadge(currE?.ggr, prev?.ggr) : '';
-      const thumb = gameThumbUrl(r.last_game_name || r.game_name);
+      const thumb = gameThumbUrl(r.last_game_name || r.game_name, r.game_id);
       return`<tr>
         <td>${i+1}</td>
         <td>
@@ -1214,9 +1279,13 @@ async function loadAll(){
       const hh  = document.getElementById('rep-page-hh');
       const mg  = document.getElementById('rep-page-multigame');
       const cl  = document.getElementById('rep-page-clienti');
+      const mkt = document.getElementById('rep-page-marketing');
+      const co  = document.getElementById('rep-page-cashout');
       if (hh  && hh.style.display !== 'none' && hh.style.display !== '')  loadHhReport();
       else if (mg  && mg.style.display  !== 'none' && mg.style.display  !== '') loadMultigame();
       else if (cl  && cl.style.display  !== 'none' && cl.style.display  !== '') loadClientiReport();
+      else if (mkt && mkt.style.display !== 'none' && mkt.style.display !== '') loadMarketingReport();
+      else if (co  && co.style.display  !== 'none' && co.style.display  !== '') loadCashoutReport();
       else loadHourlyReport();
     }
     if (document.getElementById('view-live')?.classList.contains('active')) {
@@ -1256,18 +1325,22 @@ async function loadDashboardLiveCard() {
           const c = p.credite_ron || 0;
           const bet = p.bet_ron || 0;
           const est_in_str = (p.est_in !== undefined) ? fmt(p.est_in) : '—';
+          const thumbUrl = gameThumbUrl(p.joc_activ, p.game_id);
           html += `
-            <div style="border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:8px; cursor:pointer;" onclick="openPlayerDetails(${p.player_id_live||''})">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                <strong style="font-size:12px; color:var(--accent); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${i+1}. ${n}</strong>
-                <strong style="color:${c < 0 ? 'var(--danger)' : 'var(--blue)'}; font-size:12px; white-space:nowrap;">${fmt(c)} <span style="font-size:9px">RON</span></strong>
-              </div>
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; font-size:10px;">
-                <span style="color:var(--muted);">${p.locatie} &bull; Bet: <span style="color:var(--orange)">${fmt(bet)}</span></span>
-                <span style="color:#10b981; font-weight:700;">Est. IN: ${est_in_str}</span>
-              </div>
-              <div style="font-size:10px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                <strong style="color:var(--text);">#${p.pozitie || p.machine_id || '—'}</strong> (SN: ${p.serial_nr || '—'}) &bull; <span style="cursor:pointer; text-decoration:underline; text-decoration-style:dotted;" onclick="event.stopPropagation(); openGameDetails('${(p.joc_activ||'').replace(/'/g,"\\'")}')">${p.joc_activ || 'Necunoscut'}</span>
+            <div style="border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:8px; cursor:pointer; display:flex; align-items:center; gap:12px;" onclick="openPlayerDetails(${p.player_id_live||''})">
+              <img src="${thumbUrl}" style="width:40px; height:40px; border-radius:8px; object-fit:cover; border:1px solid rgba(255,255,255,0.1); background:var(--surface2);" onerror="this.src='https://cdn.cashpot.ro/cashpot/t1/thumbnail_games/placeholder.png'; this.style.opacity='0.3'" alt="">
+              <div style="flex:1; min-width:0;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+                  <strong style="font-size:12px; color:var(--accent); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${i+1}. ${n}</strong>
+                  <strong style="color:${c < 0 ? 'var(--danger)' : 'var(--blue)'}; font-size:12px; white-space:nowrap;">${fmt(c)} <span style="font-size:9px">RON</span></strong>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px; font-size:10px;">
+                  <span style="color:var(--muted);">${p.locatie} &bull; Bet: <span style="color:var(--orange)">${fmt(bet)}</span></span>
+                  <span style="color:#10b981; font-weight:700;">Est. IN: ${est_in_str}</span>
+                </div>
+                <div style="font-size:10px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                  <strong style="color:var(--text);">#${p.pozitie || p.machine_id || '—'}</strong> (SN: ${p.serial_nr || '—'}) &bull; <span style="cursor:pointer; color:var(--text); text-decoration:underline; text-decoration-style:dotted;" onclick="event.stopPropagation(); openGameDetails('${(cleanGameName(p.joc_activ)||'').replace(/'/g,"\\'")}', '${p.game_id||''}')">${cleanGameName(p.joc_activ) || 'Necunoscut'}</span>
+                </div>
               </div>
             </div>
           `;
@@ -1315,7 +1388,7 @@ async function loadDashboardLiveCard() {
 
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
-(async()=>{
+setTimeout(async () => {
   await checkAuth();
   if (!currentUser) {
     if (window.location.hash.startsWith('#invite/')) {
@@ -1329,7 +1402,7 @@ async function loadDashboardLiveCard() {
   // dispatch AFTER filters+period are ready so hash-specific loaders have data
   window.dispatchEvent(new Event('hashchange'));
   if(window.location.hash === '' || window.location.hash === '#dashboard') await loadAll();
-})();
+}, 0);
 
 const savedTheme = localStorage.getItem('theme') || 'dark';
 document.documentElement.setAttribute('data-theme', savedTheme);
@@ -1349,7 +1422,8 @@ document.getElementById('theme-toggle').addEventListener('click', () => {
 
 // ─── Views & Reports ──────────────────────────────────────────────────────
 window.addEventListener('hashchange', () => {
-  const rawHash = window.location.hash.replace('#', '') || 'dashboard';
+  const fullHash = window.location.hash;
+  const rawHash = (fullHash.split('?')[0]).replace('#', '') || 'dashboard';
   const parts = rawHash.split('/');
   const mainHash = parts[0];
   const subHash = parts[1];
@@ -1438,7 +1512,8 @@ let hourlyLocChart = null;
 
 window.loadHourlyReport = async function() {
   const { s, e } = getPeriod();
-  const locId = document.getElementById('global-loc-select').value;
+  const locEl = document.getElementById('global-loc-select');
+  const locId = locEl ? locEl.value : 'all';
   const provId = document.getElementById('rep-prov-select').value;
   
   let p = `start=${s}&end=${e}`;
@@ -1570,7 +1645,8 @@ let hhScatterChart = null;
 
 window.loadHhReport = async function() {
   const { s, e } = getPeriod();
-  const locId = document.getElementById('global-loc-select').value;
+  const locEl = document.getElementById('global-loc-select');
+  const locId = locEl ? locEl.value : 'all';
   let p = `start=${s}&end=${e}`;
   if(locId !== 'all') p += `&loc_ids=${locId}`;
   else p += locParam();
@@ -1737,6 +1813,12 @@ window.loadHhReport = async function() {
     hhHistData.forEach(r => costTotal += (r.hh_cost || 0));
     const netEfectRon = (inHH - inNoHH) * 0.15 - costTotal; // estimate 15% margin on IN
     
+    document.getElementById('hh-kpi-cost').textContent = fmt(costTotal) + ' RON';
+    
+    const profEl = document.getElementById('hh-kpi-profit');
+    profEl.textContent = fmt(netEfectRon) + ' RON';
+    profEl.className = 'kpi-value ' + (netEfectRon > 0 ? 'cell-pos-3' : (netEfectRon < 0 ? 'cell-neg-2' : ''));
+    
     let insight = '';
     const globalLocEl = document.getElementById('global-loc-select');
     const isGlobal = !globalLocEl || globalLocEl.value === 'all' || globalLocEl.value === '';
@@ -1837,21 +1919,30 @@ window.loadHhReport = async function() {
     });
 
   } catch(err) {
-    console.error('loadHourlyReport error:', err);
-    if(hourlyTrendChart) { hourlyTrendChart.destroy(); hourlyTrendChart = null; }
-    if(hourlyLocChart) { hourlyLocChart.destroy(); hourlyLocChart = null; }
-    tableStates['rep-hourly'].rows = [`<tr><td colspan="10" style="padding:40px;text-align:center;">
+    console.error('loadHhReport error:', err);
+    if(hhEvoChart) { hhEvoChart.destroy(); hhEvoChart = null; }
+    if(hhScatterChart) { hhScatterChart.destroy(); hhScatterChart = null; }
+    
+    document.getElementById('body-rep-hh').innerHTML = `<tr><td colspan="6" style="padding:40px;text-align:center;">
         <div style="color:var(--red);font-weight:700;margin-bottom:8px">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
           Eroare la incarcare
         </div>
         <div style="color:var(--muted);font-size:11px;margin-bottom:12px">${err.message}</div>
         <div style="color:var(--muted);font-size:10px">
-          Perioadele lungi (ex: Luna curenta) pot fi lente.<br>
-          Incerca <strong>Azi</strong> sau <strong>7 zile</strong> pentru rezultate rapide.
+          Perioadele lungi (ex: Luna curenta) pot fi lente sau pot da timeout la nivel de server.<br>
+          Incerca o perioada mai scurta (ex: <strong>Azi</strong> sau <strong>7 zile</strong>) pentru rezultate rapide.
         </div>
-      </td></tr>`];
-    renderTablePaginated('rep-hourly');
+      </td></tr>`;
+      
+    // Clear other sub-panels if there is an error
+    const volBody = document.getElementById('hh-vol-body');
+    const depBody = document.getElementById('hh-dep-body');
+    const insightBox = document.getElementById('hh-smart-insights');
+    if(volBody) volBody.innerHTML = '';
+    if(depBody) depBody.innerHTML = '';
+    if(insightBox) insightBox.innerHTML = '';
+    
   } finally {
     showLoader(false);
   }
@@ -2681,7 +2772,7 @@ async function loadLive() {
           <td style="font-weight:800;color:var(--text);white-space:nowrap">${m.serial_nr||'—'}</td>
           <td style="color:var(--muted);white-space:nowrap">${m.locatie||'—'}</td>
           <td style="color:var(--muted);max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${(m.tip_cabinet||'').replace(/"/g,'')}">${m.tip_cabinet||'—'}</td>
-          <td style="color:var(--muted);max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${(m.joc_activ||'').replace(/"/g,'')}">${m.joc_activ||'—'}</td>
+          <td style="color:var(--muted);max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${(cleanGameName(m.joc_activ)||'').replace(/"/g,'')}">${cleanGameName(m.joc_activ)||'—'}</td>
           <td style="max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${hasPlayer?`<span style="font-weight:700;color:var(--blue);cursor:pointer;" onclick="openPlayerDetails(${m.player_id_live})">${m.player_name}</span>`:`<span style="color:var(--muted)">—</span>`}</td>
           <td class="num" style="text-align:center;color:var(--muted)">${m.pozitie||'—'}</td>
           <td class="num" style="font-weight:900;color:var(--accent);white-space:nowrap">${fmtK(m.credite_ron ?? m.current_credits * (m.denomination || 0.01))}</td>
@@ -2785,18 +2876,18 @@ window.loadMultigameReport = window.loadMultigame = async function() {
             const edgeC  = r.house_edge >= 0 ? 'var(--green)' : 'var(--red)';
             const barPct = maxBet > 0 ? Math.round(r.bet / maxBet * 100) : 0;
             const td     = `padding:9px 8px;`;
-            const thumb  = gameThumbUrl(r.game);
+            const thumb  = gameThumbUrl(r.game, r.game_id);
             return `<tr style="border-bottom:1px solid var(--border)"
               onmouseenter="this.style.background='var(--surface2)'"
               onmouseleave="this.style.background=''">
               <td style="${td}padding-left:16px;color:var(--muted);font-weight:700;font-size:10px">${i+1}</td>
               <td style="${td}width:52px">
                 <img src="${thumb}" referrerpolicy="no-referrer" alt="" loading="lazy"
-                  style="width:40px;height:40px;object-fit:cover;border-radius:50%;background:var(--surface2);border:2px solid var(--border);"
-                  onerror="this.style.display='none'">
+                  style="width:40px;height:40px;object-fit:cover;border-radius:8px;background:var(--surface2);border:1px solid rgba(255,255,255,0.1);"
+                  onerror="this.src='https://cdn.cashpot.ro/cashpot/t1/thumbnail_games/placeholder.png'; this.style.opacity='0.3'">
               </td>
               <td style="${td}min-width:160px">
-                <div style="font-weight:700;color:var(--text);cursor:pointer;text-decoration:underline;text-decoration-style:dotted;" onclick="openGameDetails('${(r.game||'').replace(/'/g,"\\'")}')">${r.game}</div>
+                <div style="font-weight:700;color:var(--text);cursor:pointer;text-decoration:underline;text-decoration-style:dotted;" onclick="openGameDetails('${(cleanGameName(r.game)||'').replace(/'/g,"\\'")}', '${r.game_id||''}')">${cleanGameName(r.game)}</div>
                 <div style="height:3px;background:var(--border);border-radius:2px;margin-top:5px;overflow:hidden">
                   <div style="width:${barPct}%;height:100%;background:var(--accent);border-radius:2px;transition:width .4s"></div>
                 </div>
@@ -2851,6 +2942,7 @@ window.filterClientiTable = function(q) {
 
 window.closePlayerDashboard_UI = function() {
   document.getElementById('player-dashboard-view').style.display = 'none';
+  document.getElementById('rep-page-clienti').style.display = 'block';
   document.getElementById('clienti-main-view').style.display = 'block';
 };
 
@@ -2862,8 +2954,10 @@ window.openPlayerDetails = function(pid) {
   window.location.hash = 'rapoarte/clienti/' + pid;
 };
 
-window.openGameDetails = function(gameName) {
-  window.location.hash = 'rapoarte/multigame/game/' + encodeURIComponent(gameName);
+window.openGameDetails = function(gameName, gameId) {
+  let hash = 'rapoarte/multigame/game/' + encodeURIComponent(gameName);
+  if (gameId) hash += '?id=' + gameId;
+  window.location.hash = hash;
 };
 
 window.closeGameDetails = function() {
@@ -2872,14 +2966,16 @@ window.closeGameDetails = function() {
 
 window._renderGameDetails = async function(gameName) {
   const gd = document.getElementById('view-game-details');
-  const mg = document.getElementById('rep-page-multigame');
-  if(!gd || !mg) return;
+  if(!gd) return;
   
-  mg.style.display = 'none';
+  // Hide ALL other rep-pages to prevent overlap
+  document.querySelectorAll('.rep-page').forEach(p => p.style.display = 'none');
   gd.style.display = 'block';
   
   document.getElementById('gd-name').textContent = gameName;
-  document.getElementById('gd-thumb').src = gameThumbUrl(gameName);
+  const urlParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
+  const gameId = urlParams.get('id');
+  document.getElementById('gd-thumb').src = gameThumbUrl(gameName, gameId);
   document.getElementById('gd-stats-grid').innerHTML = '<div style="grid-column:1/-1; padding:20px; color:var(--muted);">Se încarcă datele...</div>';
   document.getElementById('body-gd-machines').innerHTML = '<tr><td colspan="5" style="text-align:center; padding:40px; color:var(--muted);">Se caută aparate...</td></tr>';
   
@@ -2923,9 +3019,10 @@ window._renderGameDetails = async function(gameName) {
             <td style="padding:12px 24px; text-align:right;"><span style="font-size:10px; background:var(--accent); color:#000; padding:4px 10px; border-radius:12px; font-weight:700;">${m.active_mix || '—'}</span></td>
         </tr>
     `).join('') || '<tr><td colspan="5" style="text-align:center; padding:40px; color:var(--muted);">Niciun aparat găsit pentru acest joc în perioada selectată.</td></tr>';
-    
   } catch(err) {
     console.error('_renderGameDetails error:', err);
+    document.getElementById('gd-stats-grid').innerHTML = `<div style="grid-column:1/-1; padding:20px; color:var(--red);">Eroare la încărcare: ${err.message}.<br><span style="font-size:10px; color:var(--muted);">Încearcă o perioadă mai scurtă (ex: Azi sau Ieri).</span></div>`;
+    document.getElementById('body-gd-machines').innerHTML = `<tr><td colspan="5" style="text-align:center; padding:40px; color:var(--red);">Nu am putut prelua aparatele (Timeout).</td></tr>`;
   }
 };
 
@@ -3131,21 +3228,23 @@ window.loadMarketingReport = async function() {
     ]);
     
     // KPIs
-    let tCb = 0, tJp = 0, tHh = 0, tRoata = 0, tBet = 0, tMkt = 0;
+    let tCb = 0, tJp = 0, tHh = 0, tRoata = 0, tRaffles = 0, tBet = 0, tMkt = 0;
     
     dLoc.forEach(l => {
       tCb += l.cashback || 0;
       tJp += l.jackpot || 0;
       tHh += l.hh || 0;
       tRoata += l.roata || 0;
+      tRaffles += l.raffles || 0;
       tBet += l.bet || 0;
     });
-    tMkt = tCb + tJp + tHh + tRoata;
+    tMkt = tCb + tJp + tHh + tRoata + tRaffles;
 
     document.getElementById('mkt-kpi-cb').textContent = fmt(tCb) + ' RON';
     document.getElementById('mkt-kpi-jp').textContent = fmt(tJp) + ' RON';
     document.getElementById('mkt-kpi-hh').textContent = fmt(tHh) + ' RON';
     document.getElementById('mkt-kpi-roata').textContent = fmt(tRoata) + ' RON';
+    if(document.getElementById('mkt-kpi-raffles')) document.getElementById('mkt-kpi-raffles').textContent = fmt(tRaffles) + ' RON';
 
     // Evo Chart
     const labels = dDaily.map(r => r.date.substring(5));
@@ -3153,6 +3252,7 @@ window.loadMarketingReport = async function() {
     const jpData = dDaily.map(r => r.jp || 0);
     const hhData = dDaily.map(r => r.hh || 0);
     const roataData = dDaily.map(r => r.roata || 0);
+    const raffleData = dDaily.map(r => r.raffles || 0);
 
     if (window.mktEvoChart) window.mktEvoChart.destroy();
     window.mktEvoChart = new Chart(document.getElementById('mkt-evo-chart').getContext('2d'), {
@@ -3160,10 +3260,11 @@ window.loadMarketingReport = async function() {
       data: {
         labels: labels,
         datasets: [
-          { label: 'Roata Norocului', data: roataData, backgroundColor: 'rgba(168, 85, 247, 0.6)' },
-          { label: 'Jackpot', data: jpData, backgroundColor: 'rgba(234, 179, 8, 0.6)' },
-          { label: 'Happy Hour', data: hhData, backgroundColor: 'rgba(236, 72, 153, 0.6)' },
-          { label: 'Cashback', data: cbData, backgroundColor: 'rgba(249, 115, 22, 0.6)' }
+          { label: 'Tombole', data: raffleData, backgroundColor: 'rgba(59, 130, 246, 0.8)' },          // Blue
+          { label: 'Roata Norocului', data: roataData, backgroundColor: 'rgba(139, 92, 246, 0.8)' },   // Purple
+          { label: 'Jackpot', data: jpData, backgroundColor: 'rgba(245, 158, 11, 0.8)' },              // Amber
+          { label: 'Happy Hour', data: hhData, backgroundColor: 'rgba(239, 68, 68, 0.8)' },            // Red
+          { label: 'Cashback', data: cbData, backgroundColor: 'rgba(16, 185, 129, 0.8)' }              // Emerald
         ]
       },
       options: {
@@ -3181,10 +3282,10 @@ window.loadMarketingReport = async function() {
     window.mktPieChart = new Chart(document.getElementById('mkt-pie-chart').getContext('2d'), {
       type: 'doughnut',
       data: {
-        labels: ['Cashback', 'Jackpot', 'Happy Hour', 'Roata Norocului'],
+        labels: ['Cashback', 'Jackpot', 'Happy Hour', 'Roata Norocului', 'Tombole'],
         datasets: [{
-          data: [tCb, tJp, tHh, tRoata],
-          backgroundColor: ['#f97316', '#eab308', '#ec4899', '#a855f7'],
+          data: [tCb, tJp, tHh, tRoata, tRaffles],
+          backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#3b82f6'],
           borderWidth: 0
         }]
       },
@@ -3204,7 +3305,8 @@ window.loadMarketingReport = async function() {
       const lJp = l.jackpot || 0;
       const lHh = l.hh || 0;
       const lRoata = l.roata || 0;
-      const lTot = lCb + lJp + lHh + lRoata;
+      const lRaffles = l.raffles || 0;
+      const lTot = lCb + lJp + lHh + lRoata + lRaffles;
       const lBet = l.bet || 0;
       const pct = lBet > 0 ? (lTot / lBet * 100).toFixed(2) : 0;
       htm += `<tr>
@@ -3214,6 +3316,7 @@ window.loadMarketingReport = async function() {
         <td class="num" style="color:var(--yellow)">${fmt(lJp)}</td>
         <td class="num" style="color:var(--pink)">${fmt(lHh)}</td>
         <td class="num" style="color:var(--purple)">${fmt(lRoata)}</td>
+        <td class="num" style="color:var(--blue)">${fmt(lRaffles)}</td>
         <td class="num" style="background:var(--surface2); font-weight:bold;">${fmt(lTot)}</td>
         <td class="num" style="color:${pct > 5 ? 'var(--danger)' : 'var(--success)'}">${pct}%</td>
       </tr>`;
@@ -3227,6 +3330,7 @@ window.loadMarketingReport = async function() {
         <td class="num" style="color:var(--yellow)"><strong>${fmt(tJp)}</strong></td>
         <td class="num" style="color:var(--pink)"><strong>${fmt(tHh)}</strong></td>
         <td class="num" style="color:var(--purple)"><strong>${fmt(tRoata)}</strong></td>
+        <td class="num" style="color:var(--blue)"><strong>${fmt(tRaffles)}</strong></td>
         <td class="num" style="background:var(--surface2); font-weight:bold;"><strong>${fmt(tMkt)}</strong></td>
         <td class="num"><strong>${tBet > 0 ? (tMkt / tBet * 100).toFixed(2) : 0}%</strong></td>
     </tr>`;
@@ -3372,7 +3476,11 @@ window.filterCashoutTable = function() {
     const cTime = r.c_time ? r.c_time.substring(11, 16) : '—';
     const cDate = r.c_date ? r.c_date.split('-').reverse().join('.') : '—';
     const tipColor = tip === 'Jackpot' ? 'var(--yellow)' : tip === 'Handpay' ? 'var(--pink)' : 'var(--muted)';
-    const mixInfo = [r.mix, r.cabinet, r.joc].filter(Boolean).join(' · ');
+    
+    // Deduplicate game name if the DB has it duplicated (e.g., "Flaming HotFlaming Hot")
+    let cjoc = cleanGameName(r.joc || '');
+    
+    const mixInfo = [r.mix, r.cabinet, cjoc].filter(Boolean).join(' · ');
     return `<tr>
       <td style="padding-left:16px;"><input type="checkbox" class="row-checkbox"></td>
       <td>${i+1}</td>
@@ -3385,7 +3493,7 @@ window.filterCashoutTable = function() {
       <td>
         <div style="font-weight:700;color:var(--text)">#${r.machine_id} (SN: ${r.serial_nr || '?'})</div>
         <div style="font-size:10px;color:var(--accent);font-weight:600">${r.mix || r.producator || '—'}</div>
-        <div style="font-size:10px;color:var(--muted)">${r.cabinet || ''}${r.joc ? ' · ' + r.joc : ''}</div>
+        <div style="font-size:10px;color:var(--muted)">${r.cabinet || ''}${cjoc ? ' · ' + cjoc : ''}</div>
       </td>
       <td class="num" style="color:var(--red); font-weight:700;">-${fmt(val)}</td>
       <td><div style="display:inline-block; padding:2px 8px; border-radius:12px; background:var(--surface2); border:1px solid ${tipColor}; color:${tipColor}; font-size:10px; font-weight:700;">${tip}</div></td>

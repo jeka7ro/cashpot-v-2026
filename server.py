@@ -260,10 +260,11 @@ def locations():
             SUM(mas.hh) AS hh,
             SUM(mas.cashback) AS cashback,
             SUM(mas.cb_fortune_wheel) AS roata,
+            SUM(mas.cb_raffle) AS raffles,
             SUM(mas.`in`-mas.`out`-COALESCE(mas.jackpot,0)-COALESCE(mas.hh,0)-COALESCE(mas.cashback,0)) AS ngr,
             SUM(mas.games) AS games,
             SUM(mas.bet) AS bet,
-            SUM(COALESCE(mas.jackpot,0)+COALESCE(mas.cb_real,0)+COALESCE(mas.hh,0)+COALESCE(mas.cb_birthday,0)+COALESCE(mas.cb_fortune_wheel,0)) AS marketing
+            SUM(COALESCE(mas.jackpot,0)+COALESCE(mas.cb_real,0)+COALESCE(mas.hh,0)+COALESCE(mas.cb_birthday,0)+COALESCE(mas.cb_fortune_wheel,0)+COALESCE(mas.cb_raffle,0)) AS marketing
         FROM machine_audit_summaries mas
         JOIN locations l ON l.id = mas.location_id
         WHERE mas.date >= %s AND mas.date <= %s
@@ -287,7 +288,7 @@ def locations():
             merged[canon]['locatie'] = name
             merged[canon]['id']      = canon
         else:
-            for k in ('total_in','total_out','ggr','jackpot','hh','cashback','roata','ngr','games','bet','marketing'):
+            for k in ('total_in','total_out','ggr','jackpot','hh','cashback','roata','raffles','ngr','games','bet','marketing'):
                 merged[canon][k] = (merged[canon].get(k) or 0) + (r.get(k) or 0)
             merged[canon]['buc']  = max(merged[canon].get('buc',0) or 0, r.get('buc',0) or 0)
             merged[canon]['zile'] = max(merged[canon].get('zile',0) or 0, r.get('zile',0) or 0)
@@ -331,9 +332,9 @@ def providers():
             SUM(mas.`in`) AS total_in,
             SUM(mas.`in`-mas.`out`) AS ggr,
             SUM(mas.jackpot) AS jackpot, SUM(mas.hh) AS hh,
-            SUM(mas.cashback) AS cashback, SUM(mas.cb_fortune_wheel) AS roata,
+            SUM(mas.cashback) AS cashback, SUM(mas.cb_fortune_wheel) AS roata, SUM(mas.cb_raffle) AS raffles,
             SUM(mas.games) AS games, SUM(mas.bet) AS bet,
-            SUM(COALESCE(mas.jackpot,0)+COALESCE(mas.cb_real,0)+COALESCE(mas.hh,0)+COALESCE(mas.cb_birthday,0)+COALESCE(mas.cb_fortune_wheel,0)) AS marketing
+            SUM(COALESCE(mas.jackpot,0)+COALESCE(mas.cb_real,0)+COALESCE(mas.hh,0)+COALESCE(mas.cb_birthday,0)+COALESCE(mas.cb_fortune_wheel,0)+COALESCE(mas.cb_raffle,0)) AS marketing
         FROM machine_audit_summaries mas
         LEFT JOIN machine_types mt ON mt.id = mas.machine_type_id
         LEFT JOIN machine_manufacturers mm ON mm.id = mt.manufacturer_id
@@ -495,6 +496,7 @@ def machines():
             mt.name                        AS mix,
             COALESCE(mct.name,'—')         AS cabinet,
             mas.machine_id                 AS id,
+            m.last_game_id                 AS game_id,
             COALESCE(l.display_code,l.code)AS locatie,
             mt.name                        AS tip_slot,
             COALESCE(NULLIF(mm.name,''), NULLIF(mt.manufacturer,''), 'Necunoscut') AS provider,
@@ -609,6 +611,7 @@ def daily():
                 SUM(COALESCE(mas.hh, 0)) as hh,
                 SUM(COALESCE(mas.cashback, 0)) as cashback,
                 SUM(COALESCE(mas.cb_fortune_wheel, 0)) as roata,
+                SUM(COALESCE(mas.cb_raffle, 0)) as raffles,
                 SUM(mas.bet) as bet,
                 COUNT(DISTINCT mas.machine_id) as aparate
             FROM machine_audit_summaries mas
@@ -627,7 +630,7 @@ def daily():
             if day not in daily_data:
                 daily_data[day] = {
                     'date': day, 'ggr': 0, 'total_in': 0, 'jp': 0,
-                    'hh': 0, 'cb': 0, 'roata': 0, 'bet': 0, 'aparate': 0,
+                    'hh': 0, 'cb': 0, 'roata': 0, 'raffles': 0, 'bet': 0, 'aparate': 0,
                     'loc_details': []
                 }
             dd = daily_data[day]
@@ -637,6 +640,7 @@ def daily():
             dd['hh']       += safe(r['hh'])
             dd['cb']       += safe(r['cashback'])
             dd['roata']    += safe(r['roata'])
+            dd['raffles']  += safe(r['raffles'])
             dd['bet']      += safe(r['bet'])
             dd['aparate']  += int(r['aparate'] or 0)
             dd['loc_details'].append({
@@ -725,8 +729,12 @@ def serve_css():
     return send_from_directory(BASE_DIR, 'style.css')
 
 @app.route('/app.js')
-def serve_js():
+def serve_app_js():
     return send_from_directory(BASE_DIR, 'app.js')
+
+@app.route('/game_uuids.js')
+def serve_game_uuids_js():
+    return send_from_directory(BASE_DIR, 'game_uuids.js')
 
 @app.route('/slot_icon.png')
 def serve_img():
@@ -836,7 +844,8 @@ def live_monitor():
             REPLACE(REPLACE(COALESCE(l.display_code, l.code), ' E.S', ''), 'E.S', '') as locatie,
             mt.name                 as tip_cabinet,
             mt.manufacturer         as producator,
-            mg.name                 as joc_activ,
+            NULLIF(mg.name, '')     as joc_activ,
+            mg.id                   as game_id,
             rta.game_position       as pozitie,
             rta.current_credits,
             rta.current_bet,
@@ -870,6 +879,46 @@ def live_monitor():
         ORDER BY credite_ron DESC
         LIMIT 30
     """, lp_m)
+
+    # Calculate Est. IN for top_machines: suma IN de la ultimul HH/Jackpot pana azi
+    tm_fixed = []
+    from datetime import datetime
+    for tm in top_machines:
+        machine_id = tm['machine_id']
+        hist = qry("""
+            SELECT date, `in`, hh, jackpot
+            FROM machine_audit_summaries
+            WHERE machine_id = %s
+              AND date <= CURDATE()
+              AND date >= CURDATE() - INTERVAL 14 DAY
+            ORDER BY date DESC
+        """, (machine_id,))
+
+        est_in = 0
+        prev_date = None
+        for row in hist:
+            row_date = row['date']
+            row_in = float(row.get('in') or 0)
+            row_hh = float(row.get('hh') or 0)
+            row_jp = float(row.get('jackpot') or 0)
+
+            if prev_date is not None:
+                try:
+                    import datetime as _dt
+                    d1 = prev_date if not isinstance(prev_date, str) else _dt.date.fromisoformat(prev_date)
+                    d2 = row_date if not isinstance(row_date, str) else _dt.date.fromisoformat(row_date)
+                    if (d1 - d2).days > 1: break
+                except: break
+
+            est_in += row_in
+            prev_date = row_date
+            if (row_hh > 0 or row_jp > 0) and row_date < datetime.now().date(): break
+
+        row_dict = dict(tm)
+        row_dict['est_in'] = round(est_in, 0)
+        tm_fixed.append(row_dict)
+
+    top_machines = tm_fixed
 
     # Live active players count
     live_active_count = qry("""
@@ -1090,7 +1139,8 @@ def multigame():
         # Division by 100 applies the standard 0.01 denomination factor
         rows = qry("""
             SELECT
-                COALESCE(mg.name, mgs.sas_game_name, 'Necunoscut') as game_name,
+                mg.id as game_id,
+                COALESCE(NULLIF(mg.name, ''), NULLIF(mgs.sas_game_name, ''), 'Necunoscut') as game_name,
                 COUNT(DISTINCT mgs.machine_id)       as aparate,
                 ROUND(SUM(mgs.c_52_bet)   / 100, 0) as total_bet,
                 ROUND(SUM(mgs.c_52_win)   / 100, 0) as total_win,
@@ -1111,7 +1161,7 @@ def multigame():
             LEFT JOIN machine_games mg ON mgs.machine_game_id = mg.id
             WHERE mgs.created_at >= %s AND mgs.created_at < %s
         """ + loc_where + """
-            GROUP BY COALESCE(mg.name, mgs.sas_game_name)
+            GROUP BY mg.id, COALESCE(mg.name, mgs.sas_game_name)
             HAVING total_bet > 0
             ORDER BY total_bet DESC
             LIMIT 100
@@ -1124,6 +1174,7 @@ def multigame():
             bet = float(r['total_bet'] or 0)
             ggr = float(r['ggr'] or 0)
             result.append({
+                'game_id':    r['game_id'],
                 'game':       r['game_name'],
                 'aparate':    int(r['aparate'] or 0),
                 'bet':        bet,
@@ -1146,17 +1197,23 @@ def multigame_details():
         if not game_name: return jsonify({'error': 'Missing game_name'}), 400
         
         start, end = period_params(request)
-        if not start: start = dt.date.today().strftime('%Y-%m-%d')
+        if not start: start = datetime.now().strftime('%Y-%m-%d')
         if not end:   end   = start
         
-        s_dt = dt.datetime.strptime(start, '%Y-%m-%d')
-        e_dt = dt.datetime.strptime(end,   '%Y-%m-%d')
+        s_dt = datetime.strptime(start, '%Y-%m-%d')
+        e_dt = datetime.strptime(end,   '%Y-%m-%d')
         start_ts = start + ' 08:00:00'
-        end_ts = (e_dt + dt.timedelta(days=1)).strftime('%Y-%m-%d') + ' 08:00:00'
+        end_ts = (e_dt + timedelta(days=1)).strftime('%Y-%m-%d') + ' 08:00:00'
 
+        # Find game IDs first to avoid slow JOIN on millions of rows
+        game_ids_query = qry("SELECT id FROM machine_games WHERE name = %s OR name = %s", [game_name, game_name + game_name])
+        gids = [str(r['id']) for r in game_ids_query]
+        gids_sql = f"mgs.machine_game_id IN ({','.join(gids)})" if gids else "1=0"
+        
         # 1. Overall stats for this game
-        stats = qry("""
+        stats = qry(f"""
             SELECT
+                MAX(mgs.machine_game_id) as game_id,
                 COUNT(DISTINCT mgs.machine_id) as aparate,
                 ROUND(SUM(mgs.c_52_bet) / 100, 0) as total_bet,
                 ROUND(SUM(mgs.c_52_win) / 100, 0) as total_win,
@@ -1168,14 +1225,12 @@ def multigame_details():
                     ELSE NULL END, 2
                 ) as house_edge_pct
             FROM machine_audit_games_g_s mgs
-            LEFT JOIN machine_games mg ON mgs.machine_game_id = mg.id
-            WHERE (mg.name = %s OR mgs.sas_game_name = %s)
+            WHERE ({gids_sql} OR mgs.sas_game_name = %s)
               AND mgs.created_at >= %s AND mgs.created_at < %s
-        """, [game_name, game_name, start_ts, end_ts])
+        """, [game_name, start_ts, end_ts])
         
         # 2. List of machines having this game
-        # We need to find which machines currently have this game or played it in period
-        machines = qry("""
+        machines = qry(f"""
             SELECT DISTINCT
                 m.id, m.serial_nr, l.name as location_name,
                 mt.name as cabinet, mm.name as manufacturer,
@@ -1185,11 +1240,10 @@ def multigame_details():
             JOIN locations l ON m.location_id = l.id
             JOIN machine_types mt ON m.machine_type_id = mt.id
             JOIN machine_manufacturers mm ON mt.manufacturer_id = mm.id
-            LEFT JOIN machine_games mg ON mgs.machine_game_id = mg.id
-            WHERE (mg.name = %s OR mgs.sas_game_name = %s)
+            WHERE ({gids_sql} OR mgs.sas_game_name = %s)
               AND mgs.created_at >= %s AND mgs.created_at < %s
             ORDER BY l.name, m.serial_nr
-        """, [game_name, game_name, start_ts, end_ts])
+        """, [game_name, start_ts, end_ts])
 
         return jsonify({
             'game': game_name,

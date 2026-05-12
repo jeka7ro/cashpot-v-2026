@@ -8,7 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=4">
 <script>
   if (window.location.hash.startsWith('#invite')) {
     document.write('<style>#app-container, #view-login { display: none !important; } #view-register { display: flex !important; }</style>');
@@ -40,12 +40,13 @@
   
   <!-- SIDEBAR -->
   <aside class="sidebar">
-    <div class="sidebar-header" style="display:flex; justify-content:center; align-items:center;">
-      <div style="background:#0a0e1a; padding:16px 0; border-radius:16px; width:100%; display:flex; justify-content:center; box-shadow:inset 0 2px 8px rgba(0,0,0,0.3), 0 4px 12px rgba(0,0,0,0.05);">
-        <img src="/logo_cashpot.png" alt="Cashpot" style="max-height:30px; object-fit:contain; filter:drop-shadow(0 2px 8px rgba(0,0,0,0.5));">
+    <div class="sidebar-card" id="logo-card">
+      <div class="sidebar-header" style="display:flex; justify-content:center; align-items:center; padding: 12px 16px;">
+        <img src="/logo_cashpot.png" alt="Cashpot" style="height:26px; object-fit:contain; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5));">
       </div>
     </div>
-    <nav class="sidebar-nav">
+    <div class="sidebar-card" style="flex:1; display:flex; flex-direction:column; padding-top:16px; margin-bottom:0;">
+      <nav class="sidebar-nav" style="flex:1;">
       <a href="#dashboard" class="nav-item active">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
         Dashboard
@@ -99,6 +100,7 @@
           Utilizatori
         </a>
       </nav>
+    </div>
       
   </aside>
 
@@ -248,19 +250,20 @@
     <!-- PERIOD SELECTOR: CELL-BASED MONTH GRID -->
     <div class="timeline-section">
     <div class="timeline-top-row">
-      <div class="timeline-label" style="display:flex; align-items:center; gap:16px;">
-        <div>Perioadă:&nbsp;<span id="tl-range-display" class="tl-range-text">—</span></div>
-        <select id="global-loc-select" class="glass-select" onchange="reloadCurrentView()" style="margin:0; padding:4px 12px; height:auto; background:var(--surface2); border:1px solid var(--border); font-size:12px; font-weight:600;"><option value="all">Toate locațiile</option></select>
+      <div class="timeline-label" style="display:flex; align-items:center;">
+        <div><span id="tl-range-display" class="tl-range-text">—</span></div>
       </div>
       <div class="timeline-presets">
         <input type="date" id="native-date-start" class="date-picker-input">
         <input type="date" id="native-date-end" class="date-picker-input">
         <button class="preset-btn" data-preset="today">Azi</button>
         <button class="preset-btn" data-preset="yesterday">Ieri</button>
+        <button class="preset-btn" data-preset="7d">7 zile</button>
         <button class="preset-btn active" data-preset="month">Luna curentă</button>
         <button class="preset-btn" data-preset="prev_month">Luna anterioară</button>
-        <button class="preset-btn" data-preset="7d">7 zile</button>
-        <button class="preset-btn" data-preset="30d">30 zile</button>
+        <select id="preset-month-select" class="preset-btn" style="padding-right:8px; appearance:auto; min-width:140px;" onchange="selectPresetMonth(this.value)">
+           <option value="" disabled selected>Alege luna...</option>
+        </select>
         <button class="preset-btn" data-preset="ytd">An curent</button>
       </div>
     </div>
@@ -280,7 +283,7 @@
       </div>
       <div class="kpi-sub" id="v-in-day">AVG/zi: —</div>
     </div>
-    <div class="kpi-card accent-green" id="kpi-ggr">
+    <div class="kpi-card" id="kpi-ggr">
       <div class="kpi-label">GGR</div>
       <div style="display:flex; align-items:center; flex-wrap:wrap; gap:8px;">
         <div class="kpi-value" id="v-ggr">—</div>
@@ -288,7 +291,7 @@
       </div>
       <div class="kpi-sub" id="v-hold">Hold: —%</div>
     </div>
-    <div class="kpi-card accent-blue" id="kpi-ggr-eur">
+    <div class="kpi-card" id="kpi-ggr-eur">
       <div class="kpi-label" style="display:flex; justify-content:space-between; align-items:center; gap:4px;">
         <span style="white-space:nowrap;">GGR €</span>
         <div class="bnr-rate-badge" id="bnr-badge" title="Curs BNR zilnic EUR/RON" style="padding:2px 6px; font-size:10px; white-space:nowrap;">
@@ -300,12 +303,12 @@
       <div class="kpi-sub" style="opacity:0">.</div>
     </div>
 
-    <div class="kpi-card accent-purple" id="kpi-jp">
+    <div class="kpi-card" id="kpi-jp">
       <div class="kpi-label">Jackpot Plătit</div>
       <div class="kpi-value" id="v-jp">—</div>
       <div class="kpi-sub" id="v-hh">HH: —</div>
     </div>
-    <div class="kpi-card accent-orange" id="kpi-games">
+    <div class="kpi-card" id="kpi-games">
       <div class="kpi-label">Total Games</div>
       <div class="kpi-value" id="v-games">—</div>
       <div class="kpi-sub" id="v-betgame">Bet/Game: —</div>
@@ -367,7 +370,7 @@
     </div>
   </section>
 
-  <section class="charts-row" style="grid-template-columns: 1fr 1fr 1fr 1fr 1fr;">
+  <section class="charts-row" style="grid-template-columns: 1fr 1fr 1fr 1fr;">
     <div class="chart-card">
       <div class="chart-title">GGR per Locație</div>
       <div class="canvas-wrap"><canvas id="loc-pie"></canvas></div>
@@ -388,17 +391,21 @@
         Așteptare date...
       </div>
     </div>
-    <div class="chart-card" onclick="window.location.hash='#rapoarte/multigame'" style="cursor:pointer; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='none'">
-      <div class="chart-title" style="color:var(--yellow); display:flex; align-items:center; gap:6px;">
-        Top 10 Jocuri (Live)
-      </div>
-      <div id="top10-games-body" style="height:260px; overflow-y:auto; padding-right:8px; display:flex; flex-direction:column;">
-        <div style="color:var(--muted);padding:16px;font-size:11px">Încărcare...</div>
-      </div>
-    </div>
     <div class="chart-card">
       <div class="chart-title">GGR per Provider</div>
       <div class="canvas-wrap" id="prov-bar-container" style="overflow-y: auto; padding-right: 8px;"></div>
+    </div>
+  </section>
+
+  <!-- TOP 10 JOCURI HORIZONTAL -->
+  <section class="charts-row" style="grid-template-columns: 1fr;">
+    <div class="chart-card" style="padding-bottom:8px;">
+      <div class="chart-title" style="color:var(--yellow); display:flex; align-items:center; gap:6px;">
+        <span style="width:8px; height:8px; border-radius:50%; background:var(--yellow);"></span> Top 10 Jocuri (Live)
+      </div>
+      <div id="top10-games-body" style="display:flex; gap:16px; overflow-x:auto; padding-bottom:8px; scroll-snap-type: x mandatory;">
+        <div style="color:var(--muted);padding:16px;font-size:11px">Încărcare...</div>
+      </div>
     </div>
   </section>
 
@@ -418,7 +425,7 @@
           <thead><tr>
             <th>Locație</th><th>Buc</th><th>Zile</th><th class="num" style="width:50px; text-align:right">Clienți/zi</th>
             <th class="num">Total IN</th><th class="num">GGR</th><th class="num">GGR €</th>
-            <th class="num">Jackpot</th><th class="num">HH</th><th class="num">Cashback</th><th class="num">Roata</th>
+            <th class="num">Jackpot</th><th class="num">HH</th><th class="num">Cashback</th><th class="num">Roata</th><th class="num">Tombole</th>
             <th class="num">Games</th><th class="num">Hold%</th><th class="num">Bonus Cost</th>
           </tr></thead>
           <tbody id="body-locatii"></tbody>
@@ -434,7 +441,7 @@
           <thead><tr>
             <th>#</th><th>Provider</th><th>Buc</th><th>Zile</th>
             <th class="num">Total IN</th><th class="num">GGR</th><th class="num">GGR €</th>
-            <th class="num">Jackpot</th><th class="num">Cashback</th><th class="num">Roata</th>
+            <th class="num">Jackpot</th><th class="num">Cashback</th><th class="num">Roata</th><th class="num">Tombole</th>
             <th class="num">Games</th><th class="num">Hold%</th><th class="num">Bonus Cost</th>
           </tr></thead>
           <tbody id="body-provideri"></tbody>
@@ -549,7 +556,7 @@
         <div id="hh-smart-insights" style="padding:16px 20px; border-radius:12px; margin-bottom:24px; font-weight:700; font-size:14px; background:rgba(0,0,0,0.2); border:1px solid var(--border);"></div>
 
         <!-- KPI Cards -->
-        <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:16px; margin-bottom: 24px;">
+        <div style="display:grid; grid-template-columns: repeat(6, 1fr); gap:16px; margin-bottom: 24px;">
           <div class="kpi-card">
             <div class="kpi-label">Total Zile cu HH</div>
             <div class="kpi-value" id="hh-kpi-zile">0</div>
@@ -566,11 +573,16 @@
             <div class="kpi-label">Efect Net Estimat</div>
             <div class="kpi-value" id="hh-kpi-efect">0%</div>
           </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Cost Total HH</div>
+            <div class="kpi-value cell-neg-2" id="hh-kpi-cost" style="padding:4px 8px; border-radius:4px; display:inline-block;">0</div>
+          </div>
+          <div class="kpi-card">
+            <div class="kpi-label">Profit Net (ROI)</div>
+            <div class="kpi-value" id="hh-kpi-profit">0</div>
+          </div>
         </div>
 
-
-
-        
         <!-- Charts Row -->
         <div style="display:flex; gap:24px; margin-bottom: 32px;">
           <div class="chart-card" style="flex: 2;">
@@ -578,8 +590,8 @@
             <div class="canvas-wrap" style="height: 320px;"><canvas id="hh-evo-chart"></canvas></div>
           </div>
           <div class="chart-card" style="flex: 1;">
-            <div class="chart-title">Corelație Cost HH / Total IN (Scatter)</div>
-            <div class="canvas-wrap" style="height: 320px;"><canvas id="hh-scatter-chart"></canvas></div>
+            <div class="chart-title">GGR Real vs. Cost HH (pe locații)</div>
+            <div class="canvas-wrap" style="height: 320px;"><canvas id="hh-loc-chart"></canvas></div>
           </div>
         </div>
 
@@ -657,7 +669,7 @@
 
         <!-- ═══ PAGE: MARKETING ═══ -->
         <div id="rep-page-marketing" class="rep-page" style="display:none;">
-          <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:16px; margin-bottom: 24px;">
+          <div style="display:grid; grid-template-columns: repeat(5, 1fr); gap:16px; margin-bottom: 24px;">
             <div class="kpi-card">
               <div class="kpi-label" style="color:var(--orange)">Cashback</div>
               <div class="kpi-value" id="mkt-kpi-cb">0</div>
@@ -673,6 +685,10 @@
             <div class="kpi-card">
               <div class="kpi-label" style="color:var(--purple)">Roata Norocului</div>
               <div class="kpi-value" id="mkt-kpi-roata">0</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label" style="color:var(--blue)">Tombole</div>
+              <div class="kpi-value" id="mkt-kpi-raffles">0</div>
             </div>
           </div>
 
@@ -694,7 +710,7 @@
             <div class="table-scroll">
               <table class="data-table">
                 <thead><tr>
-                  <th>Locație</th><th class="num">Bet Total</th><th class="num">Cashback</th><th class="num">Jackpot</th><th class="num">Happy Hour</th><th class="num">Roata Norocului</th><th class="num" style="background:var(--surface2)">Cost Total Marketing</th><th class="num">% din Bet</th>
+                  <th>Locație</th><th class="num">Bet Total</th><th class="num">Cashback</th><th class="num">Jackpot</th><th class="num">Happy Hour</th><th class="num">Roata Norocului</th><th class="num">Tombole</th><th class="num" style="background:var(--surface2)">Cost Total Marketing</th><th class="num">% din Bet</th>
                 </tr></thead>
                 <tbody id="body-mkt-locatii"></tbody>
                 <tfoot id="foot-mkt-locatii"></tfoot>
@@ -703,7 +719,7 @@
           </section>
         </div><!-- /rep-page-marketing -->
             
-            <div id="rep-page-clienti" class="rep-page" style="display:none;">
+        <div id="rep-page-clienti" class="rep-page" style="display:none;">
           <div id="clienti-main-view">
             <!-- Floating Search Bar -->
             <div style="margin-bottom:16px;">
@@ -738,117 +754,8 @@
                 </table>
               </div>
               <div id="pg-rep-clienti" class="pagination-wrapper" style="border-top:1px solid var(--border); padding:12px 20px; display:flex; justify-content:space-between; align-items:center; background:var(--surface2);"></div>
-            </div>
-
-            <!-- PLAYER FULL PAGE DASHBOARD -->
-            <div id="player-dashboard-view" style="display:none; animation: fadeIn 0.3s ease; padding: 24px;">
-              <div style="display:flex; align-items:center; gap:16px; margin-bottom:24px;">
-                <button class="premium-btn" onclick="closePlayerDashboard()" style="padding:8px 16px; background:var(--surface2); color:var(--text); border: 1px solid var(--border);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> Înapoi la Jucători</button>
-                <div style="flex:1;">
-                  <h2 id="pd-name" style="margin:0; font-size:24px; font-weight:800; color:var(--text);">Nume Jucător</h2>
-                  <div id="pd-meta" style="font-size:12px; color:var(--muted);">ID: — &bull; Tel: —</div>
-                </div>
-                <div style="text-align:right;">
-                  <div style="font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1px;">Total Puncte</div>
-                  <div id="pd-points" style="font-size:24px; font-weight:900; color:var(--accent);">0</div>
-                </div>
-              </div>
-
-              <!-- AI Profile Analysis -->
-              <div class="glass-panel" style="margin-bottom:24px; padding:20px; border:1px solid var(--border); border-radius:12px; background:linear-gradient(135deg, rgba(234,179,8,0.1) 0%, rgba(0,0,0,0) 100%);">
-                <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-                  <h3 style="margin:0; font-size:12px; font-weight:800; color:var(--accent); text-transform:uppercase; letter-spacing:1px;">Analiză Comportamentală Jucător</h3>
-                </div>
-                <div id="pd-ai-analysis" style="font-size:13px; line-height:1.6; color:var(--text);">
-                  Se generează profilul jucătorului...
-                </div>
-              </div>
-
-              <!-- Charts Row -->
-              <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:24px; margin-bottom:24px;">
-                <div class="glass-panel" style="padding:20px; border: 1px solid var(--border); border-radius: 12px;">
-                  <h3 style="margin-top:0; margin-bottom:16px; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:1px;">Mixuri/Aparate</h3>
-                  <div style="height:250px; position:relative;"><canvas id="pd-mix-chart"></canvas></div>
-                </div>
-                <div class="glass-panel" style="padding:20px; border: 1px solid var(--border); border-radius: 12px;">
-                  <h3 style="margin-top:0; margin-bottom:16px; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:1px;">Activitate pe Zile</h3>
-                  <div style="height:250px; position:relative;"><canvas id="pd-days-chart"></canvas></div>
-                </div>
-                <div class="glass-panel" style="padding:20px; border: 1px solid var(--border); border-radius: 12px;">
-                  <h3 style="margin-top:0; margin-bottom:16px; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:1px;">Activitate pe Ore</h3>
-                  <div style="height:250px; position:relative;"><canvas id="pd-hours-chart"></canvas></div>
-                </div>
-              </div>
-
-              <div class="glass-panel" style="border: 1px solid var(--border); border-radius: 12px; overflow:hidden;">
-                <div style="padding:16px; border-bottom:1px solid var(--border); font-weight:700; font-size:14px; background: var(--surface2);">Istoric Sesiuni Jucător</div>
-                <div class="table-scroll">
-                  <table class="data-table" style="width:100%; border-collapse:collapse; font-size:11px;">
-                    <thead>
-                      <tr>
-                        <th style="padding:10px 16px; width:40px;"><input type="checkbox"></th>
-                        <th style="padding:10px 16px; width:40px; text-align:left;">Nr.</th>
-                        <th style="padding:10px 16px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted);">DATA & ORA</th>
-                        <th style="padding:10px 16px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted);">LOCAȚIE</th>
-                        <th style="padding:10px 16px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted);">APARAT & MIX</th>
-                        <th style="padding:10px 16px; text-align:right; border-bottom:1px solid var(--border); color:var(--muted);">IN</th>
-                        <th style="padding:10px 16px; text-align:right; border-bottom:1px solid var(--border); color:var(--muted);">OUT</th>
-                        <th style="padding:10px 16px; text-align:right; border-bottom:1px solid var(--border); color:var(--muted);">GGR (In - Out)</th>
-                      </tr>
-                    </thead>
-                    <tbody id="body-pd-history"></tbody>
-                  </table>
-                </div>
-                <div id="pg-pd-history" class="pagination-wrapper" style="border-top:1px solid var(--border); padding:12px 20px; display:flex; justify-content:space-between; align-items:center; background:var(--surface2);"></div>
-              </div>
-            </div>
-
-            <!-- GAME DETAILS FULL PAGE -->
-            <div id="view-game-details" style="display:none; animation: fadeIn 0.3s ease; padding: 24px;">
-                <div style="display:flex; align-items:center; gap:16px; margin-bottom:24px;">
-                    <button class="premium-btn" onclick="closeGameDetails()" style="padding:8px 16px; background:var(--surface2); color:var(--text); border:1px solid var(--border);">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> Înapoi
-                    </button>
-                    <h1 id="gd-name" style="font-size:24px; font-weight:900; margin:0; color:var(--text);">Joc Detalii</h1>
-                </div>
-
-                <div style="display:grid; grid-template-columns: 320px 1fr; gap:24px;">
-                    <!-- LEFT: Game Info & KPI -->
-                    <div style="display:flex; flex-direction:column; gap:24px;">
-                        <div class="glass-panel" style="padding:24px; text-align:center; border:1px solid var(--border); border-radius:12px;">
-                            <img id="gd-thumb" src="" referrerpolicy="no-referrer" style="width:200px; height:200px; border-radius:24px; object-fit:cover; box-shadow: 0 16px 32px rgba(0,0,0,0.4); margin-bottom:20px; background:var(--surface2);" onerror="this.style.opacity='0.3'">
-                            <div id="gd-stats-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                                <!-- KPIs will be injected here -->
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- RIGHT: Machines List -->
-                    <div class="glass-panel" style="padding:0; overflow:hidden; border:1px solid var(--border); border-radius:12px;">
-                        <div style="padding:16px 24px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:var(--surface2);">
-                            <span style="font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:1px; color:var(--muted);">Distribuție pe Aparate / Locații</span>
-                            <span id="gd-mach-count" style="font-size:11px; font-weight:700; color:var(--accent);">0 aparate</span>
-                        </div>
-                        <div style="max-height: calc(100vh - 250px); overflow-y:auto;">
-                            <table class="data-table" style="width:100%; border-collapse:collapse; font-size:11px;">
-                                <thead>
-                                    <tr>
-                                        <th style="padding:10px 24px; text-align:left; color:var(--muted);">#</th>
-                                        <th style="padding:10px 16px; text-align:left; color:var(--muted);">SERIE APARAT</th>
-                                        <th style="padding:10px 16px; text-align:left; color:var(--muted);">LOCAȚIE</th>
-                                        <th style="padding:10px 16px; text-align:left; color:var(--muted);">CABINET / PRODUCĂTOR</th>
-                                        <th style="padding:10px 24px; text-align:right; color:var(--muted);">MIX ACTIV</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="body-gd-machines"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-          </section>
+            </section>
+          </div>
         </div>
 
 
@@ -927,6 +834,107 @@
       </section>
           </div> <!-- /rep-tab-multigame -->
         </div><!-- /rep-page-multigame -->
+
+        <!-- PLAYER DASHBOARD VIEW -->
+        <div id="player-dashboard-view" class="rep-page" style="display:none; animation: fadeIn 0.3s ease;">
+          <div style="display:flex; align-items:center; gap:16px; margin-bottom:24px;">
+            <button class="premium-btn" onclick="closePlayerDashboard()" style="padding:10px 24px; background:var(--surface2); color:var(--text); border:1px solid var(--border); border-radius:99px; font-weight:700; display:flex; align-items:center; gap:8px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> ÎNAPOI
+            </button>
+            <div style="flex:1;">
+              <h2 id="pd-name" style="margin:0; font-size:24px; font-weight:800; color:var(--text);">Nume Jucător</h2>
+              <div id="pd-meta" style="font-size:12px; color:var(--muted);">ID: — &bull; Tel: —</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1px;">Total Puncte</div>
+              <div id="pd-points" style="font-size:24px; font-weight:900; color:var(--accent);">0</div>
+            </div>
+          </div>
+
+          <div class="glass-panel" style="margin-bottom:24px; padding:20px; border:1px solid var(--border); border-radius:12px; background:linear-gradient(135deg, rgba(234,179,8,0.1) 0%, rgba(0,0,0,0) 100%);">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+              <h3 style="margin:0; font-size:12px; font-weight:800; color:var(--accent); text-transform:uppercase; letter-spacing:1px;">Analiză Comportamentală Jucător</h3>
+            </div>
+            <div id="pd-ai-analysis" style="font-size:13px; line-height:1.6; color:var(--text);">Se generează profilul jucătorului...</div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:24px; margin-bottom:24px;">
+            <div class="glass-panel" style="padding:20px; border: 1px solid var(--border); border-radius: 12px;">
+              <h3 style="margin-top:0; margin-bottom:16px; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:1px;">Mixuri/Aparate</h3>
+              <div style="height:250px; position:relative;"><canvas id="pd-mix-chart"></canvas></div>
+            </div>
+            <div class="glass-panel" style="padding:20px; border: 1px solid var(--border); border-radius: 12px;">
+              <h3 style="margin-top:0; margin-bottom:16px; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:1px;">Activitate pe Zile</h3>
+              <div style="height:250px; position:relative;"><canvas id="pd-days-chart"></canvas></div>
+            </div>
+            <div class="glass-panel" style="padding:20px; border: 1px solid var(--border); border-radius: 12px;">
+              <h3 style="margin-top:0; margin-bottom:16px; font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:1px;">Activitate pe Ore</h3>
+              <div style="height:250px; position:relative;"><canvas id="pd-hours-chart"></canvas></div>
+            </div>
+          </div>
+
+          <div class="glass-panel" style="border: 1px solid var(--border); border-radius: 12px; overflow:hidden;">
+            <div style="padding:16px; border-bottom:1px solid var(--border); font-weight:700; font-size:14px; background: var(--surface2);">Istoric Sesiuni Jucător</div>
+            <div class="table-scroll">
+              <table class="data-table" style="width:100%; border-collapse:collapse; font-size:11px;">
+                <thead>
+                  <tr>
+                    <th style="padding:10px 16px; width:40px;"><input type="checkbox"></th>
+                    <th style="padding:10px 16px; width:40px; text-align:left;">Nr.</th>
+                    <th style="padding:10px 16px; text-align:left; color:var(--muted);">DATA & ORA</th>
+                    <th style="padding:10px 16px; text-align:left; color:var(--muted);">LOCAȚIE</th>
+                    <th style="padding:10px 16px; text-align:left; color:var(--muted);">APARAT & MIX</th>
+                    <th style="padding:10px 16px; text-align:right; color:var(--muted);">IN</th>
+                    <th style="padding:10px 16px; text-align:right; color:var(--muted);">OUT</th>
+                    <th style="padding:10px 16px; text-align:right; color:var(--muted);">GGR</th>
+                  </tr>
+                </thead>
+                <tbody id="body-pd-history"></tbody>
+              </table>
+            </div>
+            <div id="pg-pd-history" class="pagination-wrapper" style="border-top:1px solid var(--border); padding:12px 20px; display:flex; justify-content:space-between; align-items:center; background:var(--surface2);"></div>
+          </div>
+        </div>
+
+        <!-- GAME DETAILS VIEW -->
+        <div id="view-game-details" class="rep-page" style="display:none; animation: fadeIn 0.3s ease;">
+          <div style="display:flex; align-items:center; gap:16px; margin-bottom:24px;">
+            <button class="premium-btn" onclick="closeGameDetails()" style="padding:10px 24px; background:var(--surface2); color:var(--text); border: 1px solid var(--border); border-radius:99px; font-weight:700; display:flex; align-items:center; gap:8px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> ÎNAPOI
+            </button>
+            <h1 id="gd-name" style="font-size:24px; font-weight:900; margin:0; color:var(--text);">Joc Detalii</h1>
+          </div>
+
+          <div style="display:grid; grid-template-columns: 320px 1fr; gap:24px;">
+            <div style="display:flex; flex-direction:column; gap:24px;">
+              <div class="glass-panel" style="padding:24px; text-align:center; border:1px solid var(--border); border-radius:12px;">
+                <img id="gd-thumb" src="" referrerpolicy="no-referrer" style="width:200px; height:200px; border-radius:24px; object-fit:contain; box-shadow: 0 16px 32px rgba(0,0,0,0.4); margin-bottom:20px; background:var(--surface2);" onerror="this.src='https://cdn.cashpot.ro/cashpot/t1/thumbnail_games/placeholder.png'; this.style.opacity='0.5'">
+                <div id="gd-stats-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;"></div>
+              </div>
+            </div>
+            <div class="glass-panel" style="padding:0; overflow:hidden; border:1px solid var(--border); border-radius:12px;">
+              <div style="padding:16px 24px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:var(--surface2);">
+                <span style="font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:1px; color:var(--muted);">Distribuție pe Aparate / Locații</span>
+                <span id="gd-mach-count" style="font-size:11px; font-weight:700; color:var(--accent);">0 aparate</span>
+              </div>
+              <div style="max-height: calc(100vh - 250px); overflow-y:auto;">
+                <table class="data-table" style="width:100%; border-collapse:collapse; font-size:11px;">
+                  <thead>
+                    <tr>
+                      <th style="padding:10px 24px; text-align:left; color:var(--muted);">#</th>
+                      <th style="padding:10px 16px; text-align:left; color:var(--muted);">SERIE APARAT</th>
+                      <th style="padding:10px 16px; text-align:left; color:var(--muted);">LOCAȚIE</th>
+                      <th style="padding:10px 16px; text-align:left; color:var(--muted);">CABINET / PRODUCĂTOR</th>
+                      <th style="padding:10px 24px; text-align:right; color:var(--muted);">MIX ACTIV</th>
+                    </tr>
+                  </thead>
+                  <tbody id="body-gd-machines"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
 
     </div><!-- /padding container -->
   </div> <!-- /view-rapoarte -->
@@ -1346,6 +1354,7 @@
   </div>
 </div>
 
-<script src="app.js?v=20260511210600"></script>
+<script src="game_uuids.js?v=1"></script>
+<script src="app.js?v=20260512133200"></script>
 </body>
 </html>
