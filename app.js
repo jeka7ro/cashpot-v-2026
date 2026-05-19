@@ -3840,7 +3840,7 @@ window.doLogin = async function(e) {
       } else {
         localStorage.removeItem('cp2_saved_email');
       }
-      window.location.reload();
+      setTimeout(() => window.location.reload(), 300);
     }
   } catch (err) {
     errEl.textContent = 'Eroare retea. Verifica daca serverul ruleaza.';
