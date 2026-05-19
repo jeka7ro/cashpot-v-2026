@@ -1,6 +1,7 @@
 const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:5050' : '';
 let trendChart=null,pieChart=null,barChart=null,cabChart=null;
 let filtersData={},dailyData={},calViewDate=new Date();
+window.globalTooltipTimer = null;
 let EUR_RATE=5.0;
 const CHART_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#0ea5e9', '#d946ef'];
 
@@ -498,9 +499,8 @@ function renderMonthCalendar(){
         htmlTip += `</table>`;
       }
       htmlTip += `<div style="margin-top:12px;"><button class="btn" style="width:100%; justify-content:center; padding:6px; font-size:11px; background:var(--accent); color:#fff; border:none; border-radius:6px; cursor:pointer;" onclick="window.openDayAnalysis('${k}');">📈 Vezi Analiza Zilei</button></div>`;
-      let _ttHideTimer = null;
       const _showTooltip = () => {
-        clearTimeout(_ttHideTimer);
+        clearTimeout(window.globalTooltipTimer);
         let tt = document.getElementById('global-tooltip');
         if (!tt) { tt = document.createElement('div'); tt.id = 'global-tooltip'; tt.className = 'custom-tooltip'; document.body.appendChild(tt); }
         tt.innerHTML = htmlTip;
@@ -512,10 +512,10 @@ function renderMonthCalendar(){
         if (left < 10) left = 10;
         tt.style.left = left + 'px'; tt.style.top = top + 'px';
         // Allow hovering over the tooltip itself without it disappearing
-        tt.onmouseenter = () => clearTimeout(_ttHideTimer);
-        tt.onmouseleave = () => { _ttHideTimer = setTimeout(() => { tt.style.display = 'none'; }, 100); };
+        tt.onmouseenter = () => clearTimeout(window.globalTooltipTimer);
+        tt.onmouseleave = () => { window.globalTooltipTimer = setTimeout(() => { tt.style.display = 'none'; }, 100); };
       };
-      const _hideTooltip = () => { _ttHideTimer = setTimeout(() => { const tt = document.getElementById('global-tooltip'); if (tt) tt.style.display = 'none'; }, 150); };
+      const _hideTooltip = () => { window.globalTooltipTimer = setTimeout(() => { const tt = document.getElementById('global-tooltip'); if (tt) tt.style.display = 'none'; }, 150); };
       cell.addEventListener('mouseenter', _showTooltip);
       cell.addEventListener('mouseleave', _hideTooltip);
     } else {
@@ -560,14 +560,26 @@ function renderHourCalendar(selectedDate) {
         row.locs.forEach(l => { htmlTip += `<tr><td style="padding:4px 0; color:#cbd5e1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${l.locatie}">${l.locatie}</td><td style="text-align:right; padding:4px 0;" class="tt-val ${l.ggr>=0?'pos':'neg'}">${fmtK(l.ggr)}</td><td style="text-align:right; padding:4px 0;" class="tt-val">${fmtK(l.in)}</td><td style="text-align:right; padding:4px 0;" class="tt-val hl">${fmtK(l.hh)}</td></tr>`; });
         htmlTip += `</table>`;
       }
-      cell.addEventListener('mouseenter', (e) => {
-        let tt = document.getElementById('global-tooltip'); if (!tt) { tt = document.createElement('div'); tt.id = 'global-tooltip'; tt.className = 'custom-tooltip'; document.body.appendChild(tt); }
-        tt.innerHTML = htmlTip; tt.style.display = 'block'; const rect = cell.getBoundingClientRect();
-        let left = rect.left + rect.width / 2 - 140; let top = rect.bottom + 10 + window.scrollY;
-        if (left + 280 > window.innerWidth) left = window.innerWidth - 290; if (left < 10) left = 10;
-        tt.style.left = left + 'px'; tt.style.top = top + 'px';
-      });
-      cell.addEventListener('mouseleave', () => { const tt = document.getElementById('global-tooltip'); if (tt) tt.style.display = 'none'; });
+      const _showHourTooltip = () => {
+        clearTimeout(window.globalTooltipTimer);
+        let tt = document.getElementById('global-tooltip'); 
+        if (!tt) { tt = document.createElement('div'); tt.id = 'global-tooltip'; tt.className = 'custom-tooltip'; document.body.appendChild(tt); }
+        tt.innerHTML = htmlTip; 
+        tt.style.display = 'block'; 
+        const rect = cell.getBoundingClientRect();
+        let left = rect.left + rect.width / 2 - 140; 
+        let top = rect.bottom + 10 + window.scrollY;
+        if (left + 280 > window.innerWidth) left = window.innerWidth - 290; 
+        if (left < 10) left = 10;
+        tt.style.left = left + 'px'; 
+        tt.style.top = top + 'px';
+        tt.onmouseenter = () => clearTimeout(window.globalTooltipTimer);
+        tt.onmouseleave = () => { window.globalTooltipTimer = setTimeout(() => { tt.style.display = 'none'; }, 100); };
+      };
+      const _hideHourTooltip = () => { window.globalTooltipTimer = setTimeout(() => { const tt = document.getElementById('global-tooltip'); if (tt) tt.style.display = 'none'; }, 150); };
+      
+      cell.addEventListener('mouseenter', _showHourTooltip);
+      cell.addEventListener('mouseleave', _hideHourTooltip);
       cell.style.cursor = 'pointer';
       cell.addEventListener('click', () => {
         window.openHourAnalysis(selectedDate, k);
