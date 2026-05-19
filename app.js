@@ -1,4 +1,4 @@
-const API='http://localhost:5050';
+const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:5050' : '';
 let trendChart=null,pieChart=null,barChart=null,cabChart=null;
 let filtersData={},dailyData={},calViewDate=new Date();
 let EUR_RATE=5.0;
@@ -1334,9 +1334,16 @@ async function loadDashboardLiveCard() {
           const bet = p.bet_ron || 0;
           const est_in_str = (p.est_in !== undefined) ? fmt(p.est_in) : '—';
           const thumbUrl = gameThumbUrl(p.joc_activ, p.game_id);
+          
+          const pInitials = n.split(' ').filter(Boolean).map(x => x[0]).join('').substring(0, 2).toUpperCase() || 'P';
+          const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#0ea5e9', '#d946ef'];
+          const bg = colors[(p.player_id_live || 0) % colors.length];
+          
           html += `
             <div style="border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:8px; cursor:pointer; display:flex; align-items:center; gap:12px;" onclick="openPlayerDetails(${p.player_id_live||''})">
-              <img src="${thumbUrl}" style="width:40px; height:40px; border-radius:8px; object-fit:cover; border:1px solid rgba(255,255,255,0.1); background:var(--surface2);" onerror="this.src='https://cdn.cashpot.ro/cashpot/t1/thumbnail_games/placeholder.png'; this.style.opacity='0.3'" alt="">
+              <div style="width:40px; height:40px; border-radius:50%; background:${bg}; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:13px; flex-shrink:0; overflow:hidden; box-shadow:0 2px 6px rgba(0,0,0,0.2);">
+                ${pInitials}
+              </div>
               <div style="flex:1; min-width:0;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
                   <strong style="font-size:12px; color:var(--accent); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${i+1}. ${n}</strong>
@@ -1346,8 +1353,8 @@ async function loadDashboardLiveCard() {
                   <span style="color:var(--muted);">${p.locatie} &bull; Bet: <span style="color:var(--orange)">${fmt(bet)}</span></span>
                   <span style="color:#10b981; font-weight:700;">Est. IN: ${est_in_str}</span>
                 </div>
-                <div style="font-size:10px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                  <strong style="color:var(--text);">#${p.pozitie || p.machine_id || '—'}</strong> (SN: ${p.serial_nr || '—'}) &bull; <span style="cursor:pointer; color:var(--text); text-decoration:underline; text-decoration-style:dotted;" onclick="event.stopPropagation(); openGameDetails('${(cleanGameName(p.joc_activ)||'').replace(/'/g,"\\'")}', '${p.game_id||''}')">${cleanGameName(p.joc_activ) || 'Necunoscut'}</span>
+                <div style="font-size:10px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:6px;">
+                  <strong style="color:var(--text);">#${p.pozitie || p.machine_id || '—'}</strong> (SN: ${p.serial_nr || '—'}) &bull; <img src="${thumbUrl}" style="width:16px; height:16px; border-radius:4px; object-fit:cover; display:inline-block; vertical-align:middle; background:var(--surface2);" onerror="this.style.display='none'"> <span style="cursor:pointer; color:var(--text); text-decoration:underline; text-decoration-style:dotted;" onclick="event.stopPropagation(); openGameDetails('${(cleanGameName(p.joc_activ)||'').replace(/'/g,"\\'")}', '${p.game_id||''}')">${cleanGameName(p.joc_activ) || 'Necunoscut'}</span>
                 </div>
               </div>
             </div>
@@ -1755,11 +1762,22 @@ window.loadHhReport = async function() {
     const playersBody = document.getElementById('body-hh-players');
     if (playersBody) {
       if (playersData && playersData.length > 0) {
-        tableStates['hh-players'].rows = playersData.map((p, i) => `
+        tableStates['hh-players'].rows = playersData.map((p, i) => {
+          const pInitials = ((p.first_name || '') + ' ' + (p.last_name || '')).split(' ').filter(Boolean).map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'P';
+          const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#0ea5e9', '#d946ef'];
+          const bg = colors[p.id % colors.length];
+          return `
           <tr style="border-bottom:1px solid var(--border)" onmouseenter="this.style.background='var(--surface2)'" onmouseleave="this.style.background=''">
             <td style="text-align:left;">
-              <div style="font-weight:700;color:var(--text)">${p.first_name || 'N/A'} ${p.last_name || ''}</div>
-              <div style="font-size:10px;color:var(--muted)">ID: ${p.id} &bull; ${p.locatie || '—'}</div>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div style="width:32px; height:32px; border-radius:50%; background:${bg}; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:11px; flex-shrink:0; overflow:hidden; box-shadow:0 2px 5px rgba(0,0,0,0.2);">
+                  ${pInitials}
+                </div>
+                <div>
+                  <div style="font-weight:700;color:var(--text)">${p.first_name || 'N/A'} ${p.last_name || ''}</div>
+                  <div style="font-size:10px;color:var(--muted)">ID: ${p.id} &bull; ${p.locatie || '—'}</div>
+                </div>
+              </div>
             </td>
             <td>${p.phone || '—'}</td>
             <td class="num" style="font-weight:800; color:var(--accent);">${p.sessions_in_hh}</td>
@@ -1768,7 +1786,8 @@ window.loadHhReport = async function() {
             </td>
             <td class="num">${p.last_hh_session ? p.last_hh_session.substring(0, 16) : '—'}</td>
           </tr>
-        `);
+        `;
+        });
       } else {
         tableStates['hh-players'].rows = ['<tr><td colspan="5" style="text-align:center; padding:24px; color:var(--muted);">Nu au fost găsiți jucători activi în orele de HH.</td></tr>'];
       }
@@ -2802,6 +2821,21 @@ async function loadLive() {
     tableStates['live-machines'].rows = machines.map((m, i) => {
       const hasPlayer = m.player_name && !m.player_name.includes('None') && m.player_name.trim();
       const ggrC = (m.ggr_azi||0) >= 0 ? 'var(--green)' : 'var(--red)';
+      
+      let playerCellHtml = `<span style="color:var(--muted)">—</span>`;
+      if (hasPlayer) {
+        const pInitials = m.player_name.split(' ').filter(Boolean).map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'P';
+        const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#0ea5e9', '#d946ef'];
+        const bg = colors[(m.player_id_live || 0) % colors.length];
+        playerCellHtml = `
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div style="width:24px; height:24px; border-radius:50%; background:${bg}; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:9px; flex-shrink:0; overflow:hidden;">
+              ${pInitials}
+            </div>
+            <span style="font-weight:700;color:var(--blue);cursor:pointer;" onclick="openPlayerDetails(${m.player_id_live})">${m.player_name}</span>
+          </div>`;
+      }
+      
       return `
         <tr>
           <td style="padding-left:16px;color:var(--muted);font-weight:700">${i+1}</td>
@@ -2809,7 +2843,7 @@ async function loadLive() {
           <td style="color:var(--muted);white-space:nowrap">${m.locatie||'—'}</td>
           <td style="color:var(--muted);max-width:140px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${(m.tip_cabinet||'').replace(/"/g,'')}">${m.tip_cabinet||'—'}</td>
           <td style="color:var(--muted);max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${(cleanGameName(m.joc_activ)||'').replace(/"/g,'')}">${cleanGameName(m.joc_activ)||'—'}</td>
-          <td style="max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${hasPlayer?`<span style="font-weight:700;color:var(--blue);cursor:pointer;" onclick="openPlayerDetails(${m.player_id_live})">${m.player_name}</span>`:`<span style="color:var(--muted)">—</span>`}</td>
+          <td style="max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${playerCellHtml}</td>
           <td class="num" style="text-align:center;color:var(--muted)">${m.pozitie||'—'}</td>
           <td class="num" style="font-weight:900;color:var(--accent);white-space:nowrap">${fmtK(m.credite_ron ?? m.current_credits * (m.denomination || 0.01))}</td>
           <td class="num" style="color:var(--text)">${fmtK(m.bet_ron ?? m.current_bet * (m.denomination || 0.01))}</td>
@@ -3086,8 +3120,104 @@ window._renderPlayerDetails = async function(pid) {
     // Header Data
     const p = res.player;
     document.getElementById('pd-name').textContent = p.first_name + ' ' + (p.last_name || '');
-    document.getElementById('pd-meta').innerHTML = `ID: ${p.id} &bull; Tel: ${p.phone || '—'} &bull; Card: ${p.card_no || '—'}`;
+    document.getElementById('pd-meta').innerHTML = `
+      <span style="display:inline-block; background:rgba(255,255,255,0.05); padding:4px 10px; border-radius:12px; border:1px solid var(--border); margin-right:8px; font-weight:600;">ID: <strong style="color:var(--text); font-weight:700;">${p.id}</strong></span>
+      <span style="display:inline-block; background:rgba(255,255,255,0.05); padding:4px 10px; border-radius:12px; border:1px solid var(--border); margin-right:8px; font-weight:600;">Tel: <strong style="color:var(--text); font-weight:700;">${p.phone || '—'}</strong></span>
+      <span style="display:inline-block; background:rgba(99,102,241,0.1); padding:4px 12px; border-radius:12px; border:1px solid rgba(99,102,241,0.25); font-weight:600;">Card: <strong style="color:var(--accent); font-weight:800;">${p.card_no || '—'}</strong></span>
+    `;
     document.getElementById('pd-points').textContent = fmt(p.points, 2);
+    
+    // Set Player Avatar
+    const pInitials = ((p.first_name || '') + ' ' + (p.last_name || '')).split(' ').filter(Boolean).map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'P';
+    const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#0ea5e9', '#d946ef'];
+    const bg = colors[p.id % colors.length];
+    const pdAvatar = document.getElementById('pd-avatar');
+    if (pdAvatar) {
+      pdAvatar.style.background = bg;
+      pdAvatar.textContent = pInitials;
+    }
+
+    // Dynamic VIP Level & Progress Calculation
+    const pts = p.points || 0;
+    let lvlName = 'Bronz';
+    let lvlEmoji = '🏆';
+    let badgeBg = 'linear-gradient(135deg, #cd7f32, #a0522d)'; // Bronze
+    let minPts = 0;
+    let maxPts = 100;
+    let nextLvl = 'ARGINT';
+    let statusText = 'Jucător Standard';
+    
+    if (pts >= 10000) {
+      lvlName = 'Diamond';
+      lvlEmoji = '👑';
+      badgeBg = 'linear-gradient(135deg, #06b6d4, #0891b2)';
+      minPts = 10000;
+      maxPts = 10000;
+      nextLvl = '';
+      statusText = 'Jucător de Elită VIP';
+    } else if (pts >= 2000) {
+      lvlName = 'Platinum';
+      lvlEmoji = '💎';
+      badgeBg = 'linear-gradient(135deg, #3b82f6, #1d4ed8)';
+      minPts = 2000;
+      maxPts = 10000;
+      nextLvl = 'DIAMOND';
+      statusText = 'Super VIP';
+    } else if (pts >= 500) {
+      lvlName = 'Gold';
+      lvlEmoji = '🥇';
+      badgeBg = 'linear-gradient(135deg, #fbbf24, #d97706)';
+      minPts = 500;
+      maxPts = 2000;
+      nextLvl = 'PLATINUM';
+      statusText = 'VIP Gold';
+    } else if (pts >= 100) {
+      lvlName = 'Silver';
+      lvlEmoji = '🥈';
+      badgeBg = 'linear-gradient(135deg, #94a3b8, #475569)';
+      minPts = 100;
+      maxPts = 500;
+      nextLvl = 'GOLD';
+      statusText = 'Client Argint';
+    } else {
+      lvlName = 'Bronz';
+      lvlEmoji = '🏆';
+      badgeBg = 'linear-gradient(135deg, #b45309, #78350f)';
+      minPts = 0;
+      maxPts = 100;
+      nextLvl = 'SILVER';
+      statusText = 'Client Bronz';
+    }
+    
+    const range = maxPts - minPts;
+    const progressPct = range > 0 ? Math.min(100, Math.max(0, ((pts - minPts) / range) * 100)) : 100;
+    const remaining = maxPts - pts;
+    
+    const lvlTitleEl = document.getElementById('pd-level-title');
+    if (lvlTitleEl) lvlTitleEl.textContent = `Nivel ${lvlName}`;
+    
+    const lvlPointsEl = document.getElementById('pd-level-points');
+    if (lvlPointsEl) {
+      lvlPointsEl.textContent = range > 0 ? `${fmt(pts, 2)} / ${maxPts} pct` : `${fmt(pts, 2)} pct`;
+    }
+    
+    const prgBarEl = document.getElementById('pd-level-progress-bar');
+    if (prgBarEl) prgBarEl.style.width = `${progressPct}%`;
+    
+    const badgeEl = document.getElementById('pd-level-badge');
+    if (badgeEl) {
+      badgeEl.style.left = `calc(${progressPct}% - 29px)`;
+      badgeEl.style.background = badgeBg;
+      badgeEl.textContent = lvlEmoji;
+    }
+    
+    const nextEl = document.getElementById('pd-level-next');
+    if (nextEl) {
+      nextEl.innerHTML = range > 0 ? `Următorul Nivel: <strong>${nextLvl}</strong> (mai ai ${fmt(remaining, 2)} pct)` : `Ai atins nivelul maxim!`;
+    }
+    
+    const statusEl = document.getElementById('pd-level-status');
+    if (statusEl) statusEl.textContent = `Statut: ${statusText}`;
     
     // History Table
     const pgBodyId = 'pd-history';
@@ -3393,13 +3523,24 @@ window.loadClientiReport = async function() {
     const data = await api(`/api/players?${p}`);
     if (!tableStates['rep-clienti']) tableStates['rep-clienti'] = { page: 1, limit: 20, rows: [], allRows: [] };
     
-    const htmlRows = data.map((r, i) => `
+    const htmlRows = data.map((r, i) => {
+      const pInitials = ((r.first_name || '') + ' ' + (r.last_name || '')).split(' ').filter(Boolean).map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'P';
+      const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#0ea5e9', '#d946ef'];
+      const bg = colors[r.id % colors.length];
+      return `
       <tr>
         <td style="padding-left:16px; width:40px;"><input type="checkbox" class="row-checkbox"></td>
         <td style="width:40px;">${i+1}</td>
         <td style="text-align:left; cursor:pointer;" onclick="openPlayerDetails(${r.id})">
-          <div style="font-weight:700;color:var(--accent); text-decoration:underline;">${r.first_name || 'N/A'} ${r.last_name || ''}</div>
-          <div style="font-size:10px;color:var(--muted)">ID: ${r.id}</div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <div style="width:32px; height:32px; border-radius:50%; background:${bg}; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:11px; flex-shrink:0; overflow:hidden; box-shadow:0 2px 5px rgba(0,0,0,0.2);">
+              ${pInitials}
+            </div>
+            <div>
+              <div style="font-weight:700;color:var(--accent); text-decoration:underline;">${r.first_name || 'N/A'} ${r.last_name || ''}</div>
+              <div style="font-size:10px;color:var(--muted)">ID: ${r.id}</div>
+            </div>
+          </div>
         </td>
         <td>${r.phone || '—'}</td>
         <td>${r.locatie || '—'}</td>
@@ -3413,7 +3554,8 @@ window.loadClientiReport = async function() {
         <td class="num">${fmt(r.total_bets || 0)}</td>
         <td class="num">${fmt(r.avg_bet || 0, 2)}</td>
       </tr>
-    `);
+      `;
+    });
     
     tableStates['rep-clienti'].allRows = htmlRows;
     
@@ -3536,6 +3678,17 @@ window.filterCashoutTable = function() {
       <td class="num" style="color:var(--green); font-weight:700;">${est_in_str}</td>
     </tr>`;
   });
+
+  const counter = document.getElementById('csh-search-counter');
+  if (counter) {
+    if (q) {
+      counter.textContent = `${filtered.length} rezultate`;
+      counter.style.display = 'flex';
+    } else {
+      counter.style.display = 'none';
+    }
+  }
+
   renderTablePaginated('rep-cashout');
 };
 
@@ -3637,7 +3790,8 @@ async function checkAuth() {
         });
         // Auto-redirect if current hash is not allowed
         const currentHash = window.location.hash.replace('#', '') || 'dashboard';
-        if (!perms.pages.includes(currentHash) && perms.pages.length > 0) {
+        const mainHash = currentHash.split('/')[0];
+        if (!perms.pages.includes(mainHash) && perms.pages.length > 0) {
           window.location.hash = '#' + perms.pages[0];
         }
       }
@@ -3975,6 +4129,17 @@ window.renderSloturi = function() {
       </td>
     </tr>`;
   });
+
+  const counter = document.getElementById('slot-search-counter');
+  if (counter) {
+    if (q) {
+      counter.textContent = `${filtered.length} rezultate`;
+      counter.style.display = 'flex';
+    } else {
+      counter.style.display = 'none';
+    }
+  }
+
   renderTablePaginated('admin-sloturi');
 };
 
