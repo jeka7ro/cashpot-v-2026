@@ -3823,7 +3823,7 @@ window.toggleLoginPassword = function() {
 }
 
 window.doLogin = async function(e) {
-  if(e) e.preventDefault();
+  // Allow native submit to hidden iframe
   const email = document.getElementById('login-email').value;
   const pwd = document.getElementById('login-password').value;
   const remember = document.getElementById('login-remember')?.checked;
@@ -3846,7 +3846,7 @@ window.doLogin = async function(e) {
       } else {
         localStorage.removeItem('cp2_saved_email');
       }
-      setTimeout(() => window.location.reload(), 300);
+      setTimeout(() => window.location.reload(), 1500);
     }
   } catch (err) {
     errEl.textContent = 'Eroare retea. Verifica daca serverul ruleaza.';
