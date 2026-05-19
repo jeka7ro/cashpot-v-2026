@@ -568,6 +568,10 @@ function renderHourCalendar(selectedDate) {
         tt.style.left = left + 'px'; tt.style.top = top + 'px';
       });
       cell.addEventListener('mouseleave', () => { const tt = document.getElementById('global-tooltip'); if (tt) tt.style.display = 'none'; });
+      cell.style.cursor = 'pointer';
+      cell.addEventListener('click', () => {
+        window.openHourAnalysis(selectedDate, k);
+      });
     } else { cell.innerHTML=`<div class="cal-day-num">${k}</div>`; }
     grid.appendChild(cell);
   });
@@ -4353,3 +4357,81 @@ document.addEventListener('DOMContentLoaded', () => {
   loadFilters();
 });
 
+window.openHourAnalysis = async function(date, hour) {
+  const modal = document.getElementById('hour-analysis-modal');
+  const body = document.getElementById('hour-analysis-body');
+  const title = document.getElementById('hour-analysis-title');
+  if(!modal) return;
+  
+  title.textContent = `Analiză Oră: ${date} ${hour}`;
+  modal.classList.add('show');
+  body.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:24px; color:var(--muted)">Se încarcă datele...</td></tr>';
+  
+  try {
+    const locEl = document.getElementById('global-loc-select');
+    const locId = locEl ? locEl.value : 'all';
+    let p = `start=${date}&end=${date}`;
+    if(locId !== 'all') p += `&loc_ids=${locId}`;
+    else {
+      const ex=getExcluded();
+      const active=(filtersData.locations||[]).filter(l=>!ex.includes(String(l.id))).map(l=>l.id);
+      if(active.length) p += '&loc_ids='+active.join(',');
+    }
+
+    // Fetch machines to get cabinet and mix
+    const dataMachines = await api(`/api/machines?${p}`);
+    const machineMap = {};
+    if(Array.isArray(dataMachines)) {
+      dataMachines.forEach(m => {
+        machineMap[m.serial_nr] = { cabinet: m.cabinet, mix: m.mix, game: m.last_game_name || m.game_name };
+      });
+    }
+
+    // Fetch hourly details
+    const dataHourly = await api(`/api/reports/hourly?${p}`);
+    
+    // Filter to selected hour
+    const hPrefix = hour.split(':')[0]; // "11"
+    const hourRows = dataHourly.filter(r => {
+      if (!r.dt) return false;
+      const parts = r.dt.split(' ');
+      if (parts.length < 2) return false;
+      return parts[1].startsWith(hPrefix + ':');
+    });
+
+    if (hourRows.length === 0) {
+      body.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:24px; color:var(--muted)">Nu există date sau plăți înregistrate în această oră.</td></tr>';
+      return;
+    }
+
+    // Sort ascending by GGR (biggest minus first)
+    hourRows.sort((a, b) => (parseFloat(a.ggr) || 0) - (parseFloat(b.ggr) || 0));
+
+    body.innerHTML = hourRows.map(r => {
+      const ggr = parseFloat(r.ggr) || 0;
+      const tIn = parseFloat(r.in) || 0;
+      const tOut = parseFloat(r.out) || 0;
+      const ggrClass = ggr < 0 ? 'cell-neg-2' : (ggr > 0 ? 'cell-pos-2' : '');
+      const serial = r.serial || '—';
+      const mInfo = machineMap[serial] || {};
+      const cabInfo = mInfo.cabinet ? `${mInfo.cabinet} / ${mInfo.mix||''}` : '—';
+      const gameInfo = mInfo.game ? `<div style="font-size:9px; color:var(--accent); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:140px;" title="${mInfo.game}">${mInfo.game}</div>` : '';
+      
+      return `<tr>
+        <td>${r.locatie || '—'}</td>
+        <td>
+          <div style="font-weight:700;">${serial}</div>
+          ${gameInfo}
+        </td>
+        <td><span style="font-size:10px; color:var(--muted)">${cabInfo}</span></td>
+        <td>${r.provider || '—'}</td>
+        <td class="num">${fmt(tIn)}</td>
+        <td class="num">${fmt(tOut)}</td>
+        <td class="num ${ggrClass}"><strong>${fmt(ggr)}</strong></td>
+      </tr>`;
+    }).join('');
+
+  } catch(e) {
+    body.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:24px; color:#ef4444">Eroare la încărcare: ${e.message}</td></tr>`;
+  }
+};

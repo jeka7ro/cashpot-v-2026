@@ -1392,6 +1392,29 @@
   </div>
 </div>
 
+<!-- HOUR ANALYSIS MODAL -->
+<div class="settings-modal" id="hour-analysis-modal" onclick="if(event.target===this) this.classList.remove('show')">
+  <div class="settings-panel" style="width:900px; max-width:95%;">
+    <div class="settings-header">
+      <div class="settings-title" id="hour-analysis-title">Analiză Oră</div>
+      <button class="settings-close" onclick="document.getElementById('hour-analysis-modal').classList.remove('show')">×</button>
+    </div>
+    <div class="settings-body" style="padding:0; overflow-y:auto; max-height:70vh;">
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead><tr>
+            <th>Locație</th><th>Serial</th><th>Cabinet & Mix</th><th>Provider</th>
+            <th class="num">IN</th><th class="num">OUT</th><th class="num">GGR</th>
+          </tr></thead>
+          <tbody id="hour-analysis-body">
+            <tr><td colspan="7" style="text-align:center; padding:24px; color:var(--muted)">Se încarcă datele...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="game_uuids.js?v=1"></script>
 <script src="app.js?v=20260512184500"></script>
 </body>
