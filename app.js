@@ -790,6 +790,8 @@ async function loadKPI(s,e){
   document.getElementById('v-in-day').textContent='AVG/zi: '+fmt(d.avg_in_zi)+' RON';
   document.getElementById('v-ggr').textContent=fmt(d.ggr)+' RON';
   document.getElementById('v-hold').textContent='Hold: '+fmt(d.hold_pct,2)+'%';
+  const ggrDayEl = document.getElementById('v-ggr-day');
+  if(ggrDayEl) ggrDayEl.textContent = 'AVG/zi: ' + fmt(d.avg_ggr_zi) + ' RON';
   document.getElementById('v-ngr').textContent=fmtE(d.ggr);
   document.getElementById('v-jp').textContent=fmt(d.jackpot)+' RON';
   document.getElementById('v-hh').textContent='HH: '+fmt(d.hh)+' RON';
