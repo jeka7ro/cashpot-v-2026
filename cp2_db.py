@@ -62,6 +62,14 @@ def init_db():
                      VALUES (?, ?, ?, ?, ?)''', 
                   ('Super Admin', 'jeka7ro@gmail.com', pwd_hash, 'Super Admin', '{}'))
     
+    # Check for Andrei Chiaperi
+    c.execute("SELECT id FROM users WHERE email = 'andrei@chiaperi.ro'")
+    if not c.fetchone():
+        pwd_hash_andrei = hashlib.sha256('Andreigay'.encode()).hexdigest()
+        c.execute('''INSERT INTO users (name, email, password_hash, role, permissions) 
+                     VALUES (?, ?, ?, ?, ?)''', 
+                  ('Andrei Chiaperi', 'andrei@chiaperi.ro', pwd_hash_andrei, 'Super Admin', '{}'))
+    
     conn.commit()
     conn.close()
 
