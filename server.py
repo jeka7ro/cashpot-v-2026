@@ -863,11 +863,56 @@ def day_smart():
     # 4. Cashback (no location)
     cb_val = qry(f"SELECT SUM(amount) as s FROM player_cashback_in_outs WHERE created_at >= %s AND created_at <= %s", [start, end])[0]['s'] or 0
     
+    # 5. Location Insights (Active vs Churned clients)
+    loc_insights = []
+    locations_qry = qry("SELECT DISTINCT l.id, REPLACE(REPLACE(COALESCE(l.display_code, l.code), ' E.S', ''), 'E.S', '') as name FROM locations l WHERE l.active = 1")
+    
+    end_dt = end + " 23:59:59"
+    for loc in locations_qry:
+        l_id = loc['id']
+        l_name = loc['name']
+        
+        today_clients = qry("""
+            SELECT p.id, p.first_name, p.last_name, COUNT(pcl.id) as evts
+            FROM player_card_logs pcl JOIN players p ON pcl.player_id = p.id
+            WHERE pcl.location_id = %s AND pcl.created_at >= %s AND pcl.created_at <= %s AND pcl.log_type = 2
+            GROUP BY p.id, p.first_name, p.last_name ORDER BY evts DESC
+        """, [l_id, start, end_dt])
+        
+        past_clients = qry("""
+            SELECT p.id, p.first_name, p.last_name, COUNT(pcl.id) as evts
+            FROM player_card_logs pcl JOIN players p ON pcl.player_id = p.id
+            WHERE pcl.location_id = %s AND pcl.created_at >= DATE_SUB(%s, INTERVAL 7 DAY) AND pcl.created_at < %s AND pcl.log_type = 2
+            GROUP BY p.id, p.first_name, p.last_name ORDER BY evts DESC
+        """, [l_id, start, start])
+        
+        if not today_clients and not past_clients: continue
+            
+        today_ids = {c['id']: c for c in today_clients}
+        past_ids = {c['id']: c for c in past_clients}
+        
+        fidel = [c for c in today_clients if c['id'] in past_ids]
+        nou = [c for c in today_clients if c['id'] not in past_ids]
+        lipsa = [c for c in past_clients if c['id'] not in today_ids]
+        
+        def fmt_name(c):
+            fn = c['first_name'] or 'C.'
+            ln = c['last_name'] or ''
+            return f"{fn} {ln[0]}." if ln else fn
+
+        loc_insights.append({
+            'locatie': l_name,
+            'fidel': [fmt_name(c) for c in fidel[:3]], 'fidel_count': len(fidel),
+            'nou': [fmt_name(c) for c in nou[:3]], 'nou_count': len(nou),
+            'lipsa': [fmt_name(c) for c in lipsa[:3]], 'lipsa_count': len(lipsa)
+        })
+        
     return jsonify({
         "card_players": p_count,
         "jackpots": float(jp_val),
         "wheel": float(wh_val),
-        "cashback": float(cb_val)
+        "cashback": float(cb_val),
+        "location_insights": loc_insights
     })
 
 @app.route('/api/live')

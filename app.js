@@ -2263,19 +2263,50 @@ window.openDayAnalysis = async function(dateStr) {
       </div>`).join('');
 
     // ── Smart Client Stats ──────────────────────────────────────────────
+    let locInsightsHtml = '';
+    if (smart.location_insights && smart.location_insights.length > 0) {
+      locInsightsHtml = `<div style="margin-top:16px; display:flex; gap:12px; flex-wrap:wrap;">`;
+      smart.location_insights.forEach(li => {
+        locInsightsHtml += `
+          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:12px; flex:1; min-width:220px;">
+            <div style="font-weight:800; font-size:12px; color:var(--text); margin-bottom:8px;">${li.locatie}</div>
+            
+            <div style="font-size:11px; margin-bottom:4px; display:flex; justify-content:space-between;">
+              <span style="color:var(--muted)">Fideli (${li.fidel_count}):</span>
+              <span style="color:var(--text)">${li.fidel.join(', ') || '—'}</span>
+            </div>
+            
+            <div style="font-size:11px; margin-bottom:4px; display:flex; justify-content:space-between;">
+              <span style="color:var(--green)">+ Noi/Reveniți (${li.nou_count}):</span>
+              <span style="color:var(--text)">${li.nou.join(', ') || '—'}</span>
+            </div>
+            
+            <div style="font-size:11px; display:flex; justify-content:space-between;">
+              <span style="color:var(--red)">- Lipsă (7 zile) (${li.lipsa_count}):</span>
+              <span style="color:var(--text)">${li.lipsa.join(', ') || '—'}</span>
+            </div>
+          </div>
+        `;
+      });
+      locInsightsHtml += `</div>`;
+    }
+
     let smartHtml = `
-      <div style="background:linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(139,92,246,0.1) 100%); border:1px solid rgba(139,92,246,0.3); border-radius:var(--radius); padding:20px; margin-bottom:24px; display:flex; justify-content:space-between; align-items:center;">
-        <div>
-          <div style="font-size:11px; font-weight:800; color:#8b5cf6; text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px;">✨ Smart Client Insights</div>
-          <div style="font-size:13px; color:var(--text); max-width:400px; line-height:1.4;">
-            Activitate loialitate: <strong>${smart.card_players}</strong> clienți cu card unici au jucat azi.
+      <div style="background:linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(139,92,246,0.1) 100%); border:1px solid rgba(139,92,246,0.3); border-radius:var(--radius); padding:20px; margin-bottom:24px; display:flex; flex-direction:column;">
+        <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+          <div>
+            <div style="font-size:11px; font-weight:800; color:#8b5cf6; text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px;">✨ Smart Client Insights</div>
+            <div style="font-size:13px; color:var(--text); max-width:400px; line-height:1.4;">
+              Activitate loialitate: <strong>${smart.card_players}</strong> clienți cu card unici au jucat.
+            </div>
+          </div>
+          <div style="display:flex; gap:16px; text-align:right;">
+            <div><div style="font-size:10px; color:var(--muted); text-transform:uppercase;">Cashback Oferit</div><div style="font-size:16px; font-weight:800; color:var(--text);">${fmt(smart.cashback)} RON</div></div>
+            <div><div style="font-size:10px; color:var(--muted); text-transform:uppercase;">Câștig Roată</div><div style="font-size:16px; font-weight:800; color:var(--orange);">${fmt(smart.wheel)} RON</div></div>
+            <div><div style="font-size:10px; color:var(--muted); text-transform:uppercase;">Jackpoturi (Card)</div><div style="font-size:16px; font-weight:800; color:var(--green);">${fmt(smart.jackpots)} RON</div></div>
           </div>
         </div>
-        <div style="display:flex; gap:16px; text-align:right;">
-          <div><div style="font-size:10px; color:var(--muted); text-transform:uppercase;">Cashback Oferit</div><div style="font-size:16px; font-weight:800; color:var(--text);">${fmt(smart.cashback)} RON</div></div>
-          <div><div style="font-size:10px; color:var(--muted); text-transform:uppercase;">Câștig Roată</div><div style="font-size:16px; font-weight:800; color:var(--orange);">${fmt(smart.wheel)} RON</div></div>
-          <div><div style="font-size:10px; color:var(--muted); text-transform:uppercase;">Jackpoturi (Card)</div><div style="font-size:16px; font-weight:800; color:var(--green);">${fmt(smart.jackpots)} RON</div></div>
-        </div>
+        ${locInsightsHtml}
       </div>
     `;
     
