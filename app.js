@@ -2268,22 +2268,22 @@ window.openDayAnalysis = async function(dateStr) {
       locInsightsHtml = `<div style="margin-top:16px; display:flex; gap:12px; flex-wrap:wrap;">`;
       smart.location_insights.forEach(li => {
         locInsightsHtml += `
-          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:12px; flex:1; min-width:220px;">
-            <div style="font-weight:800; font-size:12px; color:var(--text); margin-bottom:8px;">${li.locatie}</div>
+          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:12px; flex:1; min-width:220px; display:flex; flex-direction:column; gap:8px;">
+            <div style="font-weight:800; font-size:12px; color:var(--text); border-bottom:1px solid var(--border); padding-bottom:6px;">${li.locatie}</div>
             
-            <div style="font-size:11px; margin-bottom:4px; display:flex; justify-content:space-between;">
-              <span style="color:var(--muted)">Fideli (${li.fidel_count}):</span>
-              <span style="color:var(--text)">${li.fidel.join(', ') || '—'}</span>
+            <div style="font-size:11px; display:flex; flex-direction:column; gap:2px;">
+              <span style="color:var(--muted); font-weight:600;">Fideli (${li.fidel_count}):</span>
+              <span style="color:var(--text); line-height:1.4;">${li.fidel.join(', ') || '—'}</span>
             </div>
             
-            <div style="font-size:11px; margin-bottom:4px; display:flex; justify-content:space-between;">
-              <span style="color:var(--green)">+ Noi/Reveniți (${li.nou_count}):</span>
-              <span style="color:var(--text)">${li.nou.join(', ') || '—'}</span>
+            <div style="font-size:11px; display:flex; flex-direction:column; gap:2px;">
+              <span style="color:var(--green); font-weight:600;">+ Noi/Reveniți (${li.nou_count}):</span>
+              <span style="color:var(--text); line-height:1.4;">${li.nou.join(', ') || '—'}</span>
             </div>
             
-            <div style="font-size:11px; display:flex; justify-content:space-between;">
-              <span style="color:var(--red)">- Lipsă (7 zile) (${li.lipsa_count}):</span>
-              <span style="color:var(--text)">${li.lipsa.join(', ') || '—'}</span>
+            <div style="font-size:11px; display:flex; flex-direction:column; gap:2px;">
+              <span style="color:var(--red); font-weight:600;">- Lipsă (7 zile) (${li.lipsa_count}):</span>
+              <span style="color:var(--text); line-height:1.4;">${li.lipsa.join(', ') || '—'}</span>
             </div>
           </div>
         `;
