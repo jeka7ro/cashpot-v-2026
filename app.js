@@ -147,10 +147,20 @@ function locParam() {
 }
 window.reloadCurrentView = function() {
   const hash = window.location.hash || '#dashboard';
-  if (hash.startsWith('#rapoarte/evolutie-ore')) loadHourlyReport();
+  const { s, e } = getPeriod();
+  
+  if (s && e && !hash.startsWith('#dashboard') && !hash.startsWith('#live') && !hash.startsWith('#admin')) {
+    loadKPI(s, e);
+  }
+
+  if (hash.startsWith('#rapoarte/ore')) loadHourlyReport();
   else if (hash.startsWith('#rapoarte/hh')) loadHhReport();
   else if (hash.startsWith('#rapoarte/marketing')) loadMarketingReport();
   else if (hash.startsWith('#rapoarte/clienti')) loadClientiReport();
+  else if (hash.startsWith('#rapoarte/cashout')) loadRapoarteCashout();
+  else if (hash.startsWith('#rapoarte/multigame')) {
+    window.loadMultigameReport ? loadMultigameReport() : loadMultigame();
+  }
   else if (hash.startsWith('#admin/sloturi')) loadAdminSloturi();
   else loadAll();
 };
@@ -1448,6 +1458,14 @@ document.getElementById('theme-toggle').addEventListener('click', () => {
   localStorage.setItem('theme', next);
   Chart.defaults.color = next === 'light' ? '#64748b' : '#94a3b8';
   Chart.defaults.borderColor = next === 'light' ? '#e2e8f0' : 'rgba(255,255,255,0.06)';
+  
+  if (localStorage.getItem('cp2_token')) {
+    apiAuth('/api/me/theme', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ theme: next })
+    }).catch(e => console.error('Failed to save theme', e));
+  }
   if(trendChart) trendChart.update();
   if(barChart) barChart.update();
   if(pieChart) pieChart.update();
@@ -3778,6 +3796,12 @@ async function checkAuth() {
     if (currentUser.permissions) {
       try { perms = JSON.parse(currentUser.permissions); } catch(e) { console.error('Perms Parse Error:', e); }
     }
+    if (perms.theme && ['light', 'dark'].includes(perms.theme)) {
+      document.documentElement.setAttribute('data-theme', perms.theme);
+      localStorage.setItem('theme', perms.theme);
+      Chart.defaults.color = perms.theme === 'light' ? '#64748b' : '#94a3b8';
+      Chart.defaults.borderColor = perms.theme === 'light' ? '#e2e8f0' : 'rgba(255,255,255,0.06)';
+    }
     
     const avatarEl = document.getElementById('user-avatar');
     if (perms.avatar) {
@@ -4414,7 +4438,7 @@ window.openHourAnalysis = async function(date, hour) {
     });
 
     if (hourRows.length === 0) {
-      body.innerHTML = '<tr><td colspan="7" style="text-align:center; padding:24px; color:var(--muted)">Nu există date sau plăți înregistrate în această oră.</td></tr>';
+      body.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:24px; color:var(--muted)">Nu există date sau plăți înregistrate în această oră.</td></tr>';
       return;
     }
 
@@ -4425,11 +4449,22 @@ window.openHourAnalysis = async function(date, hour) {
       const ggr = parseFloat(r.ggr) || 0;
       const tIn = parseFloat(r.in) || 0;
       const tOut = parseFloat(r.out) || 0;
+      const tHh = parseFloat(r.hh) || 0;
+      const tJp = parseFloat(r.jackpot) || 0;
+      const tBet = parseFloat(r.bet) || 0;
+      const outHh = tOut + tHh + tJp;
+      
+      // Estimat IN: o aproximație bazată pe Cashout / Handpay, mărginită de IN-ul real
+      let estIn = outHh > 0 ? (outHh * 0.95) : 0;
+      if (estIn > tIn && tIn > 0) estIn = tIn; // Nu mai mult de IN real
+
       const ggrClass = ggr < 0 ? 'cell-neg-2' : (ggr > 0 ? 'cell-pos-2' : '');
-      const serial = r.serial || '—';
+      const serial = r.serial_nr || r.serial || '—';
       const mInfo = machineMap[serial] || {};
       const cabInfo = mInfo.cabinet ? `${mInfo.cabinet} / ${mInfo.mix||''}` : '—';
       const gameInfo = mInfo.game ? `<div style="font-size:9px; color:var(--accent); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:140px;" title="${mInfo.game}">${mInfo.game}</div>` : '';
+      
+      const clientName = r.player_name ? `<span style="font-weight:700; color:var(--blue);">${r.player_name}</span>` : '<span style="color:var(--muted)">—</span>';
       
       return `<tr>
         <td>${r.locatie || '—'}</td>
@@ -4437,15 +4472,18 @@ window.openHourAnalysis = async function(date, hour) {
           <div style="font-weight:700;">${serial}</div>
           ${gameInfo}
         </td>
+        <td>${clientName}</td>
         <td><span style="font-size:10px; color:var(--muted)">${cabInfo}</span></td>
         <td>${r.provider || '—'}</td>
+        <td class="num">${fmt(tBet)}</td>
+        <td class="num" style="color:var(--orange); font-weight:600;">${fmt(estIn)}</td>
         <td class="num">${fmt(tIn)}</td>
-        <td class="num">${fmt(tOut)}</td>
+        <td class="num">${fmt(outHh)}</td>
         <td class="num ${ggrClass}"><strong>${fmt(ggr)}</strong></td>
       </tr>`;
     }).join('');
 
   } catch(e) {
-    body.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:24px; color:#ef4444">Eroare la încărcare: ${e.message}</td></tr>`;
+    body.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:24px; color:#ef4444">Eroare la încărcare: ${e.message}</td></tr>`;
   }
 };

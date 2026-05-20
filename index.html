@@ -272,11 +272,10 @@
     <input type="hidden" id="date-start">
     <input type="hidden" id="date-end">
   </div>
-    <!-- MAIN DASHBOARD CONTENT -->
-    <div id="view-dashboard" class="view-panel active">
-      <!-- KPI CARDS -->
-      <section class="kpi-grid" id="kpi-section">
-    <div class="kpi-card" id="kpi-in">
+    <!-- KPI CARDS -->
+    <section class="kpi-grid" id="kpi-section">
+      <div class="kpi-card" id="kpi-in">
+
       <div class="kpi-label">Total IN</div>
       <div style="display:flex; align-items:center; flex-wrap:wrap; gap:8px;">
         <div class="kpi-value" id="v-in">—</div>
@@ -332,6 +331,9 @@
       </div>
     </div>
   </section>
+
+    <!-- MAIN DASHBOARD CONTENT -->
+    <div id="view-dashboard" class="view-panel active">
 
   <!-- CALENDAR GGR WIDGET -->
   <div style="display: flex; gap: 24px; margin: 0 24px 24px;">
@@ -1407,11 +1409,11 @@
       <div class="table-scroll">
         <table class="data-table">
           <thead><tr>
-            <th>Locație</th><th>Serial</th><th>Cabinet & Mix</th><th>Provider</th>
-            <th class="num">IN</th><th class="num">OUT</th><th class="num">GGR</th>
+            <th>Locație</th><th>Serial</th><th>Client</th><th>Cabinet & Mix</th><th>Provider</th>
+            <th class="num">Bet</th><th class="num">IN Estimat</th><th class="num">IN Real</th><th class="num">OUT / HH</th><th class="num">GGR</th>
           </tr></thead>
           <tbody id="hour-analysis-body">
-            <tr><td colspan="7" style="text-align:center; padding:24px; color:var(--muted)">Se încarcă datele...</td></tr>
+            <tr><td colspan="10" style="text-align:center; padding:24px; color:var(--muted)">Se încarcă datele...</td></tr>
           </tbody>
         </table>
       </div>

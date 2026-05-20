@@ -764,12 +764,14 @@ def reports_hourly():
             m.slot_machine_id as serial_nr,
             COALESCE(NULLIF(mm.name,''), NULLIF(mt.manufacturer,''), 'Necunoscut') as provider,
             mas.`in`, mas.`out`, mas.`in`-mas.`out` as ggr,
-            mas.games, mas.bet
+            mas.games, mas.bet, mas.win, mas.jackpot, mas.hh,
+            CONCAT(p.first_name, ' ', p.last_name) as player_name
         FROM machine_audit_summary_per_hours mas
         LEFT JOIN locations l ON mas.location_id = l.id
         LEFT JOIN machines m ON mas.machine_id = m.id
         LEFT JOIN machine_types mt ON mas.machine_type_id = mt.id
         LEFT JOIN machine_manufacturers mm ON mt.manufacturer_id = mm.id
+        LEFT JOIN players p ON m.player_id = p.id
         WHERE mas.date >= %s AND mas.date <= %s AND mas.`in` > 0
     """ + lf + """
         ORDER BY mas.date DESC, mas.`in` DESC
@@ -1808,6 +1810,27 @@ def logout():
         conn.commit()
         conn.close()
     return jsonify({"success": True})
+
+@app.route('/api/me/theme', methods=['POST'])
+def update_my_theme():
+    user = require_auth()
+    if not user: return jsonify({"error": "Unauthorized"}), 401
+    data = request.json
+    new_theme = data.get('theme')
+    if new_theme not in ['light', 'dark']: return jsonify({'error': 'Invalid theme'}), 400
+    conn = cp2_db.get_db()
+    c = conn.cursor()
+    c.execute('SELECT permissions FROM users WHERE id = ?', (user['id'],))
+    row = c.fetchone()
+    if row:
+        import json
+        try: perms = json.loads(row['permissions'] or '{}')
+        except: perms = {}
+        perms['theme'] = new_theme
+        c.execute('UPDATE users SET permissions = ? WHERE id = ?', (json.dumps(perms), user['id']))
+        conn.commit()
+    conn.close()
+    return jsonify({'success': True})
 
 # ─── Users CRUD ─────────────────────────────────────────────────────────────
 @app.route('/api/users', methods=['GET'])
