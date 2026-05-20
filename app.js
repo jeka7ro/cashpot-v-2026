@@ -2452,6 +2452,21 @@ window.openDayAnalysis = async function(dateStr) {
       if(!r)return '';
       const locs=(r.loc_details||[]).sort((a,b)=>Math.abs(b.ggr)-Math.abs(a.ggr)).slice(0,4)
         .map(l=>`<span style="font-size:10px;background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:2px 9px"><strong>${l.locatie}</strong>: GGR <span style="color:${l.ggr>=0?'var(--green)':'var(--red)'}">${fmt(l.ggr)}</span>${l.hh>0?` &bull; HH <span style="color:var(--accent)">${fmt(l.hh)}</span>`:''}</span>`).join('');
+        
+      let machinesHtml = '';
+      if (r.top_machine && r.top_machine.ggr > 0) {
+        machinesHtml += `<div style="font-size:11px; margin-top:8px; padding-top:8px; border-top:1px dashed var(--border); display:flex; justify-content:space-between;">
+          <span style="color:var(--muted)">Top profit: <strong style="color:var(--text)">${r.top_machine.serial_nr}</strong> <span style="font-size:9px">(${r.top_machine.mix || r.top_machine.cabinet})</span></span>
+          <strong style="color:var(--green)">+${fmt(r.top_machine.ggr)} RON</strong>
+        </div>`;
+      }
+      if (r.bottom_machine && r.bottom_machine.ggr < 0) {
+        machinesHtml += `<div style="font-size:11px; margin-top:4px; display:flex; justify-content:space-between;">
+          <span style="color:var(--muted)">Top minus: <strong style="color:var(--text)">${r.bottom_machine.serial_nr}</strong> <span style="font-size:9px">(${r.bottom_machine.mix || r.bottom_machine.cabinet})</span></span>
+          <strong style="color:var(--red)">${fmt(r.bottom_machine.ggr)} RON</strong>
+        </div>`;
+      }
+
       return `<div style="background:var(--surface);border:1px solid var(--border);border-left:3px solid ${color};padding:14px 16px;border-radius:var(--radius);margin-bottom:12px;">
         <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">${title}</div>
         <div style="display:flex;justify-content:space-between;align-items:baseline">
@@ -2459,6 +2474,7 @@ window.openDayAnalysis = async function(dateStr) {
           <div style="text-align:right;font-size:11px;color:var(--muted)">IN: ${fmt(r.total_in)}<br>HH: <span style="color:${r.hh>0?'var(--accent)':'var(--muted)'};font-weight:700">${r.hh>0?fmt(r.hh)+' RON':'—'}</span></div>
         </div>
         ${locs?`<div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:5px">${locs}</div>`:''}
+        ${machinesHtml}
       </div>`;
     };
 
@@ -3563,6 +3579,26 @@ window.loadClientiReport = async function() {
       const pInitials = ((r.first_name || '') + ' ' + (r.last_name || '')).split(' ').filter(Boolean).map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'P';
       const colors = ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#0ea5e9', '#d946ef'];
       const bg = colors[r.id % colors.length];
+      
+      const prev = r.zile_active_anterior || 0;
+      const curr = r.zile_active || 0;
+      const diff = curr - prev;
+      
+      let trendHtml = `<span style="font-size:11px; color:var(--muted)">Egal</span>`;
+      if (curr > 0 && prev === 0) {
+        trendHtml = `<span style="font-size:10px; font-weight:700; background:rgba(16,185,129,0.1); color:var(--green); padding:2px 6px; border-radius:12px;">+ Nou / Revenit</span>`;
+      } else if (diff > 0) {
+        trendHtml = `<span style="font-size:10px; font-weight:700; background:rgba(16,185,129,0.1); color:var(--green); padding:2px 6px; border-radius:12px;">▲ +${diff} zile</span>`;
+      } else if (diff < 0) {
+        if (curr === 0) {
+          trendHtml = `<span style="font-size:10px; font-weight:700; background:rgba(239,68,68,0.1); color:var(--red); padding:2px 6px; border-radius:12px;">Lipsă totală</span>`;
+        } else if (Math.abs(diff) > (prev / 2)) {
+          trendHtml = `<span style="font-size:10px; font-weight:700; background:rgba(239,68,68,0.1); color:var(--red); padding:2px 6px; border-radius:12px;">▼ La risc (${diff})</span>`;
+        } else {
+          trendHtml = `<span style="font-size:10px; font-weight:700; background:rgba(245,158,11,0.1); color:var(--orange); padding:2px 6px; border-radius:12px;">▼ ${diff} zile</span>`;
+        }
+      }
+
       return `
       <tr>
         <td style="padding-left:16px; width:40px;"><input type="checkbox" class="row-checkbox"></td>
@@ -3581,7 +3617,8 @@ window.loadClientiReport = async function() {
         <td>${r.phone || '—'}</td>
         <td>${r.locatie || '—'}</td>
         <td class="num">${r.ultima_vizita ? r.ultima_vizita.substring(0, 16) : '—'}</td>
-        <td class="num" style="font-weight:700;">${r.zile_active || 0}</td>
+        <td class="num" style="font-weight:700;">${curr}</td>
+        <td style="text-align:center;">${trendHtml}</td>
         <td class="num" style="font-weight:700; color:var(--orange);">${r.vizite_pe_zi || 0}</td>
         <td class="num">${r.timp_preferat || '—'}</td>
         <td class="num" style="font-weight:700; color:var(--success);">${fmt(r.total_in_perioada || 0)}</td>
@@ -3608,7 +3645,7 @@ window.loadClientiReport = async function() {
   } catch(err) {
     console.error('loadClientiReport error:', err);
     if (!tableStates['rep-clienti']) tableStates['rep-clienti'] = { page: 1, limit: 20, rows: [] };
-    tableStates['rep-clienti'].rows = [`<tr><td colspan="8" style="padding:40px;text-align:center;">
+    tableStates['rep-clienti'].rows = [`<tr><td colspan="15" style="padding:40px;text-align:center;">
         <div style="color:var(--red);font-weight:700;margin-bottom:8px">Eroare la incarcare</div>
         <div style="color:var(--muted);font-size:11px;">${err.message}</div>
       </td></tr>`];
@@ -4466,10 +4503,13 @@ window.openHourAnalysis = async function(date, hour) {
       
       const clientName = r.player_name ? `<span style="font-weight:700; color:var(--blue);">${r.player_name}</span>` : '<span style="color:var(--muted)">—</span>';
       
-      return `<tr>
+      return `<tr class="hr-row-main" style="border-bottom:1px solid var(--border);">
         <td>${r.locatie || '—'}</td>
-        <td>
-          <div style="font-weight:700;">${serial}</div>
+        <td style="cursor:pointer; color:var(--accent); position:relative;" onclick="toggleHourlyMachineGames(this, '${serial}', '${r.dt}')" title="Click pentru a vedea detaliile Multigame">
+          <div style="font-weight:700; display:flex; align-items:center; gap:4px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mg-icon"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            ${serial}
+          </div>
           ${gameInfo}
         </td>
         <td>${clientName}</td>
@@ -4487,3 +4527,61 @@ window.openHourAnalysis = async function(date, hour) {
     body.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:24px; color:#ef4444">Eroare la încărcare: ${e.message}</td></tr>`;
   }
 };
+
+window.toggleHourlyMachineGames = async function(td, serial, dt) {
+  const tr = td.parentElement;
+  const icon = td.querySelector('.mg-icon');
+  
+  if (tr.nextElementSibling && tr.nextElementSibling.classList.contains('hr-row-games')) {
+    // Toggle off
+    tr.nextElementSibling.remove();
+    if(icon) icon.innerHTML = '<polyline points="9 18 15 12 9 6"></polyline>';
+    return;
+  }
+  
+  // Show loading
+  const detailsTr = document.createElement('tr');
+  detailsTr.className = 'hr-row-games';
+  detailsTr.innerHTML = `<td colspan="10" style="padding:16px 24px; background:rgba(0,0,0,0.1); border-bottom:1px solid var(--border);">
+    <div style="color:var(--muted); font-size:11px; text-align:center;">Se încarcă jocurile din mix...</div>
+  </td>`;
+  tr.parentNode.insertBefore(detailsTr, tr.nextSibling);
+  if(icon) icon.innerHTML = '<polyline points="6 9 12 15 18 9"></polyline>';
+  
+  try {
+    const data = await api(`/api/reports/hourly_machine_games?serial=${serial}&dt=${dt}`);
+    if (data.length === 0) {
+      detailsTr.innerHTML = `<td colspan="10" style="padding:16px 24px; background:rgba(0,0,0,0.1); border-bottom:1px solid var(--border);">
+        <div style="color:var(--muted); font-size:11px; text-align:center;">Nu există detalii multigame pentru această oră.</div>
+      </td>`;
+      return;
+    }
+    
+    let html = `<div style="display:flex; flex-direction:column; gap:8px; padding:4px 0;">`;
+    html += `<div style="display:flex; font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; border-bottom:1px solid var(--border); padding-bottom:4px; margin-bottom:4px;">
+      <div style="flex:2">Joc</div>
+      <div style="flex:1; text-align:right;">Bet</div>
+      <div style="flex:1; text-align:right;">Win</div>
+      <div style="flex:1; text-align:right;">JP</div>
+      <div style="flex:1; text-align:right;">GGR</div>
+    </div>`;
+    
+    data.forEach(g => {
+      const gClass = g.ggr < 0 ? 'color:var(--red)' : (g.ggr > 0 ? 'color:var(--green)' : 'color:var(--text)');
+      html += `<div style="display:flex; font-size:11px; align-items:center;">
+        <div style="flex:2; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${g.game_name}">${g.game_name}</div>
+        <div style="flex:1; text-align:right;">${fmt(g.bet)}</div>
+        <div style="flex:1; text-align:right;">${fmt(g.win)}</div>
+        <div style="flex:1; text-align:right; color:var(--accent);">${g.jp > 0 ? fmt(g.jp) : '-'}</div>
+        <div style="flex:1; text-align:right; font-weight:700; ${gClass}">${fmt(g.ggr)}</div>
+      </div>`;
+    });
+    html += `</div>`;
+    
+    detailsTr.innerHTML = `<td colspan="10" style="padding:12px 24px 16px 24px; background:rgba(0,0,0,0.2); border-bottom:1px solid var(--border);">${html}</td>`;
+  } catch(e) {
+    detailsTr.innerHTML = `<td colspan="10" style="padding:16px 24px; background:rgba(0,0,0,0.1); border-bottom:1px solid var(--border);">
+      <div style="color:var(--red); font-size:11px; text-align:center;">Eroare: ${e.message}</div>
+    </td>`;
+  }
+}

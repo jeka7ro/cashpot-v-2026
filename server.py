@@ -592,10 +592,36 @@ def daily():
                 'hh': safe(r['hh'])
             })
             
+        # Pre-fetch all machines for all hours to find top/bottom per hour
+        machines_hr = qry("""
+            SELECT 
+                DATE_FORMAT(mas.date, '%%H:00') as hr,
+                m.slot_machine_id as serial_nr,
+                COALESCE(NULLIF(mt.name,''), '—') as mix,
+                COALESCE(mct.name,'—') as cabinet,
+                mas.`in`-mas.`out` as ggr
+            FROM machine_audit_summary_per_hours mas
+            JOIN machines m ON mas.machine_id = m.id
+            LEFT JOIN machine_types mt ON mas.machine_type_id = mt.id
+            LEFT JOIN machine_cabinet_types mct ON m.cabinet_type_id = mct.id
+            WHERE mas.date >= %s AND mas.date < %s AND mas.`in` > 0
+        """ + lf, [start + " 08:00:00", (datetime.strptime(end, "%Y-%m-%d") + __import__('datetime').timedelta(days=1)).strftime("%Y-%m-%d") + " 08:00:00"] + lp)
+
+        # Group machines by hour
+        m_by_hr = {}
+        for m in machines_hr:
+            h = m['hr']
+            if h not in m_by_hr: m_by_hr[h] = []
+            m_by_hr[h].append(m)
+
         result = []
         for hd in sorted(hourly_data.values(), key=lambda x: x['date']):
-            # sort loc_details by total_in desc
             hd['loc_details'].sort(key=lambda x: x['in'], reverse=True)
+            hr = hd['date']
+            if hr in m_by_hr and m_by_hr[hr]:
+                sorted_m = sorted(m_by_hr[hr], key=lambda x: x['ggr'], reverse=True)
+                hd['top_machine'] = sorted_m[0]
+                hd['bottom_machine'] = sorted_m[-1]
             result.append(hd)
         return jsonify(result)
     else:
@@ -783,6 +809,38 @@ def reports_hourly():
             r['dt'] = str(r['dt'])
         r['locatie'] = LOC_NAMES.get(r.get('location_id'), r.get('locatie', '—'))
         
+    return jsonify(rows)
+
+@app.route('/api/reports/hourly_machine_games')
+def hourly_machine_games():
+    serial = request.args.get('serial')
+    dt = request.args.get('dt') # YYYY-MM-DD HH:MM
+    if not serial or not dt: return jsonify([])
+    
+    dt_start = dt + ':00'
+    from datetime import datetime, timedelta
+    try:
+        dt_end = (datetime.strptime(dt_start, '%Y-%m-%d %H:%M:%S') + timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
+    except: return jsonify([])
+
+    rows = qry("""
+        SELECT
+            mg.id as game_id,
+            COALESCE(NULLIF(mg.name, ''), NULLIF(mgs.sas_game_name, ''), 'Necunoscut') as game_name,
+            ROUND(SUM(mgs.c_52_bet)   / 100, 0) as bet,
+            ROUND(SUM(mgs.c_52_win)   / 100, 0) as win,
+            ROUND(SUM(mgs.c_52_jackpot)/100, 0) as jp,
+            SUM(mgs.c_52_games)                  as games,
+            ROUND((SUM(mgs.c_52_bet) - SUM(mgs.c_52_win)) / 100, 0) as ggr
+        FROM machine_audit_games_g_s mgs
+        JOIN machines m ON mgs.machine_id = m.id
+        LEFT JOIN machine_games mg ON mgs.machine_game_id = mg.id
+        WHERE m.slot_machine_id = %s
+          AND mgs.created_at >= %s AND mgs.created_at < %s
+          AND mgs.c_52_bet > 0
+        GROUP BY mg.id, COALESCE(mg.name, mgs.sas_game_name)
+        ORDER BY bet DESC
+    """, [serial, dt_start, dt_end])
     return jsonify(rows)
 
 # ─── Live Monitor ────────────────────────────────────────────────────────────
@@ -1632,8 +1690,15 @@ def api_players():
                  WHERE pcl2.player_id = p.id AND pcl2.created_at >= %s AND pcl2.created_at <= %s AND pcl2.log_type = 2
              )
             ) as total_in_perioada,
-
             
+            (SELECT COUNT(DISTINCT DATE(pcl3.created_at))
+             FROM player_card_logs pcl3
+             WHERE pcl3.player_id = p.id 
+               AND pcl3.created_at >= DATE_SUB(%s, INTERVAL DATEDIFF(%s, %s)+1 DAY)
+               AND pcl3.created_at < %s
+               AND pcl3.log_type = 2
+            ) as zile_active_anterior,
+
             p.points,
             p.total_bets,
             p.avg_bet,
@@ -1650,7 +1715,7 @@ def api_players():
         GROUP BY p.id, p.first_name, p.last_name, p.phone, p.points, p.total_bets, p.avg_bet, l.display_code, l.code
         ORDER BY total_interactiuni DESC
         LIMIT 500
-    ''', [start, end_dt, start, end_dt] + lp)
+    ''', [start, end_dt, start, end, start, start, start, end_dt] + lp)
     
     for r in rows:
         if r.get('ultima_vizita'):
