@@ -82,39 +82,14 @@ def get_exp_config():
 @app.route('/api/admin/expenses_config', methods=['GET'])
 def get_expenses_config():
     cfg = get_exp_config()
-    excl_deps = cfg.get('excluded_departments', [])
     excl_types = cfg.get('excluded_types', [])
-
-    deps = pg_qry("SELECT id, name FROM casino_departments WHERE is_deleted=false ORDER BY name;")
-
-    # Get payment types per department from actual payments
-    rows = pg_qry("""
-        SELECT DISTINCT d.id::text as dep_id, pt.id::text as type_id, pt.name as type_name
-        FROM casino_departments d
-        JOIN casino_payments p ON p.department_id = d.id
-        JOIN casino_payment_types pt ON pt.id = p.type_id
-        WHERE d.is_deleted = false AND pt.is_deleted = false;
-    """)
-
-    # Build map dep_id -> list of types
-    types_map = {}
-    for r in rows:
-        did = r['dep_id']
-        if did not in types_map:
-            types_map[did] = []
-        types_map[did].append({
-            "id": r['type_id'],
-            "name": r['type_name'],
-            "is_expense": r['type_id'] not in excl_types
-        })
-
+    types = pg_qry("SELECT id, name FROM casino_payment_types WHERE is_deleted=false ORDER BY name;")
     return jsonify({
-        "departments": [{
-            "id": str(d['id']),
-            "name": d['name'],
-            "is_expense": str(d['id']) not in excl_deps,
-            "types": types_map.get(str(d['id']), [])
-        } for d in deps]
+        "types": [{
+            "id": str(t['id']),
+            "name": t['name'],
+            "is_expense": str(t['id']) not in excl_types
+        } for t in types]
     })
 
 @app.route('/api/admin/expenses_config', methods=['POST'])

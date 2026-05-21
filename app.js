@@ -4755,83 +4755,44 @@ window.renderExpensesTable = function() {
 
 
 // --- EXPENSES CONFIG SETTINGS ---
-let _allExpDeps = [];
+let _allExpTypes = [];
 
 window.loadExpensesConfig = async function() {
   try {
     const data = await api('/api/admin/expenses_config');
-    _allExpDeps = (data.departments || []).filter(d => d.types && d.types.length > 0);
+    _allExpTypes = data.types || [];
 
     const tbody = document.getElementById('set-exp-tbody');
     if (!tbody) return;
 
-    let html = '';
-    _allExpDeps.forEach(dep => {
-      const depRowCount = dep.types.length;
-      dep.types.forEach((t, i) => {
-        const isFirst = i === 0;
-        html += `<tr style="border-bottom:1px solid var(--border); ${isFirst ? 'border-top:2px solid var(--border);' : ''}">`;
-        if (isFirst) {
-          html += `<td style="padding:8px 12px; vertical-align:top; border-right:1px solid var(--border); color:var(--text); font-weight:600;" rowspan="${depRowCount}">
-            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-              <span>${dep.name}</span>
-              <label class="toggle" title="Activează/dezactivează tot departamentul" onclick="event.stopPropagation(); onDepToggle('${dep.id}', this.querySelector('input').checked)">
-                <input type="checkbox" class="cfg-dep" value="${dep.id}" ${dep.is_expense ? 'checked' : ''}>
-                <span class="toggle-slider"></span>
-              </label>
-            </div>
-          </td>`;
-        }
-        html += `<td style="padding:6px 12px; color:var(--text);">${t.name}</td>`;
-        html += `<td style="padding:6px 12px; text-align:center;">
+    tbody.innerHTML = _allExpTypes.map(t => `
+      <tr style="border-bottom:1px solid var(--border); transition:background .1s;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+        <td style="padding:8px 14px; color:var(--text); font-size:12px;">${t.name}</td>
+        <td style="padding:8px 14px; text-align:center;">
           <label class="toggle">
-            <input type="checkbox" class="cfg-type" value="${t.id}" data-dep="${dep.id}" ${t.is_expense ? 'checked' : ''} onchange="onTypeToggle('${dep.id}', '${t.id}', this.checked)">
+            <input type="checkbox" class="cfg-type" value="${t.id}" ${t.is_expense ? 'checked' : ''}
+              onchange="onTypeToggle('${t.id}', this.checked)">
             <span class="toggle-slider"></span>
           </label>
-        </td>`;
-        html += '</tr>';
-      });
-    });
-
-    tbody.innerHTML = html;
-    tbody.style.display = '';
-  } catch(e) { console.error(e); }
+        </td>
+      </tr>
+    `).join('');
+  } catch(e) { console.error('loadExpensesConfig error:', e); }
 }
 
-window.onDepToggle = function(depId, isChecked) {
-  const dep = _allExpDeps.find(d => d.id === depId);
-  if (!dep) return;
-  dep.is_expense = isChecked;
-  // Also toggle all types
-  dep.types.forEach(t => t.is_expense = isChecked);
-  // Update visible checkboxes
-  document.querySelectorAll(`.cfg-type[data-dep="${depId}"]`).forEach(cb => cb.checked = isChecked);
-}
-
-window.onTypeToggle = function(depId, typeId, isChecked) {
-  const dep = _allExpDeps.find(d => d.id === depId);
-  if (dep) {
-    const t = dep.types.find(t => t.id === typeId);
-    if (t) t.is_expense = isChecked;
-  }
+window.onTypeToggle = function(typeId, isChecked) {
+  const t = _allExpTypes.find(t => t.id === typeId);
+  if (t) t.is_expense = isChecked;
 }
 
 
 window.saveExpensesConfig = async function() {
-  // Collect from in-memory state (covers ALL departments, not just the visible one)
-  const exclDeps = _allExpDeps.filter(d => !d.is_expense).map(d => d.id);
-  const exclTypes = [];
-  _allExpDeps.forEach(d => {
-    (d.types || []).forEach(t => {
-      if (!t.is_expense && !exclTypes.includes(t.id)) exclTypes.push(t.id);
-    });
-  });
-
+  const exclTypes = _allExpTypes.filter(t => !t.is_expense).map(t => t.id);
   try {
     const r = await fetch(API + '/api/admin/expenses_config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ excluded_departments: exclDeps, excluded_types: exclTypes })
+      body: JSON.stringify({ excluded_departments: [], excluded_types: exclTypes })
     });
     const res = await r.json();
     if(!res.success) console.error('Eroare la salvare configuratie cheltuieli');
