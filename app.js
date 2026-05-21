@@ -2265,25 +2265,36 @@ window.openDayAnalysis = async function(dateStr) {
     // ── Smart Client Stats ──────────────────────────────────────────────
     let locInsightsHtml = '';
     if (smart.location_insights && smart.location_insights.length > 0) {
+      const renderClientList = (list) => {
+        if (!list || !list.length) return `<div style="color:var(--muted); font-size:11px;">—</div>`;
+        return `<div style="display:flex; flex-direction:column; gap:2px; max-height:220px; overflow-y:auto; padding-right:4px;">
+          ${list.map(c => `
+            <div style="display:flex; justify-content:space-between; align-items:center; background:var(--surface); padding:3px 6px; border-radius:4px; border:1px solid rgba(255,255,255,0.03);">
+              <span style="font-size:10.5px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${c.name}">${c.name}</span>
+              <span style="font-size:9.5px; font-weight:700; color:var(--muted); background:rgba(0,0,0,0.2); padding:1px 4px; border-radius:3px;">${c.v} vizite</span>
+            </div>
+          `).join('')}
+        </div>`;
+      };
       locInsightsHtml = `<div style="margin-top:16px; display:flex; gap:12px; flex-wrap:wrap;">`;
       smart.location_insights.forEach(li => {
         locInsightsHtml += `
-          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:12px; flex:1; min-width:220px; display:flex; flex-direction:column; gap:8px;">
+          <div style="background:var(--surface2); border:1px solid var(--border); border-radius:6px; padding:12px; flex:1; min-width:240px; display:flex; flex-direction:column; gap:12px;">
             <div style="font-weight:800; font-size:12px; color:var(--text); border-bottom:1px solid var(--border); padding-bottom:6px;">${li.locatie}</div>
             
-            <div style="font-size:11px; display:flex; flex-direction:column; gap:2px;">
-              <span style="color:var(--muted); font-weight:600;">Fideli (${li.fidel_count}):</span>
-              <span style="color:var(--text); line-height:1.4;">${li.fidel.join(', ') || '—'}</span>
+            <div style="display:flex; flex-direction:column; gap:4px;">
+              <span style="color:var(--muted); font-weight:600; font-size:11px; padding-left:2px;">Fideli (${li.fidel_count})</span>
+              ${renderClientList(li.fidel)}
             </div>
             
-            <div style="font-size:11px; display:flex; flex-direction:column; gap:2px;">
-              <span style="color:var(--green); font-weight:600;">+ Noi/Reveniți (${li.nou_count}):</span>
-              <span style="color:var(--text); line-height:1.4;">${li.nou.join(', ') || '—'}</span>
+            <div style="display:flex; flex-direction:column; gap:4px;">
+              <span style="color:var(--green); font-weight:600; font-size:11px; padding-left:2px;">+ Noi/Reveniți (${li.nou_count})</span>
+              ${renderClientList(li.nou)}
             </div>
             
-            <div style="font-size:11px; display:flex; flex-direction:column; gap:2px;">
-              <span style="color:var(--red); font-weight:600;">- Lipsă (30 zile) (${li.lipsa_count}):</span>
-              <span style="color:var(--text); line-height:1.4;">${li.lipsa.join(', ') || '—'}</span>
+            <div style="display:flex; flex-direction:column; gap:4px;">
+              <span style="color:var(--red); font-weight:600; font-size:11px; padding-left:2px;">- Lipsă (30 zile) (${li.lipsa_count})</span>
+              ${renderClientList(li.lipsa)}
             </div>
           </div>
         `;

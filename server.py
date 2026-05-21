@@ -855,15 +855,20 @@ def day_smart():
     # 1. Card players
     p_count = qry(f"SELECT COUNT(DISTINCT player_id) as c FROM player_card_logs pcl WHERE pcl.created_at >= %s AND pcl.created_at <= %s {lf}", [start, end_dt] + lp)[0]['c']
     
-    # 2. Jackpots (alias pjh)
-    lf_pjh, lp_pjh = loc_filter(request, alias='pjh')
-    jp_val = qry(f"SELECT SUM(hit_value) as s FROM player_jackpot_histories pjh WHERE pjh.hit_date >= %s AND pjh.hit_date <= %s {lf_pjh}", [start, end_dt] + lp_pjh)[0]['s'] or 0
+    # Totals from machine_audit_summaries
+    lf_mas, lp_mas = loc_filter(request, alias='mas')
+    mas_totals = qry(f"""
+        SELECT 
+            SUM(mas.jackpot) as jp, 
+            SUM(mas.cb_fortune_wheel) as wh, 
+            SUM(mas.cashback) as cb 
+        FROM machine_audit_summaries mas 
+        WHERE mas.date >= %s AND mas.date <= %s {lf_mas}
+    """, [start, end] + lp_mas)[0]
     
-    # 3. Wheel (no location)
-    wh_val = qry(f"SELECT SUM(amount) as s FROM player_fortune_wheel_transactions WHERE created_at >= %s AND created_at <= %s", [start, end_dt])[0]['s'] or 0
-    
-    # 4. Cashback (no location)
-    cb_val = qry(f"SELECT SUM(amount) as s FROM player_cashback_in_outs WHERE created_at >= %s AND created_at <= %s", [start, end_dt])[0]['s'] or 0
+    jp_val = mas_totals['jp'] or 0
+    wh_val = mas_totals['wh'] or 0
+    cb_val = mas_totals['cb'] or 0
     
     # 5. Location Insights (Active vs Churned clients)
     loc_insights = []
@@ -901,7 +906,7 @@ def day_smart():
             fn = c['first_name'] or 'C.'
             ln = c['last_name'] or ''
             name = f"{fn} {ln[0]}." if ln else fn
-            return f"{name} ({c['evts']}v)"
+            return {"name": name, "v": c['evts']}
 
         loc_insights.append({
             'locatie': l_name,
