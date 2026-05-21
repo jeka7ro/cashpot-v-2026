@@ -1288,31 +1288,34 @@
       <div class="settings-title">⚙ Setări Dashboard</div>
       <button class="settings-close" onclick="closeSettings()">×</button>
     </div>
-    <div class="settings-body">
-      <div class="settings-section-title">Locații vizibile</div>
-      <div id="settings-locations-list"></div>
+    <div class="settings-body" style="padding:16px 20px;">
+      <!-- Locatii: un singur rand de pills -->
+      <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px;">Locații vizibile</div>
+      <div id="settings-locations-list" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:20px;"></div>
 
-      <div id="settings-expenses" style="margin-top:24px; padding-top:20px; border-top:1px solid var(--border);">
-        <div style="font-size:13px; font-weight:700; color:var(--text); margin-bottom:4px;">Cheltuieli Operaționale</div>
-        <p style="font-size:11px; color:var(--muted); margin-bottom:12px;">Debifează ce NU sunt cheltuieli (POS, Bancă, Transferuri). Click pe departament → filtrează tipurile.</p>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0; border:1px solid var(--border); border-radius:10px; overflow:hidden;">
-          <div style="border-right:1px solid var(--border);">
-            <div style="padding:7px 12px; background:var(--surface2); border-bottom:1px solid var(--border); font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; display:flex; justify-content:space-between;">
-              <span>Departament</span><span style="font-weight:400;">Cheltuială?</span>
-            </div>
-            <div id="set-exp-deps" style="max-height:260px; overflow-y:auto;"></div>
+      <!-- Cheltuieli: tabel full width -->
+      <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px; padding-top:16px; border-top:1px solid var(--border);">
+        Configurare Cheltuieli Operaționale
+        <span style="font-size:10px; color:var(--muted); font-weight:400; text-transform:none; margin-left:6px;">— click pe departament pentru a vedea tipurile</span>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:0; border:1px solid var(--border); border-radius:10px; overflow:hidden;">
+        <div style="border-right:1px solid var(--border);">
+          <div style="padding:7px 12px; background:var(--surface2); border-bottom:1px solid var(--border); font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; display:flex; justify-content:space-between;">
+            <span>Departament</span><span style="font-weight:400; text-transform:none;">Cheltuială?</span>
           </div>
-          <div>
-            <div style="padding:7px 12px; background:var(--surface2); border-bottom:1px solid var(--border); font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; display:flex; justify-content:space-between;">
-              <span>Tip Plată <span id="set-exp-dep-filter-label" style="color:var(--accent); text-transform:none;"></span></span>
-              <span style="font-weight:400;">Cheltuială?</span>
-            </div>
-            <div id="set-exp-types" style="max-height:260px; overflow-y:auto;">
-              <div style="padding:24px 12px; font-size:11px; color:var(--muted); text-align:center;">← Selectează departament</div>
-            </div>
+          <div id="set-exp-deps" style="max-height:340px; overflow-y:auto;"></div>
+        </div>
+        <div>
+          <div style="padding:7px 12px; background:var(--surface2); border-bottom:1px solid var(--border); font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; display:flex; justify-content:space-between; align-items:center;">
+            <span>Tip Plată <span id="set-exp-dep-filter-label" style="color:var(--accent); text-transform:none; font-weight:600;"></span></span>
+            <span style="font-weight:400; text-transform:none;">Cheltuială?</span>
+          </div>
+          <div id="set-exp-types" style="max-height:340px; overflow-y:auto;">
+            <div style="padding:24px 12px; font-size:11px; color:var(--muted); text-align:center;">← Selectează departament</div>
           </div>
         </div>
       </div>
+      <div id="settings-expenses"></div>
     </div>
     <div class="settings-footer">
       <button class="btn-ghost" onclick="closeSettings()">Anulează</button>

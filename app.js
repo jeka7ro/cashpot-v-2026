@@ -675,7 +675,10 @@ function openSettings(){
   list.innerHTML='';
   (filtersData.locations||[]).forEach(l=>{
     const on=!ex.includes(String(l.id));
-    list.innerHTML+=`<div class="settings-item"><div><div class="settings-item-name">${l.name}</div><div class="settings-item-sub">${l.city||''}</div></div><label class="toggle"><input type="checkbox" id="lt-${l.id}" ${on?'checked':''}><span class="toggle-slider"></span></label></div>`;
+    list.innerHTML+=`<label style="display:inline-flex; align-items:center; gap:8px; padding:6px 14px; border-radius:9999px; border:1px solid ${on ? 'var(--accent)' : 'var(--border)'}; background:${on ? 'color-mix(in srgb,var(--accent) 12%,transparent)' : 'var(--surface2)'}; cursor:pointer; font-size:12px; color:var(--text); transition:all .2s;" onclick="this.style.border='1px solid '+(this.querySelector('input').checked?'var(--border)':'var(--accent)');this.style.background=(this.querySelector('input').checked?'var(--surface2)':'color-mix(in srgb,var(--accent) 12%,transparent)');">
+      <input type="checkbox" id="lt-${l.id}" ${on?'checked':''} style="display:none;">
+      <span>${l.name}</span>
+    </label>`;
   });
   document.getElementById('settings-modal').classList.add('show');
 }
