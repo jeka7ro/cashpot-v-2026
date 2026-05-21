@@ -83,14 +83,25 @@ def get_exp_config():
 def get_expenses_config():
     cfg = get_exp_config()
     excl_types = cfg.get('excluded_types', [])
-    types = pg_qry("SELECT id, name FROM casino_payment_types WHERE is_deleted=false ORDER BY name;")
-    return jsonify({
-        "types": [{
-            "id": str(t['id']),
-            "name": t['name'],
-            "is_expense": str(t['id']) not in excl_types
-        } for t in types]
-    })
+    rows = pg_qry("""
+        SELECT et.id::text as id, et.name as type_name, d.name as dep_name, d.id::text as dep_id
+        FROM casino_expenditure_types et
+        JOIN casino_departments d ON d.id = et.department_id
+        WHERE et.is_deleted = false AND d.is_deleted = false
+        ORDER BY d.name, et.name;
+    """)
+    # Group by department
+    deps = {}
+    for r in rows:
+        did = r['dep_id']
+        if did not in deps:
+            deps[did] = {'id': did, 'name': r['dep_name'], 'types': []}
+        deps[did]['types'].append({
+            'id': r['id'],
+            'name': r['type_name'],
+            'is_expense': r['id'] not in excl_types
+        })
+    return jsonify({'departments': list(deps.values())})
 
 @app.route('/api/admin/expenses_config', methods=['POST'])
 def save_expenses_config():
@@ -2412,12 +2423,9 @@ def api_expenses():
     excl_types = cfg.get('excluded_types', [])
     
     pg_excl_where = ""
-    if excl_deps:
-        ph_d = ','.join([f"'{d}'" for d in excl_deps])
-        pg_excl_where += f" AND (p.department_id IS NULL OR p.department_id::text NOT IN ({ph_d}))"
     if excl_types:
         ph_t = ','.join([f"'{t}'" for t in excl_types])
-        pg_excl_where += f" AND (p.type_id IS NULL OR p.type_id::text NOT IN ({ph_t}))"
+        pg_excl_where += f" AND (p.expenditure_type_id IS NULL OR p.expenditure_type_id::text NOT IN ({ph_t}))"
 
     rows = pg_qry(f"""
         SELECT

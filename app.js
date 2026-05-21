@@ -4755,39 +4755,55 @@ window.renderExpensesTable = function() {
 
 
 // --- EXPENSES CONFIG SETTINGS ---
-let _allExpTypes = [];
+let _expConfigDeps = [];  // [{id, name, types:[{id, name, is_expense}]}]
 
 window.loadExpensesConfig = async function() {
   try {
     const data = await api('/api/admin/expenses_config');
-    _allExpTypes = data.types || [];
+    _expConfigDeps = data.departments || [];
 
     const tbody = document.getElementById('set-exp-tbody');
     if (!tbody) return;
 
-    tbody.innerHTML = _allExpTypes.map(t => `
-      <tr style="border-bottom:1px solid var(--border); transition:background .1s;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
-        <td style="padding:8px 14px; color:var(--text); font-size:12px;">${t.name}</td>
-        <td style="padding:8px 14px; text-align:center;">
-          <label class="toggle">
-            <input type="checkbox" class="cfg-type" value="${t.id}" ${t.is_expense ? 'checked' : ''}
-              onchange="onTypeToggle('${t.id}', this.checked)">
-            <span class="toggle-slider"></span>
-          </label>
+    let html = '';
+    _expConfigDeps.forEach(dep => {
+      // Department header row
+      html += `<tr style="background:color-mix(in srgb, var(--accent) 8%, var(--surface2));">
+        <td colspan="3" style="padding:7px 14px; font-weight:700; font-size:11px; color:var(--accent); letter-spacing:.03em; text-transform:uppercase; border-bottom:1px solid var(--border);">
+          ${dep.name}
         </td>
-      </tr>
-    `).join('');
+      </tr>`;
+      // Type rows
+      dep.types.forEach(t => {
+        html += `<tr style="border-bottom:1px solid var(--border);" 
+          onmouseover="this.style.background='var(--surface2)'" 
+          onmouseout="this.style.background=''">
+          <td style="width:12px; padding:0;"></td>
+          <td style="padding:7px 14px; color:var(--text); font-size:12px;">${t.name}</td>
+          <td style="padding:7px 14px; text-align:right; width:90px; padding-right:20px;">
+            <label class="toggle">
+              <input type="checkbox" class="cfg-type" value="${t.id}" data-dep="${dep.id}" 
+                ${t.is_expense ? 'checked' : ''}
+                onchange="onExpTypeToggle('${dep.id}','${t.id}',this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+          </td>
+        </tr>`;
+      });
+    });
+
+    tbody.innerHTML = html || '<tr><td colspan="3" style="padding:20px; text-align:center; color:var(--muted);">Nu există tipuri de cheltuieli configurate.</td></tr>';
   } catch(e) { console.error('loadExpensesConfig error:', e); }
 }
 
-window.onTypeToggle = function(typeId, isChecked) {
-  const t = _allExpTypes.find(t => t.id === typeId);
-  if (t) t.is_expense = isChecked;
+window.onExpTypeToggle = function(depId, typeId, isChecked) {
+  const dep = _expConfigDeps.find(d => d.id === depId);
+  if (dep) { const t = dep.types.find(t => t.id === typeId); if (t) t.is_expense = isChecked; }
 }
 
 
 window.saveExpensesConfig = async function() {
-  const exclTypes = _allExpTypes.filter(t => !t.is_expense).map(t => t.id);
+  const exclTypes = []; _expConfigDeps.forEach(d => (d.types||[]).forEach(t => { if(!t.is_expense && !exclTypes.includes(t.id)) exclTypes.push(t.id); }));
   try {
     const r = await fetch(API + '/api/admin/expenses_config', {
       method: 'POST',
