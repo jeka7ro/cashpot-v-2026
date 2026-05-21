@@ -4831,22 +4831,31 @@ window.renderExpensesTable = function() {
     `;
   }
   
-  // Total general = ALL records regardless of search filter
-  const totalGeneral = _expensesData.reduce((s, r) => s + r.amount, 0);
+  // Totals
+  const totalGeneral = filtered.reduce((s, r) => s + r.amount, 0); // all filtered rows
+  const totalAll = _expensesData.reduce((s, r) => s + r.amount, 0); // all data (no filter)
+  const isFiltered = filtered.length < _expensesData.length;
   
   if (!html) html = `<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">Nu s-au găsit cheltuieli.</td></tr>`;
   else {
+    const showPageTotal = perPage < filtered.length; // only show page total if there's more than 1 page
     html += `
+      ${showPageTotal ? `
+      <tr style="background:var(--surface2)">
+        <td colspan="6" style="text-align:right;font-weight:600;color:var(--muted);padding:6px 12px;font-size:11px;">Total Pagina ${_expPage}:</td>
+        <td class="num" style="color:var(--muted);font-weight:700;font-size:12px;padding:6px 12px;">${fmt(total)} RON</td>
+      </tr>` : ''}
       <tr style="background:var(--surface2); border-top:2px solid var(--border)">
-        <td colspan="6" style="text-align:right;font-weight:800;color:var(--text);padding:10px 12px;">${q ? 'Total Filtrat:' : 'Total General:'}</td>
-        <td class="num" style="color:var(--red);font-weight:800;font-size:14px;padding:10px 12px;">${fmt(total)} RON</td>
+        <td colspan="6" style="text-align:right;font-weight:800;color:var(--text);padding:10px 12px;">${isFiltered ? 'Total Filtrat:' : 'Total General:'}</td>
+        <td class="num" style="color:var(--red);font-weight:800;font-size:14px;padding:10px 12px;">${fmt(totalGeneral)} RON</td>
       </tr>
-      ${q ? `<tr style="background:var(--surface2)"><td colspan="6" style="text-align:right;font-size:11px;color:var(--muted);padding:4px 12px;">Total General:</td><td class="num" style="font-size:11px;color:var(--muted);padding:4px 12px;">${fmt(totalGeneral)} RON</td></tr>` : ''}
+      ${isFiltered ? `<tr style="background:var(--surface2)"><td colspan="6" style="text-align:right;font-size:11px;color:var(--muted);padding:4px 12px;">Total General (fara filtre):</td><td class="num" style="font-size:11px;color:var(--muted);padding:4px 12px;">${fmt(totalAll)} RON</td></tr>` : ''}
     `;
   }
   
   tbody.innerHTML = html;
 }
+
 
 
 
