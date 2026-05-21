@@ -4740,7 +4740,6 @@ window.renderExpensesTable = function() {
 
 
 // --- EXPENSES CONFIG SETTINGS ---
-let _allExpTypes = [];
 window.loadExpensesConfig = async function() {
   try {
     const data = await api('/api/admin/expenses_config');
@@ -4748,66 +4747,31 @@ window.loadExpensesConfig = async function() {
     const typeContainer = document.getElementById('set-exp-types');
     if(!depContainer || !typeContainer) return;
     
-    _allExpTypes = data.expenditure_types || [];
-    
     depContainer.innerHTML = data.departments.map(d => `
-      <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; cursor:pointer; border-radius:8px; transition:all 0.2s; background:var(--bg);" class="exp-dep-row" onclick="selectExpDep('${d.id}', this)">
-        <div style="font-size:13px; font-weight:600; color:var(--text);">${d.name}</div>
-        <label class="toggle" onclick="event.stopPropagation()">
-          <input type="checkbox" class="cfg-dep" value="${d.id}" ${d.is_expense ? 'checked' : ''} onchange="toggleDepTypes('${d.id}', this.checked)">
-          <span class="toggle-slider"></span>
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 16px; border-radius:9999px; background:var(--surface2); margin-bottom:8px;">
+        <div style="font-size:12px; font-weight:600; color:var(--text);">${d.name}</div>
+        <label class="toggle">
+          <input type="checkbox" class="cfg-dep" value="${d.id}" ${d.is_expense ? 'checked' : ''}>
+          <span class="toggle-slider rounded-full"></span>
         </label>
       </div>
     `).join('');
     
-    typeContainer.innerHTML = '<div style="font-size:11px; color:var(--muted); text-align:center; padding:20px;">Selectează un departament pentru a vedea categoriile.</div>';
+    typeContainer.innerHTML = data.types.map(t => `
+      <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 16px; border-radius:9999px; background:var(--surface2); margin-bottom:8px;">
+        <div style="font-size:12px; font-weight:600; color:var(--text);">${t.name}</div>
+        <label class="toggle">
+          <input type="checkbox" class="cfg-type" value="${t.id}" ${t.is_expense ? 'checked' : ''}>
+          <span class="toggle-slider rounded-full"></span>
+        </label>
+      </div>
+    `).join('');
   } catch(e) { console.error(e); }
-}
-
-window.selectExpDep = function(depId, el) {
-  document.querySelectorAll('.exp-dep-row').forEach(row => { row.style.boxShadow = 'none'; row.style.background = 'var(--bg)'; });
-  if(el) { el.style.boxShadow = 'inset 3px 0 0 var(--accent)'; el.style.background = 'var(--surface)'; }
-  
-  const typeContainer = document.getElementById('set-exp-types');
-  const types = _allExpTypes.filter(t => t.department_id === depId);
-  
-  if (types.length === 0) {
-    typeContainer.innerHTML = '<div style="font-size:11px; color:var(--muted); text-align:center; padding:20px;">Nicio categorie pentru acest departament.</div>';
-    return;
-  }
-  
-  typeContainer.innerHTML = types.map(t => `
-    <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:var(--bg); border-radius:8px; margin-bottom:4px;">
-      <div style="font-size:12px; font-weight:500; color:var(--text);">${t.name}</div>
-      <label class="toggle">
-        <input type="checkbox" class="cfg-type" data-dep="${depId}" value="${t.id}" ${t.is_expense ? 'checked' : ''} onchange="updateDepStatus('${t.id}', this.checked)">
-        <span class="toggle-slider"></span>
-      </label>
-    </div>
-  `).join('');
-}
-
-window.toggleDepTypes = function(depId, isChecked) {
-  _allExpTypes.forEach(t => {
-    if (t.department_id === depId) t.is_expense = isChecked;
-  });
-  const openDep = Array.from(document.querySelectorAll('.exp-dep-row')).find(r => r.style.boxShadow !== 'none' && r.style.boxShadow !== '');
-  if (openDep) {
-      const elDepId = document.querySelector(`.cfg-dep[value="${depId}"]`);
-      if (elDepId && elDepId.closest('.exp-dep-row') === openDep) {
-          selectExpDep(depId, openDep);
-      }
-  }
-}
-
-window.updateDepStatus = function(typeId, isChecked) {
-  const typeObj = _allExpTypes.find(t => t.id === typeId);
-  if(typeObj) typeObj.is_expense = isChecked;
 }
 
 window.saveExpensesConfig = async function() {
   const exclDeps = Array.from(document.querySelectorAll('.cfg-dep:not(:checked)')).map(i => i.value);
-  const exclTypes = _allExpTypes.filter(t => !t.is_expense).map(t => t.id);
+  const exclTypes = Array.from(document.querySelectorAll('.cfg-type:not(:checked)')).map(i => i.value);
 
   try {
     const r = await fetch(API + '/api/admin/expenses_config', {
