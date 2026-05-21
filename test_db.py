@@ -1,15 +1,11 @@
-import unicodedata
-
-def normalize(name):
-    if not name: return ''
-    n = unicodedata.normalize('NFKD', name).encode('ASCII', 'ignore').decode('utf-8')
-    n = n.lower().replace('(', '').replace(')', '').replace(' ', '')
-    return n
-
-mysql_names = ['Pitesti', 'Ploiesti', 'Depozit', 'Valcea', 'Craiova', 'Ploiesti (centru)', 'Ploiesti (nord)']
-pg_names = ['Ploiesti (nord)', 'Ploiesti (centru)', 'Pitesti', 'Depozit', 'Valcea', 'Birou', 'Focsani', 'Craiova']
-
-pg_map = {normalize(n): n for n in pg_names}
-for m in mysql_names:
-    norm = normalize(m)
-    print(f"MySQL {m} -> norm: {norm} -> PG matched: {pg_map.get(norm)}")
+import psycopg2
+conn = psycopg2.connect(dbname="cashpot", user="cashpot", password="129hj8oahwd7yaw3e21321", host="82.76.35.50", port="26257")
+cur = conn.cursor()
+tables = ["casino_departments", "casino_payment_types", "casino_expenditure_types", "casino_vendors"]
+for t in tables:
+    try:
+        cur.execute(f"SELECT id, name FROM {t} LIMIT 2;")
+        print(t, cur.fetchall())
+    except Exception as e:
+        print(t, "Error:", e)
+        conn.rollback()
