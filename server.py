@@ -64,6 +64,46 @@ PG_DB_CFG = dict(
 def get_pg_conn():
     return psycopg2.connect(**PG_DB_CFG)
 
+
+import json
+import os
+
+EXP_CFG_FILE = 'expenses_config.json'
+
+def get_exp_config():
+    if os.path.exists(EXP_CFG_FILE):
+        try:
+            with open(EXP_CFG_FILE, 'r') as f:
+                return json.load(f)
+        except:
+            pass
+    return {"excluded_departments": [], "excluded_types": []}
+
+@app.route('/api/admin/expenses_config', methods=['GET'])
+def get_expenses_config():
+    cfg = get_exp_config()
+    deps = pg_qry("SELECT id, name FROM casino_departments ORDER BY name;")
+    types = pg_qry("SELECT id, name FROM casino_payment_types ORDER BY name;")
+    
+    return jsonify({
+        "departments": [{"id": str(d['id']), "name": d['name'], "is_expense": str(d['id']) not in cfg.get('excluded_departments', [])} for d in deps],
+        "types": [{"id": str(t['id']), "name": t['name'], "is_expense": str(t['id']) not in cfg.get('excluded_types', [])} for t in types]
+    })
+
+@app.route('/api/admin/expenses_config', methods=['POST'])
+def save_expenses_config():
+    data = request.json or {}
+    cfg = get_exp_config()
+    
+    if 'excluded_departments' in data:
+        cfg['excluded_departments'] = data['excluded_departments']
+    if 'excluded_types' in data:
+        cfg['excluded_types'] = data['excluded_types']
+        
+    with open(EXP_CFG_FILE, 'w') as f:
+        json.dump(cfg, f)
+    return jsonify({"success": True})
+
 def pg_qry(sql, params=None):
     conn = get_pg_conn()
     try:
@@ -231,10 +271,22 @@ def kpi():
     else:
         pg_loc_where = " AND 1=0" # If filter is empty and no default locations matched
 
+cfg = get_exp_config()
+    excl_deps = cfg.get('excluded_departments', [])
+    excl_types = cfg.get('excluded_types', [])
+    
+    pg_excl_where = ""
+    if excl_deps:
+        ph_d = ','.join([f"'{d}'" for d in excl_deps])
+        pg_excl_where += f" AND (department_id IS NULL OR department_id::text NOT IN ({ph_d}))"
+    if excl_types:
+        ph_t = ','.join([f"'{t}'" for t in excl_types])
+        pg_excl_where += f" AND (type_id IS NULL OR type_id::text NOT IN ({ph_t}))"
+
     exp_res = pg_qry(f"""
         SELECT SUM(amount) as s 
         FROM casino_payments 
-        WHERE direction = 1 AND date >= %s AND date <= %s {pg_loc_where}
+        WHERE direction = 1 AND date >= %s AND date <= %s {pg_loc_where} {pg_excl_where}
     """, pg_params)
     expenses = float(exp_res[0]['s'] or 0) if exp_res else 0.0
 
@@ -2317,10 +2369,6 @@ def register_with_invite():
     if not success: return jsonify({"error": "Email-ul exista deja"}), 400
     return jsonify({"success": True})
 
-if __name__ == '__main__':
-    print(" CyberSlot Analytics Dashboard → http://localhost:5050")
-    app.run(host='0.0.0.0', port=5050, debug=False)
-
 @app.route('/api/reports/expenses')
 def api_expenses():
     start, end = period_params(request)
@@ -2357,6 +2405,18 @@ def api_expenses():
     else:
         pg_loc_where = " AND 1=0"
 
+cfg = get_exp_config()
+    excl_deps = cfg.get('excluded_departments', [])
+    excl_types = cfg.get('excluded_types', [])
+    
+    pg_excl_where = ""
+    if excl_deps:
+        ph_d = ','.join([f"'{d}'" for d in excl_deps])
+        pg_excl_where += f" AND (p.department_id IS NULL OR p.department_id::text NOT IN ({ph_d}))"
+    if excl_types:
+        ph_t = ','.join([f"'{t}'" for t in excl_types])
+        pg_excl_where += f" AND (p.type_id IS NULL OR p.type_id::text NOT IN ({ph_t}))"
+
     rows = pg_qry(f"""
         SELECT
             p.date,
@@ -2376,7 +2436,7 @@ def api_expenses():
         LEFT JOIN casino_expenditure_types et ON p.expenditure_type_id = et.id
         LEFT JOIN casino_vendors v ON p.vendor_id = v.id
         WHERE p.direction = 1 AND p.date >= %s AND p.date <= %s
-        {pg_loc_where}
+        {pg_loc_where} {pg_excl_where}
         ORDER BY p.date DESC
     """, pg_params)
     
@@ -2394,3 +2454,8 @@ def api_expenses():
         })
         
     return jsonify(data)
+
+if __name__ == '__main__':
+    print(" CyberSlot Analytics Dashboard → http://localhost:5050")
+    app.run(host='0.0.0.0', port=5050, debug=False)
+
