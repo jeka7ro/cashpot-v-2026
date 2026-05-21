@@ -681,7 +681,7 @@ function openSettings(){
 }
 function closeSettings(){document.getElementById('settings-modal').classList.remove('show');}
 function closeSettingsOutside(e){if(e.target===document.getElementById('settings-modal'))closeSettings();}
-function saveSettings(){
+async function saveSettings(){
   const ex=[];
   document.querySelectorAll('#settings-locations-list input[type="checkbox"]').forEach(c => {
     if(!c.checked) {
@@ -689,6 +689,11 @@ function saveSettings(){
     }
   });
   localStorage.setItem('excluded_locs',JSON.stringify(ex));
+  
+  if (window.saveExpensesConfig) {
+    await window.saveExpensesConfig();
+  }
+  
   closeSettings();
   loadFilters().then(() => loadAll());
 }
@@ -4783,9 +4788,8 @@ window.saveExpensesConfig = async function() {
       })
     });
     const res = await r.json();
-    if(res.success) {
-      alert('Configurația a fost salvată cu succes! Cheltuielile și Profitul Net au fost actualizate.');
-      loadAll();
+    if(!res.success) {
+      console.error('Eroare la salvare configuratie cheltuieli');
     }
-  } catch(e) { console.error(e); alert('Eroare la salvare!'); }
+  } catch(e) { console.error(e); }
 }
