@@ -222,7 +222,7 @@ td.cell-neg-3 { background:rgba(239,68,68,.38) !important; }
 .settings-title { font-size:15px; font-weight:700; }
 .settings-close { background:none; border:none; color:var(--muted); font-size:20px; cursor:pointer; padding:4px 8px; border-radius:8px; }
 .settings-close:hover { background:var(--surface2); color:var(--text); }
-.settings-body { padding:16px 20px; max-height:75vh; overflow-y:auto; }
+.settings-body { padding:16px 20px; max-height:82vh; overflow-y:auto; }
 .settings-section-title { font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.08em; margin-bottom:12px; }
 .settings-item { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:var(--surface2); border-radius:12px; margin-bottom:8px; }
 .settings-item-name { font-size:13px; font-weight:500; }

@@ -1297,19 +1297,20 @@
       <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px; padding-top:14px; border-top:1px solid var(--border);">
         Configurare Cheltuieli
       </div>
-      <div style="display:grid; grid-template-columns:230px 1fr; border:1px solid var(--border); border-radius:10px; overflow:hidden; height:360px;">
+      <div style="display:grid; grid-template-columns:230px 1fr; border:1px solid var(--border); border-radius:10px; overflow:hidden; height:420px;">
         <!-- STANGA: Departamente -->
-        <div style="border-right:1px solid var(--border); display:flex; flex-direction:column;">
+        <div style="border-right:1px solid var(--border); display:flex; flex-direction:column; min-height:0;">
           <div style="padding:7px 12px; background:var(--surface2); border-bottom:1px solid var(--border); font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; flex-shrink:0; display:flex; justify-content:space-between; align-items:center;">
             <span>Departament</span><span>Tot</span>
           </div>
           <div id="set-exp-deps" style="overflow-y:auto; flex:1;"></div>
         </div>
         <!-- DREAPTA: Tipuri cheltuiala -->
-        <div style="display:flex; flex-direction:column;">
-          <div style="padding:7px 12px; background:var(--surface2); border-bottom:1px solid var(--border); font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; flex-shrink:0; display:flex; justify-content:space-between; align-items:center;">
-            <span id="set-exp-dep-filter-label" style="text-transform:none; font-weight:600; color:var(--text);">← Selectează dept.</span>
-            <span>On/Off</span>
+        <div style="display:flex; flex-direction:column; min-height:0;">
+          <div style="padding:6px 10px; background:var(--surface2); border-bottom:1px solid var(--border); font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; flex-shrink:0; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+            <span id="set-exp-dep-filter-label" style="text-transform:none; font-weight:600; color:var(--text); flex:1;">← Selectează dept.</span>
+            <button onclick="expTypesAll(false)" style="padding:3px 10px; font-size:10px; border-radius:9999px; border:1px solid var(--border); background:var(--surface); color:var(--muted); cursor:pointer; white-space:nowrap;">Toate OFF</button>
+            <button onclick="expTypesAll(true)"  style="padding:3px 10px; font-size:10px; border-radius:9999px; border:1px solid var(--accent); background:color-mix(in srgb,var(--accent) 15%,transparent); color:var(--accent); cursor:pointer; white-space:nowrap;">Toate ON</button>
           </div>
           <div id="set-exp-types" style="overflow-y:auto; flex:1;">
             <div style="padding:30px; text-align:center; font-size:12px; color:var(--muted);">← Click pe un departament</div>

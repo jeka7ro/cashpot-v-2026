@@ -4832,6 +4832,28 @@ window.onExpTypeToggle = function(depId, typeId, isChecked) {
   if (dep) { const t = dep.types.find(t => t.id === typeId); if (t) t.is_expense = isChecked; }
 }
 
+window.expTypesAll = function(isChecked) {
+  // Find currently selected department
+  const activeRow = document.querySelector('.exp-dep-row[data-id]');
+  const activeId = document.querySelector('.exp-dep-row[style*="color-mix"]') || 
+                   document.querySelector('.exp-dep-row[style*="accent"]');
+  
+  // Find selected dep from highlighted row
+  let depId = null;
+  document.querySelectorAll('.exp-dep-row').forEach(r => {
+    if (r.style.background && r.style.background !== '') depId = r.dataset.id;
+  });
+  
+  if (!depId) return;
+  const dep = _expConfigDeps.find(d => d.id === depId);
+  if (!dep) return;
+  
+  dep.types.forEach(t => t.is_expense = isChecked);
+  
+  // Update visible checkboxes
+  document.querySelectorAll('#set-exp-types .cfg-type').forEach(cb => cb.checked = isChecked);
+}
+
 
 window.saveExpensesConfig = async function() {
   const exclTypes = []; _expConfigDeps.forEach(d => (d.types||[]).forEach(t => { if(!t.is_expense && !exclTypes.includes(t.id)) exclTypes.push(t.id); }));
