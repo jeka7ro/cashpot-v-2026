@@ -4752,89 +4752,99 @@ window.renderExpensesTable = function() {
 
 
 // --- EXPENSES CONFIG SETTINGS ---
-let _allExpTypes = [];
-let _allExpDeps = [];
+let _allExpDeps = [];  // [{id, name, is_expense, types:[{id,name,is_expense}]}]
 
 window.loadExpensesConfig = async function() {
   try {
     const data = await api('/api/admin/expenses_config');
     _allExpDeps = data.departments || [];
-    _allExpTypes = data.types || [];
 
     const depContainer = document.getElementById('set-exp-deps');
     if (!depContainer) return;
 
     depContainer.innerHTML = _allExpDeps.map(d => `
-      <div class="exp-dep-row" data-id="${d.id}" onclick="selectExpDep('${d.id}', '${d.name.replace(/'/g,"\'")}', this)"
-        style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; cursor:pointer; border-bottom:1px solid var(--border); transition:background .15s;">
+      <div class="exp-dep-row" data-id="${d.id}"
+        style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; cursor:pointer; border-bottom:1px solid var(--border); transition:background .15s;"
+        onclick="selectExpDep('${d.id}', this)">
         <span style="font-size:12px; color:var(--text);">${d.name}</span>
         <label class="toggle" onclick="event.stopPropagation()">
-          <input type="checkbox" class="cfg-dep" value="${d.id}" ${d.is_expense ? 'checked' : ''}>
+          <input type="checkbox" class="cfg-dep" value="${d.id}" ${d.is_expense ? 'checked' : ''}
+            onchange="onDepToggle('${d.id}', this.checked)">
           <span class="toggle-slider"></span>
         </label>
       </div>
     `).join('');
 
-    // select first department automatically
-    if (_allExpDeps.length > 0) {
-      const firstRow = depContainer.querySelector('.exp-dep-row');
-      if (firstRow) selectExpDep(_allExpDeps[0].id, _allExpDeps[0].name, firstRow);
+    // Autoselect first dep that has types
+    const firstWithTypes = _allExpDeps.find(d => d.types && d.types.length > 0);
+    if (firstWithTypes) {
+      const row = depContainer.querySelector(`.exp-dep-row[data-id="${firstWithTypes.id}"]`);
+      if (row) selectExpDep(firstWithTypes.id, row);
     }
   } catch(e) { console.error(e); }
 }
 
-window.selectExpDep = function(depId, depName, el) {
+window.selectExpDep = function(depId, el) {
   document.querySelectorAll('.exp-dep-row').forEach(r => {
     r.style.background = '';
-    r.style.fontWeight = '';
   });
-  if (el) {
-    el.style.background = 'color-mix(in srgb, var(--accent) 10%, transparent)';
-    el.style.fontWeight = '700';
-  }
+  if (el) el.style.background = 'color-mix(in srgb, var(--accent) 12%, transparent)';
 
+  const dep = _allExpDeps.find(d => d.id === depId);
   const label = document.getElementById('set-exp-dep-filter-label');
-  if (label) label.textContent = '— ' + depName;
+  if (label) label.textContent = dep ? '— ' + dep.name : '';
 
   const typeContainer = document.getElementById('set-exp-types');
   if (!typeContainer) return;
 
-  const types = _allExpTypes.filter(t => t.id === depId || true); // show all, filtered by depId from server
-  // Since API returns all types flat (not linked to dept), show all and let user toggle
-  // When API returns dept-linked types, filter: _allExpTypes.filter(t => t.department_id === depId)
-  
-  if (_allExpTypes.length === 0) {
-    typeContainer.innerHTML = '<div style="padding:20px; font-size:11px; color:var(--muted); text-align:center;">Niciun tip de plată disponibil.</div>';
+  if (!dep || !dep.types || dep.types.length === 0) {
+    typeContainer.innerHTML = '<div style="padding:20px 12px; font-size:11px; color:var(--muted); text-align:center;">Nicio tranzacție înregistrată pentru acest departament.</div>';
     return;
   }
 
-  typeContainer.innerHTML = _allExpTypes.map(t => `
+  typeContainer.innerHTML = dep.types.map(t => `
     <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border-bottom:1px solid var(--border);">
       <span style="font-size:12px; color:var(--text);">${t.name}</span>
       <label class="toggle">
-        <input type="checkbox" class="cfg-type" value="${t.id}" ${t.is_expense ? 'checked' : ''}>
+        <input type="checkbox" class="cfg-type" value="${t.id}" data-dep="${depId}" ${t.is_expense ? 'checked' : ''}
+          onchange="onTypeToggle('${depId}', '${t.id}', this.checked)">
         <span class="toggle-slider"></span>
       </label>
     </div>
   `).join('');
 }
 
+window.onDepToggle = function(depId, isChecked) {
+  const dep = _allExpDeps.find(d => d.id === depId);
+  if (dep) dep.is_expense = isChecked;
+}
+
+window.onTypeToggle = function(depId, typeId, isChecked) {
+  const dep = _allExpDeps.find(d => d.id === depId);
+  if (dep) {
+    const t = dep.types.find(t => t.id === typeId);
+    if (t) t.is_expense = isChecked;
+  }
+}
+
+
 window.saveExpensesConfig = async function() {
-  const exclDeps = Array.from(document.querySelectorAll('.cfg-dep:not(:checked)')).map(i => i.value);
-  const exclTypes = Array.from(document.querySelectorAll('.cfg-type:not(:checked)')).map(i => i.value);
+  // Collect from in-memory state (covers ALL departments, not just the visible one)
+  const exclDeps = _allExpDeps.filter(d => !d.is_expense).map(d => d.id);
+  const exclTypes = [];
+  _allExpDeps.forEach(d => {
+    (d.types || []).forEach(t => {
+      if (!t.is_expense && !exclTypes.includes(t.id)) exclTypes.push(t.id);
+    });
+  });
 
   try {
     const r = await fetch(API + '/api/admin/expenses_config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        excluded_departments: exclDeps,
-        excluded_types: exclTypes
-      })
+      body: JSON.stringify({ excluded_departments: exclDeps, excluded_types: exclTypes })
     });
     const res = await r.json();
-    if(!res.success) {
-      console.error('Eroare la salvare configuratie cheltuieli');
-    }
+    if(!res.success) console.error('Eroare la salvare configuratie cheltuieli');
   } catch(e) { console.error(e); }
 }
