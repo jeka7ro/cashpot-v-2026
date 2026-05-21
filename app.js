@@ -669,8 +669,16 @@ window.goToMultigame = function(mix) {
 };
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
-function openSettings(){
-  loadExpensesConfig();
+function openSettings(showExpenses){
+  // Show/hide expenses section based on context (only Super Admin, only from cheltuieli page)
+  const expSection = document.getElementById('settings-exp-section');
+  const expPanel = document.getElementById('set-exp-deps')?.closest('[style*="height:420px"]') || 
+                   document.querySelector('[style*="grid-template-columns:230px"]');
+  const show = showExpenses && currentUser && currentUser.role === 'Super Admin';
+  if (expSection) expSection.style.display = show ? '' : 'none';
+  if (expPanel) expPanel.style.display = show ? '' : 'none';
+  if (show) loadExpensesConfig();
+
   const ex=getExcluded(),list=document.getElementById('settings-locations-list');
   list.innerHTML='';
   (filtersData.locations||[]).forEach(l=>{
@@ -681,6 +689,10 @@ function openSettings(){
     </label>`;
   });
   document.getElementById('settings-modal').classList.add('show');
+}
+window.openExpensesSettings = function() {
+  if (!currentUser || currentUser.role !== 'Super Admin') return;
+  openSettings(true);
 }
 function closeSettings(){document.getElementById('settings-modal').classList.remove('show');}
 function closeSettingsOutside(e){if(e.target===document.getElementById('settings-modal'))closeSettings();}
@@ -1581,7 +1593,11 @@ document.querySelectorAll('.rep-page').forEach(p => p.style.display = 'none');
         }
       }
       else if (subHash === 'cashout') loadRapoarteCashout();
-      else if (subHash === 'cheltuieli') loadExpensesReport();
+      else if (subHash === 'cheltuieli') {
+        loadExpensesReport();
+        const btnExpSettings = document.getElementById('btn-exp-settings');
+        if (btnExpSettings) btnExpSettings.style.display = (currentUser && currentUser.role === 'Super Admin') ? 'inline-flex' : 'none';
+      }
     } else {
       window.location.hash = 'rapoarte/ore';
     }

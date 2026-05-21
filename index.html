@@ -312,7 +312,7 @@
 
         <div class="kpi-card" id="kpi-total-expenses" style="display:none; border-left: 4px solid var(--red);">
           <div class="kpi-label">TOTAL CHELTUIELI</div>
-          <div class="kpi-val" id="v-only-expenses" style="color:var(--red);">—</div>
+          <div class="kpi-value" id="v-only-expenses" style="color:var(--red);">—</div>
           <div class="kpi-sub" id="v-only-profit">Profit Net: —</div>
         </div>
     <div class="kpi-card" id="kpi-games">
@@ -782,6 +782,10 @@
                 <button class="btn-primary" onclick="exportExpensesCSV()" style="padding:6px 14px; font-size:11px; display:flex; align-items:center; gap:6px; background:#16a34a; color:#fff; border:none; border-radius:8px; cursor:pointer; font-weight:600;">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                   Export Excel
+                </button>
+                <button id="btn-exp-settings" onclick="openExpensesSettings()" style="display:none; padding:6px 14px; font-size:11px; align-items:center; gap:6px; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:8px; cursor:pointer; font-weight:600;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                  Configurare
                 </button>
                 <input type="text" id="exp-search" class="glass-select" placeholder="🔍 Caută (explicație, vendor)..." onkeyup="filterExpenses()" style="padding:6px 12px; background:var(--surface2); color:var(--text); border:1px solid var(--border); border-radius:20px; font-size:11px; width:220px; outline:none;">
               </div>
@@ -1295,7 +1299,7 @@
       <div id="settings-locations-list" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;"></div>
 
       <!-- Cheltuieli: 2 panouri -->
-      <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px; padding-top:14px; border-top:1px solid var(--border);">
+      <div id="settings-exp-section" style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px; padding-top:14px; border-top:1px solid var(--border);">
         Configurare Cheltuieli
       </div>
       <div style="display:grid; grid-template-columns:230px 1fr; border:1px solid var(--border); border-radius:10px; overflow:hidden; height:420px;">
