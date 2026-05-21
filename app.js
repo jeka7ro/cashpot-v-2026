@@ -153,13 +153,14 @@ window.reloadCurrentView = function() {
     loadKPI(s, e);
   }
 
-  if (hash.startsWith('#rapoarte/ore')) loadHourlyReport();
-  else if (hash.startsWith('#rapoarte/hh')) loadHhReport();
-  else if (hash.startsWith('#rapoarte/marketing')) loadMarketingReport();
-  else if (hash.startsWith('#rapoarte/clienti')) loadClientiReport();
-  else if (hash.startsWith('#rapoarte/cashout')) loadRapoarteCashout();
-  else if (hash.startsWith('#rapoarte/cheltuieli')) window.loadExpensesReport();
+  if (hash.startsWith('#rapoarte/ore')) { loadAll(); loadHourlyReport(); }
+  else if (hash.startsWith('#rapoarte/hh')) { loadAll(); loadHhReport(); }
+  else if (hash.startsWith('#rapoarte/marketing')) { loadAll(); loadMarketingReport(); }
+  else if (hash.startsWith('#rapoarte/clienti')) { loadAll(); loadClientiReport(); }
+  else if (hash.startsWith('#rapoarte/cashout')) { loadAll(); loadRapoarteCashout(); }
+  else if (hash.startsWith('#rapoarte/cheltuieli')) { loadAll(); window.loadExpensesReport(); }
   else if (hash.startsWith('#rapoarte/multigame')) {
+    loadAll();
     window.loadMultigameReport ? loadMultigameReport() : loadMultigame();
   }
   else if (hash.startsWith('#admin/sloturi')) loadAdminSloturi();
@@ -1559,7 +1560,7 @@ document.querySelectorAll('.rep-page').forEach(p => p.style.display = 'none');
         if(kpiJp)    kpiJp.style.display    = 'none';
         if(kpiGames) kpiGames.style.display = 'none';
         if(kpiAp)    kpiAp.style.display    = 'none';
-        if(kpiExp)   kpiExp.style.display   = 'flex';
+        if(kpiExp)   kpiExp.style.display   = 'block';
         if(kpiGrid)  kpiGrid.style.gridTemplateColumns = 'repeat(4,1fr)';
       } else {
         if(kpiJp)    kpiJp.style.display    = 'flex';
@@ -2100,7 +2101,7 @@ document.querySelectorAll('.rep-page').forEach(p => p.style.display = 'none');
         if(kpiJp) kpiJp.style.display = 'none';
         if(kpiGames2) kpiGames2.style.display = 'none';
         if(kpiAp2) kpiAp2.style.display = 'none';
-        if(kpiExp) kpiExp.style.display = 'flex';
+        if(kpiExp) kpiExp.style.display = 'block';
         if(kpiGrid2) kpiGrid2.style.gridTemplateColumns = 'repeat(4,1fr)';
       } else {
         if(kpiJp) kpiJp.style.display = 'flex';
@@ -2152,7 +2153,7 @@ document.querySelectorAll('.rep-page').forEach(p => p.style.display = 'none');
         if(kpiJp) kpiJp.style.display = 'none';
         if(kpiGames2) kpiGames2.style.display = 'none';
         if(kpiAp2) kpiAp2.style.display = 'none';
-        if(kpiExp) kpiExp.style.display = 'flex';
+        if(kpiExp) kpiExp.style.display = 'block';
         if(kpiGrid2) kpiGrid2.style.gridTemplateColumns = 'repeat(4,1fr)';
       } else {
         if(kpiJp) kpiJp.style.display = 'flex';
