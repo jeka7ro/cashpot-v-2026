@@ -1535,14 +1535,21 @@ document.querySelectorAll('.rep-page').forEach(p => p.style.display = 'none');
       const repTarget = document.getElementById('rep-page-' + subHash);
       if (repTarget) repTarget.style.display = 'block';
       
-      const kpiJp = document.getElementById('kpi-jp');
-      const kpiExp = document.getElementById('kpi-total-expenses');
+      const kpiJp    = document.getElementById('kpi-jp');
+      const kpiExp   = document.getElementById('kpi-total-expenses');
+      const kpiGames = document.getElementById('kpi-games');
+      const kpiAp    = document.getElementById('kpi-aparate');
+      
       if (subHash === 'cheltuieli') {
-        if(kpiJp) kpiJp.style.display = 'none';
-        if(kpiExp) kpiExp.style.display = 'flex';
+        if(kpiJp)    kpiJp.style.display    = 'none';
+        if(kpiGames) kpiGames.style.display = 'none';
+        if(kpiAp)    kpiAp.style.display    = 'none';
+        if(kpiExp)   kpiExp.style.display   = 'flex';
       } else {
-        if(kpiJp) kpiJp.style.display = 'flex';
-        if(kpiExp) kpiExp.style.display = 'none';
+        if(kpiJp)    kpiJp.style.display    = 'flex';
+        if(kpiGames) kpiGames.style.display = 'flex';
+        if(kpiAp)    kpiAp.style.display    = 'flex';
+        if(kpiExp)   kpiExp.style.display   = 'none';
       }
       
       if (subHash === 'ore') loadHourlyReport();
@@ -4745,33 +4752,71 @@ window.renderExpensesTable = function() {
 
 
 // --- EXPENSES CONFIG SETTINGS ---
+let _allExpTypes = [];
+let _allExpDeps = [];
+
 window.loadExpensesConfig = async function() {
   try {
     const data = await api('/api/admin/expenses_config');
+    _allExpDeps = data.departments || [];
+    _allExpTypes = data.types || [];
+
     const depContainer = document.getElementById('set-exp-deps');
-    const typeContainer = document.getElementById('set-exp-types');
-    if(!depContainer || !typeContainer) return;
-    
-    depContainer.innerHTML = data.departments.map(d => `
-      <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 16px; border-radius:9999px; background:var(--surface2); margin-bottom:8px;">
-        <div style="font-size:12px; font-weight:600; color:var(--text);">${d.name}</div>
-        <label class="toggle">
+    if (!depContainer) return;
+
+    depContainer.innerHTML = _allExpDeps.map(d => `
+      <div class="exp-dep-row" data-id="${d.id}" onclick="selectExpDep('${d.id}', '${d.name.replace(/'/g,"\'")}', this)"
+        style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; cursor:pointer; border-bottom:1px solid var(--border); transition:background .15s;">
+        <span style="font-size:12px; color:var(--text);">${d.name}</span>
+        <label class="toggle" onclick="event.stopPropagation()">
           <input type="checkbox" class="cfg-dep" value="${d.id}" ${d.is_expense ? 'checked' : ''}>
-          <span class="toggle-slider rounded-full"></span>
+          <span class="toggle-slider"></span>
         </label>
       </div>
     `).join('');
-    
-    typeContainer.innerHTML = data.types.map(t => `
-      <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 16px; border-radius:9999px; background:var(--surface2); margin-bottom:8px;">
-        <div style="font-size:12px; font-weight:600; color:var(--text);">${t.name}</div>
-        <label class="toggle">
-          <input type="checkbox" class="cfg-type" value="${t.id}" ${t.is_expense ? 'checked' : ''}>
-          <span class="toggle-slider rounded-full"></span>
-        </label>
-      </div>
-    `).join('');
+
+    // select first department automatically
+    if (_allExpDeps.length > 0) {
+      const firstRow = depContainer.querySelector('.exp-dep-row');
+      if (firstRow) selectExpDep(_allExpDeps[0].id, _allExpDeps[0].name, firstRow);
+    }
   } catch(e) { console.error(e); }
+}
+
+window.selectExpDep = function(depId, depName, el) {
+  document.querySelectorAll('.exp-dep-row').forEach(r => {
+    r.style.background = '';
+    r.style.fontWeight = '';
+  });
+  if (el) {
+    el.style.background = 'color-mix(in srgb, var(--accent) 10%, transparent)';
+    el.style.fontWeight = '700';
+  }
+
+  const label = document.getElementById('set-exp-dep-filter-label');
+  if (label) label.textContent = '— ' + depName;
+
+  const typeContainer = document.getElementById('set-exp-types');
+  if (!typeContainer) return;
+
+  const types = _allExpTypes.filter(t => t.id === depId || true); // show all, filtered by depId from server
+  // Since API returns all types flat (not linked to dept), show all and let user toggle
+  // When API returns dept-linked types, filter: _allExpTypes.filter(t => t.department_id === depId)
+  
+  if (_allExpTypes.length === 0) {
+    typeContainer.innerHTML = '<div style="padding:20px; font-size:11px; color:var(--muted); text-align:center;">Niciun tip de plată disponibil.</div>';
+    return;
+  }
+
+  typeContainer.innerHTML = _allExpTypes.map(t => `
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border-bottom:1px solid var(--border);">
+      <span style="font-size:12px; color:var(--text);">${t.name}</span>
+      <label class="toggle">
+        <input type="checkbox" class="cfg-type" value="${t.id}" ${t.is_expense ? 'checked' : ''}>
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+  `).join('');
 }
 
 window.saveExpensesConfig = async function() {

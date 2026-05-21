@@ -1291,18 +1291,25 @@
     <div class="settings-body">
       <div class="settings-section-title">Locații vizibile</div>
       <div id="settings-locations-list"></div>
-      <div id="settings-expenses" style="margin-top:24px; padding-top:24px; border-top:1px solid var(--border);">
-        <h3 style="font-size:14px; font-weight:700; color:var(--text); margin-bottom:16px;">Setări Cheltuieli Operaționale</h3>
-        <p style="font-size:11px; color:var(--muted); margin-bottom:16px;">Debifează departamentele și tipurile care NU reprezintă cheltuieli reale (ex. POS, Top Pay, Bancă, Transferuri).</p>
-        
-        <div style="display:flex; gap:32px;">
-          <div style="flex:1;">
-            <div style="font-size:12px; font-weight:600; color:var(--accent); margin-bottom:8px;">Departamente</div>
-            <div id="set-exp-deps" style="display:flex; flex-direction:column; gap:8px; max-height:180px; overflow-y:auto; padding:8px; background:var(--surface2); border-radius:8px;"></div>
+
+      <div id="settings-expenses" style="margin-top:24px; padding-top:20px; border-top:1px solid var(--border);">
+        <div style="font-size:13px; font-weight:700; color:var(--text); margin-bottom:4px;">Cheltuieli Operaționale</div>
+        <p style="font-size:11px; color:var(--muted); margin-bottom:12px;">Debifează ce NU sunt cheltuieli (POS, Bancă, Transferuri). Click pe departament → filtrează tipurile.</p>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0; border:1px solid var(--border); border-radius:10px; overflow:hidden;">
+          <div style="border-right:1px solid var(--border);">
+            <div style="padding:7px 12px; background:var(--surface2); border-bottom:1px solid var(--border); font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; display:flex; justify-content:space-between;">
+              <span>Departament</span><span style="font-weight:400;">Cheltuială?</span>
+            </div>
+            <div id="set-exp-deps" style="max-height:260px; overflow-y:auto;"></div>
           </div>
-          <div style="flex:1;">
-            <div style="font-size:12px; font-weight:600; color:var(--accent); margin-bottom:8px;">Tipuri de Plăți</div>
-            <div id="set-exp-types" style="display:flex; flex-direction:column; gap:8px; max-height:180px; overflow-y:auto; padding:8px; background:var(--surface2); border-radius:8px;"></div>
+          <div>
+            <div style="padding:7px 12px; background:var(--surface2); border-bottom:1px solid var(--border); font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; display:flex; justify-content:space-between;">
+              <span>Tip Plată <span id="set-exp-dep-filter-label" style="color:var(--accent); text-transform:none;"></span></span>
+              <span style="font-weight:400;">Cheltuială?</span>
+            </div>
+            <div id="set-exp-types" style="max-height:260px; overflow-y:auto;">
+              <div style="padding:24px 12px; font-size:11px; color:var(--muted); text-align:center;">← Selectează departament</div>
+            </div>
           </div>
         </div>
       </div>
