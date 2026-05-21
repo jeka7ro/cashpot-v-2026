@@ -2282,7 +2282,7 @@ window.openDayAnalysis = async function(dateStr) {
             </div>
             
             <div style="font-size:11px; display:flex; flex-direction:column; gap:2px;">
-              <span style="color:var(--red); font-weight:600;">- Lipsă (7 zile) (${li.lipsa_count}):</span>
+              <span style="color:var(--red); font-weight:600;">- Lipsă (30 zile) (${li.lipsa_count}):</span>
               <span style="color:var(--text); line-height:1.4;">${li.lipsa.join(', ') || '—'}</span>
             </div>
           </div>
@@ -2396,7 +2396,7 @@ window.openDayAnalysis = async function(dateStr) {
                   lines.push('── Detalii locatii ──');
                   locs.sort((a,b)=>Math.abs(b.ggr)-Math.abs(a.ggr)).forEach(l => {
                     const hhStr = (+l.hh>0) ? ` | HH: ${fmt(l.hh)}` : '';
-                    lines.push(`${l.locatie}: GGR ${fmt(l.ggr)}${hhStr}`);
+                    lines.push(`${l.locatie}: IN ${fmt(l.in || 0)} | GGR ${fmt(l.ggr)}${hhStr}`);
                   });
                 }
                 // Top HH machines this hour

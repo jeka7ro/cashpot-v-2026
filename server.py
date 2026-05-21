@@ -817,7 +817,7 @@ def hourly_machine_games():
     dt = request.args.get('dt') # YYYY-MM-DD HH:MM
     if not serial or not dt: return jsonify([])
     
-    dt_start = dt + ':00'
+    dt_start = dt if len(dt) > 16 else dt + ':00'
     from datetime import datetime, timedelta
     try:
         dt_end = (datetime.strptime(dt_start, '%Y-%m-%d %H:%M:%S') + timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
@@ -884,7 +884,7 @@ def day_smart():
         past_clients = qry("""
             SELECT p.id, p.first_name, p.last_name, COUNT(pcl.id) as evts
             FROM player_card_logs pcl JOIN players p ON pcl.player_id = p.id
-            WHERE pcl.location_id = %s AND pcl.created_at >= DATE_SUB(%s, INTERVAL 7 DAY) AND pcl.created_at < %s AND pcl.log_type = 2
+            WHERE pcl.location_id = %s AND pcl.created_at >= DATE_SUB(%s, INTERVAL 30 DAY) AND pcl.created_at < %s AND pcl.log_type = 2
             GROUP BY p.id, p.first_name, p.last_name ORDER BY evts DESC
         """, [l_id, start, start])
         
@@ -900,13 +900,14 @@ def day_smart():
         def fmt_name(c):
             fn = c['first_name'] or 'C.'
             ln = c['last_name'] or ''
-            return f"{fn} {ln[0]}." if ln else fn
+            name = f"{fn} {ln[0]}." if ln else fn
+            return f"{name} ({c['evts']}v)"
 
         loc_insights.append({
             'locatie': l_name,
-            'fidel': [fmt_name(c) for c in fidel[:3]], 'fidel_count': len(fidel),
-            'nou': [fmt_name(c) for c in nou[:3]], 'nou_count': len(nou),
-            'lipsa': [fmt_name(c) for c in lipsa[:3]], 'lipsa_count': len(lipsa)
+            'fidel': [fmt_name(c) for c in fidel], 'fidel_count': len(fidel),
+            'nou': [fmt_name(c) for c in nou], 'nou_count': len(nou),
+            'lipsa': [fmt_name(c) for c in lipsa], 'lipsa_count': len(lipsa)
         })
         
     return jsonify({
