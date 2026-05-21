@@ -779,12 +779,6 @@
             <div class="card-header" style="padding:14px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
               <div class="card-title" style="font-size:11px; font-weight:700; color:var(--text); text-transform:uppercase; letter-spacing:.05em;">REGISTRU CHELTUIELI OPERAȚIONALE</div>
               <div style="display:flex; gap:12px; align-items:center;">
-                <select id="exp-per-page" class="glass-select" style="padding:6px 12px; background:var(--surface2); color:var(--text); border:1px solid var(--border); border-radius:8px; font-size:11px;" onchange="changeExpPerPage(this.value)">
-                  <option value="50">50 rânduri</option>
-                  <option value="100">100 rânduri</option>
-                  <option value="500">500 rânduri</option>
-                  <option value="999999">Toate</option>
-                </select>
                 <button class="btn-primary" onclick="exportExpensesCSV()" style="padding:6px 12px; font-size:11px; display:flex; align-items:center; gap:6px; background:var(--accent); color:#fff; border:none; border-radius:8px; cursor:pointer;">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                   Export Excel
@@ -809,10 +803,21 @@
               </table>
             </div>
             <div id="exp-pagination" style="display:flex; justify-content:space-between; align-items:center; padding:12px 20px; border-top:1px solid var(--border); background:var(--surface2);">
-              <div id="exp-page-info" style="font-size:11px; color:var(--muted)"></div>
+              <div style="display:flex; align-items:center; gap:16px;">
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span style="font-size:11px; color:var(--muted)">Rânduri pe pagină:</span>
+                  <select id="exp-per-page" class="glass-select" style="padding:4px 8px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; font-size:11px; outline:none;" onchange="changeExpPerPage(this.value)">
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                    <option value="500">500</option>
+                    <option value="999999">Toate</option>
+                  </select>
+                </div>
+                <div id="exp-page-info" style="font-size:11px; color:var(--muted)"></div>
+              </div>
               <div style="display:flex; gap:8px;">
-                <button class="btn-ghost" id="btn-exp-prev" onclick="changeExpPage(-1)" style="padding:4px 8px; font-size:11px; cursor:pointer;">Pagina Anterioară</button>
-                <button class="btn-ghost" id="btn-exp-next" onclick="changeExpPage(1)" style="padding:4px 8px; font-size:11px; cursor:pointer;">Pagina Următoare</button>
+                <button class="btn-ghost" id="btn-exp-prev" onclick="changeExpPage(-1)" style="padding:4px 8px; font-size:11px; cursor:pointer;">&lt; Anterioara</button>
+                <button class="btn-ghost" id="btn-exp-next" onclick="changeExpPage(1)" style="padding:4px 8px; font-size:11px; cursor:pointer;">Următoarea &gt;</button>
               </div>
             </div>
           </section>
