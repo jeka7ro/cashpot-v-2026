@@ -271,7 +271,7 @@ def kpi():
     else:
         pg_loc_where = " AND 1=0" # If filter is empty and no default locations matched
 
-cfg = get_exp_config()
+    cfg = get_exp_config()
     excl_deps = cfg.get('excluded_departments', [])
     excl_types = cfg.get('excluded_types', [])
     
@@ -2405,7 +2405,7 @@ def api_expenses():
     else:
         pg_loc_where = " AND 1=0"
 
-cfg = get_exp_config()
+    cfg = get_exp_config()
     excl_deps = cfg.get('excluded_departments', [])
     excl_types = cfg.get('excluded_types', [])
     
