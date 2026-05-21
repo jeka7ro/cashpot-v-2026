@@ -1277,29 +1277,40 @@ def multigame():
         # Division by 100 applies the standard 0.01 denomination factor
         rows = qry("""
             SELECT
-                mg.id as game_id,
-                COALESCE(NULLIF(mg.name, ''), NULLIF(mgs.sas_game_name, ''), 'Necunoscut') as game_name,
-                COUNT(DISTINCT mgs.machine_id)       as aparate,
-                ROUND(SUM(mgs.c_52_bet)   / 100, 0) as total_bet,
-                ROUND(SUM(mgs.c_52_win)   / 100, 0) as total_win,
-                ROUND(SUM(mgs.c_52_jackpot)/100, 0) as total_jp,
-                SUM(mgs.c_52_games)                  as total_games,
-                ROUND((SUM(mgs.c_52_bet) - SUM(mgs.c_52_win)) / 100, 0) as ggr,
+                game_id,
+                game_name,
+                COUNT(DISTINCT machine_id) as aparate,
+                ROUND(SUM(delta_bet) / 100, 0) as total_bet,
+                ROUND(SUM(delta_win) / 100, 0) as total_win,
+                ROUND(SUM(delta_jp) / 100, 0) as total_jp,
+                SUM(delta_games) as total_games,
+                ROUND(SUM(delta_bet - delta_win) / 100, 0) as ggr,
                 ROUND(
-                    CASE WHEN SUM(mgs.c_52_bet) > 0
-                    THEN (1 - SUM(mgs.c_52_win)/SUM(mgs.c_52_bet))*100
+                    CASE WHEN SUM(delta_bet) > 0
+                    THEN (1 - SUM(delta_win)/SUM(delta_bet))*100
                     ELSE NULL END, 2
                 ) as house_edge_pct,
                 ROUND(
-                    CASE WHEN SUM(mgs.c_52_games) > 0
-                    THEN SUM(mgs.c_52_bet) / SUM(mgs.c_52_games) / 100
+                    CASE WHEN SUM(delta_games) > 0
+                    THEN SUM(delta_bet) / SUM(delta_games) / 100
                     ELSE NULL END, 3
                 ) as avg_bet_per_game
-            FROM machine_audit_games_g_s mgs
-            LEFT JOIN machine_games mg ON mgs.machine_game_id = mg.id
-            WHERE mgs.created_at >= %s AND mgs.created_at < %s
-        """ + loc_where + """
-            GROUP BY mg.id, COALESCE(mg.name, mgs.sas_game_name)
+            FROM (
+                SELECT
+                    mg.id as game_id,
+                    COALESCE(NULLIF(mg.name, ''), NULLIF(mgs.sas_game_name, ''), 'Necunoscut') as game_name,
+                    mgs.machine_id,
+                    (MAX(mgs.c_52_bet) - MIN(mgs.c_52_bet)) as delta_bet,
+                    (MAX(mgs.c_52_win) - MIN(mgs.c_52_win)) as delta_win,
+                    (MAX(mgs.c_52_jackpot) - MIN(mgs.c_52_jackpot)) as delta_jp,
+                    (MAX(mgs.c_52_games) - MIN(mgs.c_52_games)) as delta_games
+                FROM machine_audit_games_g_s mgs
+                LEFT JOIN machine_games mg ON mgs.machine_game_id = mg.id
+                WHERE mgs.created_at >= %s AND mgs.created_at < %s
+            """ + loc_where + """
+                GROUP BY mgs.machine_id, mg.id, COALESCE(NULLIF(mg.name, ''), NULLIF(mgs.sas_game_name, ''), 'Necunoscut')
+            ) sub
+            GROUP BY game_id, game_name
             HAVING total_bet > 0
             ORDER BY total_bet DESC
             LIMIT 100
@@ -1351,20 +1362,29 @@ def multigame_details():
         # 1. Overall stats for this game
         stats = qry(f"""
             SELECT
-                MAX(mgs.machine_game_id) as game_id,
-                COUNT(DISTINCT mgs.machine_id) as aparate,
-                ROUND(SUM(mgs.c_52_bet) / 100, 0) as total_bet,
-                ROUND(SUM(mgs.c_52_win) / 100, 0) as total_win,
-                SUM(mgs.c_52_games) as total_games,
-                ROUND((SUM(mgs.c_52_bet) - SUM(mgs.c_52_win)) / 100, 0) as ggr,
+                MAX(game_id) as game_id,
+                COUNT(DISTINCT machine_id) as aparate,
+                ROUND(SUM(delta_bet) / 100, 0) as total_bet,
+                ROUND(SUM(delta_win) / 100, 0) as total_win,
+                SUM(delta_games) as total_games,
+                ROUND(SUM(delta_bet - delta_win) / 100, 0) as ggr,
                 ROUND(
-                    CASE WHEN SUM(mgs.c_52_bet) > 0
-                    THEN (1 - SUM(mgs.c_52_win)/SUM(mgs.c_52_bet))*100
+                    CASE WHEN SUM(delta_bet) > 0
+                    THEN (1 - SUM(delta_win)/SUM(delta_bet))*100
                     ELSE NULL END, 2
                 ) as house_edge_pct
-            FROM machine_audit_games_g_s mgs
-            WHERE ({gids_sql} OR mgs.sas_game_name = %s)
-              AND mgs.created_at >= %s AND mgs.created_at < %s
+            FROM (
+                SELECT
+                    mgs.machine_game_id as game_id,
+                    mgs.machine_id,
+                    (MAX(mgs.c_52_bet) - MIN(mgs.c_52_bet)) as delta_bet,
+                    (MAX(mgs.c_52_win) - MIN(mgs.c_52_win)) as delta_win,
+                    (MAX(mgs.c_52_games) - MIN(mgs.c_52_games)) as delta_games
+                FROM machine_audit_games_g_s mgs
+                WHERE ({gids_sql} OR mgs.sas_game_name = %s)
+                  AND mgs.created_at >= %s AND mgs.created_at < %s
+                GROUP BY mgs.machine_id, mgs.machine_game_id
+            ) sub
         """, [game_name, start_ts, end_ts])
         
         # 2. List of machines having this game
