@@ -670,6 +670,7 @@ window.goToMultigame = function(mix) {
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
 function openSettings(){
+  loadExpensesConfig();
   const ex=getExcluded(),list=document.getElementById('settings-locations-list');
   list.innerHTML='';
   (filtersData.locations||[]).forEach(l=>{
