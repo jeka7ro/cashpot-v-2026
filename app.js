@@ -4755,45 +4755,76 @@ window.renderExpensesTable = function() {
 
 
 // --- EXPENSES CONFIG SETTINGS ---
-let _expConfigDeps = [];  // [{id, name, types:[{id, name, is_expense}]}]
+let _expConfigDeps = [];
 
 window.loadExpensesConfig = async function() {
   try {
     const data = await api('/api/admin/expenses_config');
     _expConfigDeps = data.departments || [];
 
-    const tbody = document.getElementById('set-exp-tbody');
-    if (!tbody) return;
+    const depEl = document.getElementById('set-exp-deps');
+    if (!depEl) return;
 
-    let html = '';
-    _expConfigDeps.forEach(dep => {
-      // Department header row
-      html += `<tr style="background:color-mix(in srgb, var(--accent) 8%, var(--surface2));">
-        <td colspan="3" style="padding:7px 14px; font-weight:700; font-size:11px; color:var(--accent); letter-spacing:.03em; text-transform:uppercase; border-bottom:1px solid var(--border);">
-          ${dep.name}
-        </td>
-      </tr>`;
-      // Type rows
-      dep.types.forEach(t => {
-        html += `<tr style="border-bottom:1px solid var(--border);" 
-          onmouseover="this.style.background='var(--surface2)'" 
-          onmouseout="this.style.background=''">
-          <td style="width:12px; padding:0;"></td>
-          <td style="padding:7px 14px; color:var(--text); font-size:12px;">${t.name}</td>
-          <td style="padding:7px 14px; text-align:right; width:90px; padding-right:20px;">
-            <label class="toggle">
-              <input type="checkbox" class="cfg-type" value="${t.id}" data-dep="${dep.id}" 
-                ${t.is_expense ? 'checked' : ''}
-                onchange="onExpTypeToggle('${dep.id}','${t.id}',this.checked)">
-              <span class="toggle-slider"></span>
-            </label>
-          </td>
-        </tr>`;
-      });
-    });
+    // Render department list on left
+    depEl.innerHTML = _expConfigDeps.map(dep => `
+      <div class="exp-dep-row" data-id="${dep.id}"
+        style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border-bottom:1px solid var(--border); cursor:pointer; transition:background .15s;"
+        onclick="expSelectDep('${dep.id}', this)">
+        <span style="font-size:12px; color:var(--text); font-weight:500;">${dep.name}</span>
+        <label class="toggle" onclick="event.stopPropagation()">
+          <input type="checkbox" class="cfg-dep" value="${dep.id}" ${dep.is_expense ? 'checked' : ''}
+            onchange="onExpDepToggle('${dep.id}', this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    `).join('');
 
-    tbody.innerHTML = html || '<tr><td colspan="3" style="padding:20px; text-align:center; color:var(--muted);">Nu există tipuri de cheltuieli configurate.</td></tr>';
+    // Auto-select first
+    const firstRow = depEl.querySelector('.exp-dep-row');
+    if (firstRow) expSelectDep(_expConfigDeps[0].id, firstRow);
+
   } catch(e) { console.error('loadExpensesConfig error:', e); }
+}
+
+window.expSelectDep = function(depId, el) {
+  // Highlight selected row
+  document.querySelectorAll('.exp-dep-row').forEach(r => r.style.background = '');
+  if (el) el.style.background = 'color-mix(in srgb, var(--accent) 12%, transparent)';
+
+  const dep = _expConfigDeps.find(d => d.id === depId);
+  const label = document.getElementById('set-exp-dep-filter-label');
+  if (label) label.textContent = dep ? dep.name : '';
+
+  const typesEl = document.getElementById('set-exp-types');
+  if (!typesEl || !dep) return;
+
+  if (!dep.types || dep.types.length === 0) {
+    typesEl.innerHTML = '<div style="padding:20px; text-align:center; font-size:12px; color:var(--muted);">Nicio categorie definită.</div>';
+    return;
+  }
+
+  typesEl.innerHTML = dep.types.map(t => `
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 14px; border-bottom:1px solid var(--border);">
+      <span style="font-size:12px; color:var(--text);">${t.name}</span>
+      <label class="toggle">
+        <input type="checkbox" class="cfg-type" value="${t.id}" data-dep="${dep.id}" ${t.is_expense ? 'checked' : ''}
+          onchange="onExpTypeToggle('${dep.id}','${t.id}',this.checked)">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+  `).join('');
+}
+
+window.onExpDepToggle = function(depId, isChecked) {
+  const dep = _expConfigDeps.find(d => d.id === depId);
+  if (!dep) return;
+  dep.is_expense = isChecked;
+  dep.types.forEach(t => t.is_expense = isChecked);
+  // Refresh right panel if this dept is selected
+  const selectedRow = document.querySelector(`.exp-dep-row[data-id="${depId}"]`);
+  if (selectedRow && selectedRow.style.background !== '') {
+    expSelectDep(depId, selectedRow);
+  }
 }
 
 window.onExpTypeToggle = function(depId, typeId, isChecked) {
