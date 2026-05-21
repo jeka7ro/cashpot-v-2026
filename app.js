@@ -1543,16 +1543,19 @@ document.querySelectorAll('.rep-page').forEach(p => p.style.display = 'none');
       const kpiGames = document.getElementById('kpi-games');
       const kpiAp    = document.getElementById('kpi-aparate');
       
+      const kpiGrid = document.querySelector('.kpi-grid');
       if (subHash === 'cheltuieli') {
         if(kpiJp)    kpiJp.style.display    = 'none';
         if(kpiGames) kpiGames.style.display = 'none';
         if(kpiAp)    kpiAp.style.display    = 'none';
         if(kpiExp)   kpiExp.style.display   = 'flex';
+        if(kpiGrid)  kpiGrid.style.gridTemplateColumns = 'repeat(4,1fr)';
       } else {
         if(kpiJp)    kpiJp.style.display    = 'flex';
         if(kpiGames) kpiGames.style.display = 'flex';
         if(kpiAp)    kpiAp.style.display    = 'flex';
         if(kpiExp)   kpiExp.style.display   = 'none';
+        if(kpiGrid)  kpiGrid.style.gridTemplateColumns = '';
       }
       
       if (subHash === 'ore') loadHourlyReport();
@@ -2075,12 +2078,21 @@ document.querySelectorAll('.rep-page').forEach(p => p.style.display = 'none');
       
       const kpiJp = document.getElementById('kpi-jp');
       const kpiExp = document.getElementById('kpi-total-expenses');
+      const kpiGrid2 = document.querySelector('.kpi-grid');
+      const kpiGames2 = document.getElementById('kpi-games');
+      const kpiAp2 = document.getElementById('kpi-aparate');
       if (subHash === 'cheltuieli') {
         if(kpiJp) kpiJp.style.display = 'none';
+        if(kpiGames2) kpiGames2.style.display = 'none';
+        if(kpiAp2) kpiAp2.style.display = 'none';
         if(kpiExp) kpiExp.style.display = 'flex';
+        if(kpiGrid2) kpiGrid2.style.gridTemplateColumns = 'repeat(4,1fr)';
       } else {
         if(kpiJp) kpiJp.style.display = 'flex';
+        if(kpiGames2) kpiGames2.style.display = 'flex';
+        if(kpiAp2) kpiAp2.style.display = 'flex';
         if(kpiExp) kpiExp.style.display = 'none';
+        if(kpiGrid2) kpiGrid2.style.gridTemplateColumns = '';
       }
       
       const prevNav = document.querySelector(`.nav-item[href="#rapoarte"]`);
@@ -2118,12 +2130,21 @@ document.querySelectorAll('.rep-page').forEach(p => p.style.display = 'none');
       
       const kpiJp = document.getElementById('kpi-jp');
       const kpiExp = document.getElementById('kpi-total-expenses');
+      const kpiGrid2 = document.querySelector('.kpi-grid');
+      const kpiGames2 = document.getElementById('kpi-games');
+      const kpiAp2 = document.getElementById('kpi-aparate');
       if (subHash === 'cheltuieli') {
         if(kpiJp) kpiJp.style.display = 'none';
+        if(kpiGames2) kpiGames2.style.display = 'none';
+        if(kpiAp2) kpiAp2.style.display = 'none';
         if(kpiExp) kpiExp.style.display = 'flex';
+        if(kpiGrid2) kpiGrid2.style.gridTemplateColumns = 'repeat(4,1fr)';
       } else {
         if(kpiJp) kpiJp.style.display = 'flex';
+        if(kpiGames2) kpiGames2.style.display = 'flex';
+        if(kpiAp2) kpiAp2.style.display = 'flex';
         if(kpiExp) kpiExp.style.display = 'none';
+        if(kpiGrid2) kpiGrid2.style.gridTemplateColumns = '';
       }
       const prevNav = document.querySelector(`.nav-item[href="#rapoarte"]`);
       if (prevNav) prevNav.classList.add('active');
@@ -4695,12 +4716,32 @@ window.toggleHourlyMachineGames = async function(td, serial, dt) {
 
 // ─── RAPOARTE CHELTUIELI ──────────────────────────────────────────
 let _expensesData = [];
+let _expPage = 1;
+let _expPerPage = parseInt(localStorage.getItem('expPerPage') || '50');
+
+window.changeExpPerPage = function(val) {
+  _expPerPage = parseInt(val);
+  _expPage = 1;
+  localStorage.setItem('expPerPage', val);
+  window.renderExpensesTable();
+}
+window.changeExpPage = function(dir) {
+  const q = (document.getElementById('exp-search')?.value || '').toLowerCase();
+  const filtered = _expensesData.filter(r => !q || [r.explanation, r.location_name, r.department_name, r.vendor_name, r.expenditure_type_name].join(' ').toLowerCase().includes(q));
+  const totalPages = _expPerPage >= 999999 ? 1 : Math.ceil(filtered.length / _expPerPage);
+  _expPage = Math.max(1, Math.min(_expPage + dir, totalPages));
+  window.renderExpensesTable();
+}
 window.loadExpensesReport = async function() {
   showLoader(true);
   try {
     const {s, e} = getPeriod();
     const data = await api(`/api/reports/expenses?start=${s}&end=${e}${locParam()}`);
     _expensesData = data || [];
+    _expPage = 1;
+    // Restore saved per-page
+    const sel = document.getElementById('exp-per-page');
+    if (sel) sel.value = String(_expPerPage);
     window.renderExpensesTable();
   } catch(err) {
     console.error(err);
@@ -4736,13 +4777,30 @@ window.renderExpensesTable = function() {
   if (!tbody) return;
   const q = (document.getElementById('exp-search')?.value || '').toLowerCase();
   
+  // Filter
+  const filtered = _expensesData.filter(r => {
+    if (!q) return true;
+    return [r.explanation, r.location_name, r.department_name, r.vendor_name, r.expenditure_type_name].join(' ').toLowerCase().includes(q);
+  });
+  
+  // Pagination
+  const perPage = _expPerPage >= 999999 ? filtered.length : _expPerPage;
+  const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
+  _expPage = Math.min(_expPage, totalPages);
+  const pageData = filtered.slice((_expPage - 1) * perPage, _expPage * perPage);
+  
+  // Update page info
+  const pageInfo = document.getElementById('exp-page-info');
+  if (pageInfo) pageInfo.textContent = `Pagina ${_expPage}/${totalPages} (${filtered.length} total)`;
+  const prevBtn = document.getElementById('btn-exp-prev');
+  const nextBtn = document.getElementById('btn-exp-next');
+  if (prevBtn) prevBtn.disabled = _expPage <= 1;
+  if (nextBtn) nextBtn.disabled = _expPage >= totalPages;
+  
   let html = '';
   let total = 0;
   
-  for (const r of _expensesData) {
-    const textToSearch = [r.explanation, r.location_name, r.department_name, r.vendor_name, r.expenditure_type_name].join(' ').toLowerCase();
-    if (q && !textToSearch.includes(q)) continue;
-    
+  for (const r of pageData) {
     total += r.amount;
     
     html += `
