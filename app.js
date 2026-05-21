@@ -4755,71 +4755,57 @@ window.renderExpensesTable = function() {
 
 
 // --- EXPENSES CONFIG SETTINGS ---
-let _allExpDeps = [];  // [{id, name, is_expense, types:[{id,name,is_expense}]}]
+let _allExpDeps = [];
 
 window.loadExpensesConfig = async function() {
   try {
     const data = await api('/api/admin/expenses_config');
-    _allExpDeps = data.departments || [];
+    _allExpDeps = (data.departments || []).filter(d => d.types && d.types.length > 0);
 
-    const depContainer = document.getElementById('set-exp-deps');
-    if (!depContainer) return;
+    const tbody = document.getElementById('set-exp-tbody');
+    if (!tbody) return;
 
-    depContainer.innerHTML = _allExpDeps.map(d => `
-      <div class="exp-dep-row" data-id="${d.id}"
-        style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; cursor:pointer; border-bottom:1px solid var(--border); transition:background .15s;"
-        onclick="selectExpDep('${d.id}', this)">
-        <span style="font-size:12px; color:var(--text);">${d.name}</span>
-        <label class="toggle" onclick="event.stopPropagation()">
-          <input type="checkbox" class="cfg-dep" value="${d.id}" ${d.is_expense ? 'checked' : ''}
-            onchange="onDepToggle('${d.id}', this.checked)">
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-    `).join('');
+    let html = '';
+    _allExpDeps.forEach(dep => {
+      const depRowCount = dep.types.length;
+      dep.types.forEach((t, i) => {
+        const isFirst = i === 0;
+        html += `<tr style="border-bottom:1px solid var(--border); ${isFirst ? 'border-top:2px solid var(--border);' : ''}">`;
+        if (isFirst) {
+          html += `<td style="padding:8px 12px; vertical-align:top; border-right:1px solid var(--border); color:var(--text); font-weight:600;" rowspan="${depRowCount}">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+              <span>${dep.name}</span>
+              <label class="toggle" title="Activează/dezactivează tot departamentul" onclick="event.stopPropagation(); onDepToggle('${dep.id}', this.querySelector('input').checked)">
+                <input type="checkbox" class="cfg-dep" value="${dep.id}" ${dep.is_expense ? 'checked' : ''}>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </td>`;
+        }
+        html += `<td style="padding:6px 12px; color:var(--text);">${t.name}</td>`;
+        html += `<td style="padding:6px 12px; text-align:center;">
+          <label class="toggle">
+            <input type="checkbox" class="cfg-type" value="${t.id}" data-dep="${dep.id}" ${t.is_expense ? 'checked' : ''} onchange="onTypeToggle('${dep.id}', '${t.id}', this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+        </td>`;
+        html += '</tr>';
+      });
+    });
 
-    // Autoselect first dep that has types
-    const firstWithTypes = _allExpDeps.find(d => d.types && d.types.length > 0);
-    if (firstWithTypes) {
-      const row = depContainer.querySelector(`.exp-dep-row[data-id="${firstWithTypes.id}"]`);
-      if (row) selectExpDep(firstWithTypes.id, row);
-    }
+    tbody.innerHTML = html;
+    tbody.style.display = '';
   } catch(e) { console.error(e); }
-}
-
-window.selectExpDep = function(depId, el) {
-  document.querySelectorAll('.exp-dep-row').forEach(r => {
-    r.style.background = '';
-  });
-  if (el) el.style.background = 'color-mix(in srgb, var(--accent) 12%, transparent)';
-
-  const dep = _allExpDeps.find(d => d.id === depId);
-  const label = document.getElementById('set-exp-dep-filter-label');
-  if (label) label.textContent = dep ? '— ' + dep.name : '';
-
-  const typeContainer = document.getElementById('set-exp-types');
-  if (!typeContainer) return;
-
-  if (!dep || !dep.types || dep.types.length === 0) {
-    typeContainer.innerHTML = '<div style="padding:20px 12px; font-size:11px; color:var(--muted); text-align:center;">Nicio tranzacție înregistrată pentru acest departament.</div>';
-    return;
-  }
-
-  typeContainer.innerHTML = dep.types.map(t => `
-    <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border-bottom:1px solid var(--border);">
-      <span style="font-size:12px; color:var(--text);">${t.name}</span>
-      <label class="toggle">
-        <input type="checkbox" class="cfg-type" value="${t.id}" data-dep="${depId}" ${t.is_expense ? 'checked' : ''}
-          onchange="onTypeToggle('${depId}', '${t.id}', this.checked)">
-        <span class="toggle-slider"></span>
-      </label>
-    </div>
-  `).join('');
 }
 
 window.onDepToggle = function(depId, isChecked) {
   const dep = _allExpDeps.find(d => d.id === depId);
-  if (dep) dep.is_expense = isChecked;
+  if (!dep) return;
+  dep.is_expense = isChecked;
+  // Also toggle all types
+  dep.types.forEach(t => t.is_expense = isChecked);
+  // Update visible checkboxes
+  document.querySelectorAll(`.cfg-type[data-dep="${depId}"]`).forEach(cb => cb.checked = isChecked);
 }
 
 window.onTypeToggle = function(depId, typeId, isChecked) {
