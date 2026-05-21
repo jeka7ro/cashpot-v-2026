@@ -4709,8 +4709,26 @@ window.loadExpensesReport = async function() {
   }
 }
 
-window.filterExpensesTable = function() {
-  window.renderExpensesTable();
+window.filterExpensesTable = function() { window.renderExpensesTable(); }
+window.filterExpenses = window.filterExpensesTable;
+
+window.exportExpensesCSV = function() {
+  if (!_expensesData || !_expensesData.length) { alert('Nu există date de exportat.'); return; }
+  const q = (document.getElementById('exp-search')?.value || '').toLowerCase();
+  const rows = _expensesData.filter(r => {
+    if (!q) return true;
+    return [r.explanation, r.location_name, r.department_name, r.vendor_name, r.expenditure_type_name].join(' ').toLowerCase().includes(q);
+  });
+  const bom = '\uFEFF';
+  const header = ['Data','Locatie','Departament','Categorie','Furnizor','Explicatie','Suma (RON)'];
+  const csv = bom + [header, ...rows.map(r => [
+    r.date, r.location_name, r.department_name, r.expenditure_type_name, r.vendor_name,
+    (r.explanation||'').replace(/,/g,' '), r.amount
+  ].map(v => `"${v||''}"`).join(','))].join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = `cheltuieli_${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
 }
 
 window.renderExpensesTable = function() {
@@ -4740,13 +4758,17 @@ window.renderExpensesTable = function() {
     `;
   }
   
-  if (!html) html = `<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--muted)">Nu s-au găsit cheltuieli.</td></tr>`;
+  // Total general = ALL records regardless of search filter
+  const totalGeneral = _expensesData.reduce((s, r) => s + r.amount, 0);
+  
+  if (!html) html = `<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">Nu s-au găsit cheltuieli.</td></tr>`;
   else {
     html += `
-      <tr style="background:var(--surface2)">
-        <td colspan="6" style="text-align:right;font-weight:800;color:var(--text)">Total Filtru:</td>
-        <td class="num" style="color:var(--red);font-weight:800;font-size:14px">${fmt(total)} RON</td>
+      <tr style="background:var(--surface2); border-top:2px solid var(--border)">
+        <td colspan="6" style="text-align:right;font-weight:800;color:var(--text);padding:10px 12px;">${q ? 'Total Filtrat:' : 'Total General:'}</td>
+        <td class="num" style="color:var(--red);font-weight:800;font-size:14px;padding:10px 12px;">${fmt(total)} RON</td>
       </tr>
+      ${q ? `<tr style="background:var(--surface2)"><td colspan="6" style="text-align:right;font-size:11px;color:var(--muted);padding:4px 12px;">Total General:</td><td class="num" style="font-size:11px;color:var(--muted);padding:4px 12px;">${fmt(totalGeneral)} RON</td></tr>` : ''}
     `;
   }
   
@@ -4803,6 +4825,10 @@ window.expSelectDep = function(depId, el) {
     return;
   }
 
+  // Sync master toggle
+  const masterT = document.getElementById('exp-all-toggle');
+  if (masterT) masterT.checked = dep.types.length > 0 && dep.types.every(t => t.is_expense);
+
   typesEl.innerHTML = dep.types.map(t => `
     <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 14px; border-bottom:1px solid var(--border);">
       <span style="font-size:12px; color:var(--text);">${t.name}</span>
@@ -4833,25 +4859,20 @@ window.onExpTypeToggle = function(depId, typeId, isChecked) {
 }
 
 window.expTypesAll = function(isChecked) {
-  // Find currently selected department
-  const activeRow = document.querySelector('.exp-dep-row[data-id]');
-  const activeId = document.querySelector('.exp-dep-row[style*="color-mix"]') || 
-                   document.querySelector('.exp-dep-row[style*="accent"]');
-  
-  // Find selected dep from highlighted row
+  // Find selected dept from highlighted row
   let depId = null;
   document.querySelectorAll('.exp-dep-row').forEach(r => {
     if (r.style.background && r.style.background !== '') depId = r.dataset.id;
   });
-  
   if (!depId) return;
   const dep = _expConfigDeps.find(d => d.id === depId);
   if (!dep) return;
-  
   dep.types.forEach(t => t.is_expense = isChecked);
-  
-  // Update visible checkboxes
+  // Update visible type checkboxes
   document.querySelectorAll('#set-exp-types .cfg-type').forEach(cb => cb.checked = isChecked);
+  // Sync master toggle
+  const masterToggle = document.getElementById('exp-all-toggle');
+  if (masterToggle) masterToggle.checked = isChecked;
 }
 
 

@@ -101,7 +101,13 @@ def get_expenses_config():
             'name': r['type_name'],
             'is_expense': r['id'] not in excl_types
         })
-    return jsonify({'departments': list(deps.values())})
+    # Compute department is_expense: true if ALL its types are expense
+    result = []
+    for dep in deps.values():
+        all_on = all(t['is_expense'] for t in dep['types']) if dep['types'] else True
+        dep['is_expense'] = all_on
+        result.append(dep)
+    return jsonify({'departments': result})
 
 @app.route('/api/admin/expenses_config', methods=['POST'])
 def save_expenses_config():
