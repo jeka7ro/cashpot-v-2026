@@ -53,6 +53,8 @@ def get_conn():
 
 
 import psycopg2
+import unicodedata
+
 PG_DB_CFG = dict(
     host="82.76.35.50", port=26257,
     user="cashpot", password="129hj8oahwd7yaw3e21321",
@@ -76,6 +78,10 @@ def pg_qry(sql, params=None):
     finally:
         conn.close()
 
+def normalize_loc_name(name):
+    if not name: return ''
+    n = unicodedata.normalize('NFKD', name).encode('ASCII', 'ignore').decode('utf-8')
+    return n.lower().replace('(', '').replace(')', '').replace(' ', '')
 
 def qry(sql, params=None):
     conn = get_conn()
@@ -189,20 +195,32 @@ def kpi():
     games= safe(row.get('games'))
     bet  = safe(row.get('bet'))
 
-    # Fetch expenses from Postgres
-    locs_pg = pg_qry("SELECT id, hall_nr FROM casino_locations WHERE hall_nr IS NOT NULL")
-    pg_loc_map = {l['hall_nr']: str(l['id']) for l in locs_pg}
+    # Fetch locations for dynamic mapping
+    mysql_locs = qry("SELECT id, code FROM locations")
+    pg_locs = pg_qry("SELECT id, name FROM casino_locations")
+    
+    pg_name_to_id = {normalize_loc_name(l['name']): str(l['id']) for l in pg_locs}
+    
+    # Map MySQL ID -> PG UUID
+    mysql_to_pg_map = {}
+    for ml in mysql_locs:
+        norm = normalize_loc_name(ml['code'])
+        if norm in pg_name_to_id:
+            mysql_to_pg_map[str(ml['id'])] = pg_name_to_id[norm]
 
     pg_loc_ids = []
     ids_raw = request.args.get('loc_ids', '')
     if ids_raw:
         try:
-            ids = [int(x) for x in ids_raw.split(',') if x.strip()]
+            ids = [x.strip() for x in ids_raw.split(',') if x.strip()]
             for i in ids:
-                if i in pg_loc_map:
-                    pg_loc_ids.append(pg_loc_map[i])
+                if i in mysql_to_pg_map:
+                    pg_loc_ids.append(mysql_to_pg_map[i])
         except ValueError:
             pass
+    else:
+        # If no filter, include all matched PG locs to avoid pulling Focsani/Birou expenses
+        pg_loc_ids = list(mysql_to_pg_map.values())
 
     pg_loc_where = ""
     pg_params = [start + ' 00:00:00', end + ' 23:59:59']
@@ -210,6 +228,8 @@ def kpi():
         ph = ','.join(['%s']*len(pg_loc_ids))
         pg_loc_where = f" AND location_id IN ({ph})"
         pg_params.extend(pg_loc_ids)
+    else:
+        pg_loc_where = " AND 1=0" # If filter is empty and no default locations matched
 
     exp_res = pg_qry(f"""
         SELECT SUM(amount) as s 
