@@ -672,12 +672,11 @@ window.goToMultigame = function(mix) {
 function openSettings(showExpenses){
   // Show/hide expenses section based on context (only Super Admin, only from cheltuieli page)
   const expSection = document.getElementById('settings-exp-section');
-  const expPanel = document.getElementById('set-exp-deps')?.closest('[style*="height:420px"]') || 
-                   document.querySelector('[style*="grid-template-columns:230px"]');
+  const expGrid = document.getElementById('settings-exp-grid');
   const show = showExpenses && currentUser && currentUser.role === 'Super Admin';
   if (expSection) expSection.style.display = show ? '' : 'none';
-  if (expPanel) expPanel.style.display = show ? '' : 'none';
-  if (show) loadExpensesConfig();
+  if (expGrid) expGrid.style.display = show ? 'grid' : 'none';
+  if (show) setTimeout(() => loadExpensesConfig(), 50);
 
   const ex=getExcluded(),list=document.getElementById('settings-locations-list');
   list.innerHTML='';
@@ -4758,7 +4757,9 @@ window.loadExpensesReport = async function() {
     // Restore saved per-page
     const sel = document.getElementById('exp-per-page');
     if (sel) sel.value = String(_expPerPage);
+    populateExpFilterOptions();
     window.renderExpensesTable();
+    window.renderExpCharts();
   } catch(err) {
     console.error(err);
   } finally {
@@ -4793,11 +4794,8 @@ window.renderExpensesTable = function() {
   if (!tbody) return;
   const q = (document.getElementById('exp-search')?.value || '').toLowerCase();
   
-  // Filter
-  const filtered = _expensesData.filter(r => {
-    if (!q) return true;
-    return [r.explanation, r.location_name, r.department_name, r.vendor_name, r.expenditure_type_name].join(' ').toLowerCase().includes(q);
-  });
+  // Filter (includes dropdown filters)
+  const filtered = typeof getExpFiltered === 'function' ? getExpFiltered() : _expensesData.filter(r => !q || [r.explanation, r.location_name, r.department_name, r.vendor_name, r.expenditure_type_name].join(' ').toLowerCase().includes(q));
   
   // Pagination
   const perPage = _expPerPage >= 999999 ? filtered.length : _expPerPage;
@@ -4849,6 +4847,90 @@ window.renderExpensesTable = function() {
   tbody.innerHTML = html;
 }
 
+
+
+// ─── EXPENSE FILTERS + CHARTS ────────────────────────────────────────────────
+let _expChartDep = null, _expChartTime = null, _expChartTip = null;
+
+window.applyExpFilters = function() { _expPage = 1; window.renderExpensesTable(); window.renderExpCharts(); }
+window.resetExpFilters = function() {
+  ['exp-filter-loc','exp-filter-dep','exp-filter-tip'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  applyExpFilters();
+}
+
+function getExpFiltered() {
+  const q   = (document.getElementById('exp-search')?.value || '').toLowerCase();
+  const loc = document.getElementById('exp-filter-loc')?.value || '';
+  const dep = document.getElementById('exp-filter-dep')?.value || '';
+  const tip = document.getElementById('exp-filter-tip')?.value || '';
+  return _expensesData.filter(r => {
+    if (q && ![r.explanation, r.location_name, r.department_name, r.vendor_name, r.expenditure_type_name].join(' ').toLowerCase().includes(q)) return false;
+    if (loc && (r.location_name||'').toLowerCase() !== loc) return false;
+    if (dep && (r.department_name||'').toLowerCase() !== dep) return false;
+    if (tip && (r.expenditure_type_name||'').toLowerCase() !== tip) return false;
+    return true;
+  });
+}
+
+function populateExpFilterOptions() {
+  const locs = [...new Set(_expensesData.map(r => r.location_name).filter(Boolean))].sort();
+  const deps = [...new Set(_expensesData.map(r => r.department_name).filter(Boolean))].sort();
+  const tips = [...new Set(_expensesData.map(r => r.expenditure_type_name).filter(Boolean))].sort();
+  const locEl = document.getElementById('exp-filter-loc');
+  const depEl = document.getElementById('exp-filter-dep');
+  const tipEl = document.getElementById('exp-filter-tip');
+  if (locEl) locEl.innerHTML = '<option value="">Toate locațiile</option>' + locs.map(l => `<option value="${l.toLowerCase()}">${l}</option>`).join('');
+  if (depEl) depEl.innerHTML = '<option value="">Toate departamentele</option>' + deps.map(d => `<option value="${d.toLowerCase()}">${d}</option>`).join('');
+  if (tipEl) tipEl.innerHTML = '<option value="">Toate tipurile</option>' + tips.map(t => `<option value="${t.toLowerCase()}">${t}</option>`).join('');
+}
+
+window.renderExpCharts = function() {
+  const data = getExpFiltered();
+  const COLORS = ['#8b5cf6','#6366f1','#3b82f6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#14b8a6','#84cc16'];
+
+  // Chart 1: per department (horizontal bar sorted desc)
+  const depMap = {};
+  data.forEach(r => { const d = r.department_name||'Altele'; depMap[d] = (depMap[d]||0) + r.amount; });
+  const dep10 = Object.entries(depMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const c1 = document.getElementById('exp-chart-dep');
+  if (c1) {
+    if (_expChartDep) _expChartDep.destroy();
+    _expChartDep = new Chart(c1, { type:'bar', indexAxis:'y',
+      data:{ labels:dep10.map(([k])=>k.length>18?k.slice(0,16)+'…':k), datasets:[{data:dep10.map(([,v])=>v), backgroundColor:COLORS, borderRadius:4}] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+        scales:{ x:{ticks:{font:{size:9},color:'#94a3b8', callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}}, y:{ticks:{font:{size:9},color:'#94a3b8'}} } }
+    });
+  }
+
+  // Chart 2: evolution in time
+  const timeMap = {};
+  data.forEach(r => { timeMap[r.date] = (timeMap[r.date]||0) + r.amount; });
+  const times = Object.entries(timeMap).sort((a,b)=>a[0].localeCompare(b[0]));
+  const c2 = document.getElementById('exp-chart-time');
+  if (c2) {
+    if (_expChartTime) _expChartTime.destroy();
+    _expChartTime = new Chart(c2, { type:'line',
+      data:{ labels:times.map(([k])=>k.slice(5)), datasets:[{data:times.map(([,v])=>v), borderColor:'#8b5cf6', backgroundColor:'rgba(139,92,246,0.12)', fill:true, tension:0.4, pointRadius:2, borderWidth:2}] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+        scales:{ x:{ticks:{font:{size:9},color:'#94a3b8',maxRotation:50}}, y:{ticks:{font:{size:9},color:'#94a3b8', callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}} } }
+    });
+  }
+
+  // Chart 3: top 8 types (bar)
+  const tipMap = {};
+  data.forEach(r => { const t = r.expenditure_type_name||'Necategorizat'; tipMap[t] = (tipMap[t]||0) + r.amount; });
+  const tip8 = Object.entries(tipMap).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const c3 = document.getElementById('exp-chart-tip');
+  if (c3) {
+    if (_expChartTip) _expChartTip.destroy();
+    _expChartTip = new Chart(c3, { type:'bar',
+      data:{ labels:tip8.map(([k])=>k.length>14?k.slice(0,12)+'…':k), datasets:[{data:tip8.map(([,v])=>v), backgroundColor:COLORS, borderRadius:4}] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+        scales:{ x:{ticks:{font:{size:9},color:'#94a3b8',maxRotation:40}}, y:{ticks:{font:{size:9},color:'#94a3b8', callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}} } }
+    });
+  }
+}
+// ─── END EXPENSE FILTERS + CHARTS ────────────────────────────────────────────
 
 // --- EXPENSES CONFIG SETTINGS ---
 let _expConfigDeps = [];
