@@ -827,6 +827,14 @@ async function loadKPI(s,e){
   if (expEl) expEl.textContent = 'Cheltuieli: ' + fmt(d.expenses) + ' RON';
   document.getElementById('v-jp').textContent=fmt(d.jackpot)+' RON';
   document.getElementById('v-hh').textContent='HH: '+fmt(d.hh)+' RON';
+  
+  const vOnlyExp = document.getElementById('v-only-expenses');
+  if(vOnlyExp) vOnlyExp.textContent = fmt(d.expenses) + ' RON';
+  const vOnlyProf = document.getElementById('v-only-profit');
+  if(vOnlyProf) {
+    vOnlyProf.textContent = 'Profit Net: ' + fmt(d.net_profit) + ' RON';
+    vOnlyProf.style.color = d.net_profit >= 0 ? 'var(--green)' : 'var(--red)';
+  }
   document.getElementById('v-games').textContent=fmt(d.games);
   document.getElementById('v-betgame').textContent='Bet/Game: '+fmt(d.avg_bet_game,2);
   document.getElementById('v-ap').textContent=d.aparate;
@@ -1518,9 +1526,19 @@ window.addEventListener('hashchange', () => {
         subLink.classList.add('active');
       }
       
-      document.querySelectorAll('.rep-page').forEach(p => p.style.display = 'none');
+document.querySelectorAll('.rep-page').forEach(p => p.style.display = 'none');
       const repTarget = document.getElementById('rep-page-' + subHash);
       if (repTarget) repTarget.style.display = 'block';
+      
+      const kpiJp = document.getElementById('kpi-jp');
+      const kpiExp = document.getElementById('kpi-total-expenses');
+      if (subHash === 'cheltuieli') {
+        if(kpiJp) kpiJp.style.display = 'none';
+        if(kpiExp) kpiExp.style.display = 'flex';
+      } else {
+        if(kpiJp) kpiJp.style.display = 'flex';
+        if(kpiExp) kpiExp.style.display = 'none';
+      }
       
       if (subHash === 'ore') loadHourlyReport();
       else if (subHash === 'hh') loadHhReport();
@@ -2036,9 +2054,19 @@ function closeDayAnalysisPage() {
   if (prevHash.startsWith('#rapoarte/')) {
       document.getElementById('view-rapoarte').classList.add('active');
       const subHash = prevHash.replace('#rapoarte/', '');
-      document.querySelectorAll('.rep-page').forEach(p => p.style.display = 'none');
+document.querySelectorAll('.rep-page').forEach(p => p.style.display = 'none');
       const repTarget = document.getElementById('rep-page-' + subHash);
       if (repTarget) repTarget.style.display = 'block';
+      
+      const kpiJp = document.getElementById('kpi-jp');
+      const kpiExp = document.getElementById('kpi-total-expenses');
+      if (subHash === 'cheltuieli') {
+        if(kpiJp) kpiJp.style.display = 'none';
+        if(kpiExp) kpiExp.style.display = 'flex';
+      } else {
+        if(kpiJp) kpiJp.style.display = 'flex';
+        if(kpiExp) kpiExp.style.display = 'none';
+      }
       
       const prevNav = document.querySelector(`.nav-item[href="#rapoarte"]`);
       if (prevNav) prevNav.classList.add('active');
@@ -2069,9 +2097,19 @@ window.closeLocAnalysisPage = function() {
   if (prevHash.startsWith('#rapoarte/')) {
       document.getElementById('view-rapoarte').classList.add('active');
       const subHash = prevHash.replace('#rapoarte/', '');
-      document.querySelectorAll('.rep-page').forEach(p => p.style.display = 'none');
+document.querySelectorAll('.rep-page').forEach(p => p.style.display = 'none');
       const repTarget = document.getElementById('rep-page-' + subHash);
       if (repTarget) repTarget.style.display = 'block';
+      
+      const kpiJp = document.getElementById('kpi-jp');
+      const kpiExp = document.getElementById('kpi-total-expenses');
+      if (subHash === 'cheltuieli') {
+        if(kpiJp) kpiJp.style.display = 'none';
+        if(kpiExp) kpiExp.style.display = 'flex';
+      } else {
+        if(kpiJp) kpiJp.style.display = 'flex';
+        if(kpiExp) kpiExp.style.display = 'none';
+      }
       const prevNav = document.querySelector(`.nav-item[href="#rapoarte"]`);
       if (prevNav) prevNav.classList.add('active');
       const subLink = document.querySelector(`.subnav-group .nav-item[href="#rapoarte/${subHash}"]`);
@@ -4679,7 +4717,6 @@ window.renderExpensesTable = function() {
         <td style="white-space:nowrap;font-size:11px;color:var(--muted)">${r.date}</td>
         <td style="color:var(--accent);font-weight:600">${r.location_name}</td>
         <td>${r.department_name}</td>
-        <td>${r.type_name}</td>
         <td>${r.expenditure_type_name}</td>
         <td>${r.vendor_name}</td>
         <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.explanation}">${r.explanation}</td>
@@ -4692,7 +4729,7 @@ window.renderExpensesTable = function() {
   else {
     html += `
       <tr style="background:var(--surface2)">
-        <td colspan="7" style="text-align:right;font-weight:800;color:var(--text)">Total Filtru:</td>
+        <td colspan="6" style="text-align:right;font-weight:800;color:var(--text)">Total Filtru:</td>
         <td class="num" style="color:var(--red);font-weight:800;font-size:14px">${fmt(total)} RON</td>
       </tr>
     `;
@@ -4772,12 +4809,16 @@ window.saveExpensesConfig = async function() {
   const exclDeps = Array.from(document.querySelectorAll('.cfg-dep:not(:checked)')).map(i => i.value);
   const exclTypes = _allExpTypes.filter(t => !t.is_expense).map(t => t.id);
 
-  
   try {
-    const res = await api('/api/admin/expenses_config', 'POST', {
-      excluded_departments: exclDeps,
-      excluded_types: exclTypes
+    const r = await fetch(API + '/api/admin/expenses_config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        excluded_departments: exclDeps,
+        excluded_types: exclTypes
+      })
     });
+    const res = await r.json();
     if(res.success) {
       alert('Configurația a fost salvată cu succes! Cheltuielile și Profitul Net au fost actualizate.');
       loadAll();

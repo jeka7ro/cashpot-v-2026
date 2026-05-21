@@ -309,6 +309,12 @@
       <div class="kpi-value" id="v-jp">—</div>
       <div class="kpi-sub" id="v-hh">HH: —</div>
     </div>
+
+        <div class="kpi-card" id="kpi-total-expenses" style="display:none; border-left: 4px solid var(--red);">
+          <div class="kpi-label">TOTAL CHELTUIELI</div>
+          <div class="kpi-val" id="v-only-expenses" style="color:var(--red);">—</div>
+          <div class="kpi-sub" id="v-only-profit">Profit Net: —</div>
+        </div>
     <div class="kpi-card" id="kpi-games">
       <div class="kpi-label">Total Games</div>
       <div class="kpi-value" id="v-games">—</div>
@@ -770,11 +776,20 @@
         <!-- ═══ PAGE: CHELTUIELI ═══ -->
         <div id="rep-page-cheltuieli" class="rep-page" style="display:none;">
           <section class="card" style="margin-top:0; border-top-left-radius:0; padding:0; overflow:hidden;">
-            <div style="padding:14px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-              <span style="font-size:11px; font-weight:700; color:var(--text); text-transform:uppercase; letter-spacing:.05em;">Registru Cheltuieli Operaționale</span>
-              <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-                <input type="text" id="exp-search" placeholder="🔍 Caută (explicatie, vendor)..." oninput="filterExpensesTable()" 
-                  style="background:var(--surface2); color:var(--text); border:1px solid var(--border); border-radius:20px; padding:5px 14px; font-size:11px; width:220px; outline:none;">
+            <div class="card-header" style="padding:14px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+              <div class="card-title" style="font-size:11px; font-weight:700; color:var(--text); text-transform:uppercase; letter-spacing:.05em;">REGISTRU CHELTUIELI OPERAȚIONALE</div>
+              <div style="display:flex; gap:12px; align-items:center;">
+                <select id="exp-per-page" class="glass-select" style="padding:6px 12px; background:var(--surface2); color:var(--text); border:1px solid var(--border); border-radius:8px; font-size:11px;" onchange="changeExpPerPage(this.value)">
+                  <option value="50">50 rânduri</option>
+                  <option value="100">100 rânduri</option>
+                  <option value="500">500 rânduri</option>
+                  <option value="999999">Toate</option>
+                </select>
+                <button class="btn-primary" onclick="exportExpensesCSV()" style="padding:6px 12px; font-size:11px; display:flex; align-items:center; gap:6px; background:var(--accent); color:#fff; border:none; border-radius:8px; cursor:pointer;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  Export Excel
+                </button>
+                <input type="text" id="exp-search" class="glass-select" placeholder="🔍 Caută (explicație, vendor)..." onkeyup="filterExpenses()" style="padding:6px 12px; background:var(--surface2); color:var(--text); border:1px solid var(--border); border-radius:20px; font-size:11px; width:220px; outline:none;">
               </div>
             </div>
             <div class="table-scroll">
@@ -784,7 +799,6 @@
                     <th>Dată</th>
                     <th>Locație</th>
                     <th>Departament</th>
-                    <th>Tip Document</th>
                     <th>Categorie</th>
                     <th>Furnizor</th>
                     <th>Explicație</th>
@@ -793,6 +807,13 @@
                 </thead>
                 <tbody id="body-rep-cheltuieli"></tbody>
               </table>
+            </div>
+            <div id="exp-pagination" style="display:flex; justify-content:space-between; align-items:center; padding:12px 20px; border-top:1px solid var(--border); background:var(--surface2);">
+              <div id="exp-page-info" style="font-size:11px; color:var(--muted)"></div>
+              <div style="display:flex; gap:8px;">
+                <button class="btn-ghost" id="btn-exp-prev" onclick="changeExpPage(-1)" style="padding:4px 8px; font-size:11px; cursor:pointer;">Pagina Anterioară</button>
+                <button class="btn-ghost" id="btn-exp-next" onclick="changeExpPage(1)" style="padding:4px 8px; font-size:11px; cursor:pointer;">Pagina Următoare</button>
+              </div>
             </div>
           </section>
         </div>
