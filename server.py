@@ -827,18 +827,18 @@ def hourly_machine_games():
         SELECT
             mg.id as game_id,
             COALESCE(NULLIF(mg.name, ''), NULLIF(mgs.sas_game_name, ''), 'Necunoscut') as game_name,
-            ROUND(SUM(mgs.c_52_bet)   / 100, 0) as bet,
-            ROUND(SUM(mgs.c_52_win)   / 100, 0) as win,
-            ROUND(SUM(mgs.c_52_jackpot)/100, 0) as jp,
-            SUM(mgs.c_52_games)                  as games,
-            ROUND((SUM(mgs.c_52_bet) - SUM(mgs.c_52_win)) / 100, 0) as ggr
+            ROUND((MAX(mgs.c_52_bet) - MIN(mgs.c_52_bet))   / 100, 0) as bet,
+            ROUND((MAX(mgs.c_52_win) - MIN(mgs.c_52_win))   / 100, 0) as win,
+            ROUND((MAX(mgs.c_52_jackpot) - MIN(mgs.c_52_jackpot))/100, 0) as jp,
+            (MAX(mgs.c_52_games) - MIN(mgs.c_52_games))                  as games,
+            ROUND(((MAX(mgs.c_52_bet) - MIN(mgs.c_52_bet)) - (MAX(mgs.c_52_win) - MIN(mgs.c_52_win))) / 100, 0) as ggr
         FROM machine_audit_games_g_s mgs
         JOIN machines m ON mgs.machine_id = m.id
         LEFT JOIN machine_games mg ON mgs.machine_game_id = mg.id
         WHERE m.slot_machine_id = %s
           AND mgs.created_at >= %s AND mgs.created_at < %s
-          AND mgs.c_52_bet > 0
         GROUP BY mg.id, COALESCE(mg.name, mgs.sas_game_name)
+        HAVING bet > 0
         ORDER BY bet DESC
     """, [serial, dt_start, dt_end])
     return jsonify(rows)
