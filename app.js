@@ -344,8 +344,10 @@ async function loadBNR(){
   try{
     const d=await api('/api/eur_rate');
     EUR_RATE=d.rate||5.0;
-    document.getElementById('bnr-rate-val').textContent=EUR_RATE.toFixed(4);
-    document.getElementById('v-ngr-eur').textContent='curs BNR '+EUR_RATE.toFixed(4);
+    const bnrEl = document.getElementById('bnr-rate-val');
+    if (bnrEl) bnrEl.textContent=EUR_RATE.toFixed(4);
+    const ngrEurEl = document.getElementById('v-ngr-eur');
+    if (ngrEurEl) ngrEurEl.textContent='curs BNR '+EUR_RATE.toFixed(4);
   }catch(e){}
 }
 
@@ -814,7 +816,13 @@ async function loadKPI(s,e){
   document.getElementById('v-hold').textContent='Hold: '+fmt(d.hold_pct,2)+'%';
   const ggrDayEl = document.getElementById('v-ggr-day');
   if(ggrDayEl) ggrDayEl.textContent = 'AVG/zi: ' + fmt(d.avg_ggr_zi) + ' RON';
-  document.getElementById('v-ngr').textContent=fmtE(d.ggr);
+  const profitEl = document.getElementById('v-profit');
+  if (profitEl) {
+    profitEl.textContent = fmt(d.net_profit) + ' RON';
+    profitEl.style.color = d.net_profit >= 0 ? 'var(--green)' : 'var(--red)';
+  }
+  const expEl = document.getElementById('v-expenses');
+  if (expEl) expEl.textContent = 'Cheltuieli: ' + fmt(d.expenses) + ' RON';
   document.getElementById('v-jp').textContent=fmt(d.jackpot)+' RON';
   document.getElementById('v-hh').textContent='HH: '+fmt(d.hh)+' RON';
   document.getElementById('v-games').textContent=fmt(d.games);
