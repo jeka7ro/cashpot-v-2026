@@ -4699,3 +4699,44 @@ window.renderExpensesTable = function() {
   
   tbody.innerHTML = html;
 }
+
+
+// --- EXPENSES CONFIG SETTINGS ---
+async function loadExpensesConfig() {
+  try {
+    const data = await api('/api/admin/expenses_config');
+    const depContainer = document.getElementById('set-exp-deps');
+    const typeContainer = document.getElementById('set-exp-types');
+    if(!depContainer || !typeContainer) return;
+    
+    depContainer.innerHTML = data.departments.map(d => `
+      <label style="display:flex; align-items:center; gap:8px; font-size:11px; cursor:pointer;">
+        <input type="checkbox" class="cfg-dep" value="${d.id}" ${d.is_expense ? 'checked' : ''}>
+        ${d.name}
+      </label>
+    `).join('');
+    
+    typeContainer.innerHTML = data.types.map(t => `
+      <label style="display:flex; align-items:center; gap:8px; font-size:11px; cursor:pointer;">
+        <input type="checkbox" class="cfg-type" value="${t.id}" ${t.is_expense ? 'checked' : ''}>
+        ${t.name}
+      </label>
+    `).join('');
+  } catch(e) { console.error(e); }
+}
+
+window.saveExpensesConfig = async function() {
+  const exclDeps = Array.from(document.querySelectorAll('.cfg-dep:not(:checked)')).map(i => i.value);
+  const exclTypes = Array.from(document.querySelectorAll('.cfg-type:not(:checked)')).map(i => i.value);
+  
+  try {
+    const res = await api('/api/admin/expenses_config', 'POST', {
+      excluded_departments: exclDeps,
+      excluded_types: exclTypes
+    });
+    if(res.success) {
+      alert('Configurația a fost salvată cu succes! Cheltuielile și Profitul Net au fost actualizate.');
+      loadAll();
+    }
+  } catch(e) { console.error(e); alert('Eroare la salvare!'); }
+}
