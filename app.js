@@ -1572,7 +1572,7 @@ async function loadDashboardLiveCard() {
         cashoutsContainer.innerHTML = chHtm;
       }
     }
-  } catch(e) { console.error('loadDashboardLiveCard error:', e); }
+  } catch(e) { if(container) container.innerHTML = `<div style="color:red;padding:10px">ERROR: ${e.toString()}</div>`; console.error('loadDashboardLiveCard error:', e); }
 }
 
 
