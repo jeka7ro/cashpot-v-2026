@@ -4761,12 +4761,24 @@ window.loadExpensesReport = async function() {
     populateExpFilterOptions();
     window.renderExpensesTable();
     window.renderExpCharts();
+    
+    // Update Total Cheltuieli KPI directly from data (no extra API call needed)
+    const totalExp = _expensesData.reduce((sum, r) => sum + (r.amount || 0), 0);
+    const vOnlyExp = document.getElementById('v-only-expenses');
+    if (vOnlyExp) vOnlyExp.textContent = fmt(totalExp) + ' RON';
+    
+    // Trigger KPI load for dashboard KPIs if they still show "—"
+    const vIn = document.getElementById('v-in');
+    if (vIn && (vIn.textContent === '—' || vIn.textContent.trim() === '—')) {
+      if (s && e) loadKPI(s, e).catch(console.error);
+    }
   } catch(err) {
     console.error(err);
   } finally {
     showLoader(false);
   }
 }
+
 
 window.filterExpensesTable = function() { window.renderExpensesTable(); }
 window.filterExpenses = window.filterExpensesTable;
