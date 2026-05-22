@@ -8,7 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<link rel="stylesheet" href="style.css?v=4">
+<link rel="stylesheet" href="style.css?v=145">
 <script>
   if (window.location.hash.startsWith('#invite')) {
     document.write('<style>#app-container, #view-login { display: none !important; } #view-register { display: flex !important; }</style>');
@@ -20,7 +20,7 @@
     align-items: center;
     justify-content: center;
     width: 32px;
-    height: 32px;
+   
     border-radius: 50%;
     background: transparent;
     border: 1px solid var(--border);
@@ -51,6 +51,10 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
         Dashboard
       </a>
+        <a href="#cheltuieli" class="nav-item">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+          Cheltuieli
+        </a>
       <a href="#rapoarte" class="nav-item" onclick="document.getElementById('subnav-rapoarte').style.display = document.getElementById('subnav-rapoarte').style.display === 'none' ? 'block' : 'none';">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
         Rapoarte
@@ -71,10 +75,6 @@
         <a href="#rapoarte/clienti" class="nav-item sub-item" id="rep-nav-clienti">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           Clienti
-        </a>
-                <a href="#rapoarte/cheltuieli" class="nav-item sub-item">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-          Cheltuieli
         </a>
         <a href="#rapoarte/cashout" class="nav-item sub-item" id="rep-nav-cashout">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
@@ -121,8 +121,7 @@
         <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:4px;">Intelligence Analytics</div>
       </div>
 
-      <iframe name="login-frame" id="login-frame" style="display:none;"></iframe>
-      <form method="post" action="/" target="login-frame" onsubmit="setTimeout(() => window.doLogin(event), 10)">
+      <form id="login-form" onsubmit="window.doLogin(event); return false;">
         <div style="margin-bottom:20px; text-align:left;">
           <label style="display:block; font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Adresă Email</label>
           <div style="position:relative;">
@@ -210,7 +209,7 @@
 
         <div style="margin-bottom:32px;">
           <label style="display:block; font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Parolă Nouă</label>
-          <input type="password" id="reg-password" class="glass-select" style="width:100%; box-sizing:border-box; padding:10px 14px;" required>
+          <input type="password" id="reg-password" class="glass-select" style="width:100%; box-sizing:border-box; padding:10px 14px;" required autocomplete="current-password">
         </div>
 
         <button type="submit" class="btn-primary" style="width:100%; padding:12px; font-size:14px; display:flex; justify-content:center;">Setează Contul</button>
@@ -427,13 +426,14 @@
       <button class="tab" onclick="switchTab('tipuri',this)">Per Tip Slot</button>
       <button class="tab" onclick="switchTab('cabinete',this)">Per Cabinet</button>
       <button class="tab" onclick="switchTab('aparate',this)">Aparate Individuale</button>
+      <button class="tab" onclick="switchTab('clienti',this)">Clienți</button>
     </div>
 
     <div class="tab-panel active" id="tab-locatii">
       <div class="table-scroll">
         <table class="data-table">
           <thead><tr>
-            <th>Locație</th><th>Buc</th><th>Zile</th><th class="num" style="width:50px; text-align:right">Clienți/zi</th>
+            <th>Nr.</th><th>Locație</th><th>Buc</th><th>Zile</th><th class="num" style="width:50px; text-align:right">Clienți/zi</th>
             <th class="num">Total IN</th><th class="num">GGR</th><th class="num">GGR €</th>
             <th class="num">Jackpot</th><th class="num">HH</th><th class="num">Cashback</th><th class="num">Roata</th><th class="num">Tombole</th>
             <th class="num">Games</th><th class="num">Hold%</th><th class="num">Bonus Cost</th>
@@ -449,7 +449,7 @@
       <div class="table-scroll">
         <table class="data-table">
           <thead><tr>
-            <th>#</th><th>Provider</th><th>Buc</th><th>Zile</th>
+            <th>Nr.</th><th>Provider</th><th>Buc</th><th>Zile</th>
             <th class="num">Total IN</th><th class="num">GGR</th><th class="num">GGR €</th>
             <th class="num">Jackpot</th><th class="num">Cashback</th><th class="num">Roata</th><th class="num">Tombole</th>
             <th class="num">Games</th><th class="num">Hold%</th><th class="num">Bonus Cost</th>
@@ -464,7 +464,7 @@
       <div class="table-scroll">
         <table class="data-table">
           <thead><tr>
-            <th>#</th><th>Provider</th><th>Cabinet</th><th>Tip Slot</th><th>Buc</th>
+            <th>Nr.</th><th>Provider</th><th>Cabinet</th><th>Tip Slot</th><th>Buc</th>
             <th class="num">Total IN</th><th class="num">GGR</th><th class="num">GGR €</th>
             <th class="num">Games</th><th class="num">Hold%</th><th class="num">Bonus Cost</th>
           </tr></thead>
@@ -478,7 +478,7 @@
       <div class="table-scroll">
         <table class="data-table">
           <thead><tr>
-            <th>#</th><th>Provider</th><th>Cabinet</th><th>Buc</th>
+            <th>Nr.</th><th>Provider</th><th>Cabinet</th><th>Buc</th>
             <th class="num">Total IN</th><th class="num">GGR</th><th class="num">GGR €</th>
             <th class="num">Games</th><th class="num">Hold%</th><th class="num">Bonus Cost</th>
           </tr></thead>
@@ -499,7 +499,7 @@
       <div class="table-scroll">
         <table class="data-table">
           <thead><tr>
-            <th>#</th><th>Serial</th><th>Provider</th><th>Cabinet</th><th>Mix</th><th>Locație</th>
+            <th>Nr.</th><th>Serial</th><th>Provider</th><th>Cabinet</th><th>Mix</th><th>Locație</th>
             <th>Zile</th><th class="num">Total IN</th><th class="num">IN/Zi</th>
             <th class="num">GGR</th><th class="num">GGR €</th>
             <th class="num">JP</th><th class="num">HH</th><th class="num">CB</th>
@@ -510,8 +510,176 @@
       </div>
       <div id="pg-aparate" class="pagination-wrapper"></div>
     </div>
+
+    <div class="tab-panel" id="tab-clienti">
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead><tr>
+            <th id="th-clienti-name" onclick="sortDashClienti('name')" style="cursor:pointer;" title="Sortează după Jucător">Jucător</th>
+            <th id="th-clienti-sessions_count" onclick="sortDashClienti('sessions_count')" class="num" style="cursor:pointer;" title="Sortează după Vizite">Vizite</th>
+            <th id="th-clienti-last_session" onclick="sortDashClienti('last_session')" style="cursor:pointer;" title="Sortează după Data">Ultima sesiune</th>
+            <th id="th-clienti-location_id" onclick="sortDashClienti('location_id')" style="cursor:pointer;" title="Sortează după Locație">Locație</th>
+            <th>Aparate (Sesiune)</th>
+            <th>Jocuri Jucate</th>
+            <th id="th-clienti-bet" onclick="sortDashClienti('bet')" class="num" style="cursor:pointer;" title="Sortează după Pariuri">Total Bet (RON)</th>
+            <th id="th-clienti-ggr" onclick="sortDashClienti('ggr')" class="num" style="cursor:pointer;" title="Sortează după GGR">GGR (RON)</th>
+          </tr></thead>
+          <tbody id="body-clienti"></tbody>
+          <tfoot id="foot-clienti"></tfoot>
+        </table>
+      </div>
+      <div id="pg-clienti" class="pagination-wrapper"></div>
+    </div>
+  </section>
+
+    <!-- ═══ PAGE: CHELTUIELI ═══ -->
+        
   </section>
   </div> <!-- /view-dashboard -->
+
+<div id="view-cheltuieli" class="view-panel" style="overflow-y:auto;">
+  <div style="padding:16px;">
+          <section class="card" style="margin-top:0; border-top-left-radius:0; padding:0; overflow:hidden;">
+            <div class="card-header" style="display:flex; align-items:center; border-bottom:1px solid var(--border); padding:16px 20px;">
+              <div style="display:flex; gap:10px; align-items:center; flex-wrap:nowrap; overflow-x:auto; width:100%;">
+                <!-- FILTRE -->
+                <!-- BARA CAUTARE -->
+                <div style="position:relative; display:flex; align-items:center;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute; left:12px; color:var(--muted); z-index:10; pointer-events:none;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                  <input type="text" id="exp-search" class="glass-input" placeholder="Caută (explicație, vendor)..." onkeyup="filterExpenses()" style="width:220px;">
+                  <span id="exp-search-counter" style="position:absolute; right:8px; display:none; background:rgba(0,0,0,0.05); border:1px solid var(--border); padding:2px 6px; font-size:10px; font-weight:700; border-radius:10px; color:var(--muted); pointer-events:none; z-index:10;">0</span>
+                </div>
+                
+                <div style="width:1px; height:24px; background:var(--border); margin:0 4px;"></div>
+                
+                <!-- FILTRE -->
+                <select id="exp-filter-loc" class="glass-select" style="min-width:130px;" onchange="applyExpFilters()">
+                  <option value="">Toate locațiile</option>
+                </select>
+                <select id="exp-filter-dep" class="glass-select" style="min-width:150px;" onchange="applyExpFilters()">
+                  <option value="">Toate departamentele</option>
+                </select>
+                <select id="exp-filter-tip" class="glass-select" style="min-width:150px;" onchange="applyExpFilters()">
+                  <option value="">Toate tipurile</option>
+                </select>
+                
+                <div style="width:1px; height:24px; background:var(--border); margin:0 4px;"></div>
+                
+                <!-- ACTIUNI -->
+                <button class="btn-primary" onclick="openAddExpenseModal()" style="display:flex; align-items:center; gap:6px; background:var(--accent); padding: 0 16px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                  Adaugă Cheltuială
+                </button>
+                <button class="btn-primary" onclick="openImportExpenseModal()" style="display:flex; align-items:center; gap:6px;  padding: 0 16px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                  Importă G-Sheets
+                </button>
+                <button class="btn-primary" onclick="exportExpensesCSV()" style="display:flex; align-items:center; gap:6px;  padding: 0 16px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                  Export Excel
+                </button>
+                <button class="settings-btn" id="btn-exp-settings" onclick="openExpensesSettings()" style="display:none; align-items:center; gap:6px; padding: 0 14px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                  Configurare
+                </button>
+              </div>
+            </div>
+            <!-- TAB-URI -->
+            <div style="display:flex; border-bottom:1px solid var(--border); background:var(--surface);">
+              <div id="exp-tab-btn-summary" onclick="switchExpTab('summary')" style="padding: 14px 24px; font-size: 12px; font-weight: 700; cursor: pointer; border-bottom: 2px solid var(--accent); color: var(--accent); text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s;">Centralizator</div>
+              <div id="exp-tab-btn-details" onclick="switchExpTab('details')" style="padding: 14px 24px; font-size: 12px; font-weight: 700; cursor: pointer; border-bottom: 2px solid transparent; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s;">Lista Cheltuieli</div>
+            </div>
+
+            <!-- TAB 1: CENTRALIZATOR -->
+            <div id="exp-tab-summary">
+              <!-- GRAFICE -->
+                <div style="display: flex; flex-direction: column; gap: 24px; border-bottom: 1px solid var(--border); margin-bottom: 32px; padding-bottom: 24px;">
+                  <!-- ROW 1: Evolutie in Timp -->
+                  <div style="padding:16px 24px; background:var(--surface2); border:1px solid var(--border); border-radius: 16px;">
+                    <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px;">Evoluție în Timp</div>
+                    <div style="height:180px; position:relative;"><canvas id="exp-chart-time"></canvas></div>
+                  </div>
+
+                  <!-- ROW 2: Celelalte 3 grafice -->
+                  <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:24px;">
+                    <div style="padding:16px 24px; background:var(--surface2); border:1px solid var(--border); border-radius: 16px;">
+                      <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px;">Cheltuieli pe Locații</div>
+                      <div style="height:180px; position:relative;"><canvas id="exp-chart-loc"></canvas></div>
+                    </div>
+                    <div style="padding:16px 24px; background:var(--surface2); border:1px solid var(--border); border-radius: 16px;">
+                      <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px;">Cheltuieli pe Departament</div>
+                      <div style="height:180px; position:relative;"><canvas id="exp-chart-dep"></canvas></div>
+                    </div>
+                    <div style="padding:16px 24px; background:var(--surface2); border:1px solid var(--border); border-radius: 16px;">
+                      <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px;">Top Categorii</div>
+                      <div style="height:180px; position:relative;"><canvas id="exp-chart-tip"></canvas></div>
+                    </div>
+                  </div>
+                </div>
+              
+              <!-- TABEL CENTRALIZATOR -->
+              <div class="table-scroll" style="padding-top: 0;">
+                <table class="data-table w-full">
+                  <thead id="head-exp-summary">
+                    <!-- Generează dinamic din departamente -->
+                  </thead>
+                  <tbody id="body-exp-summary">
+                    <!-- Generează dinamic locațiile -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- TAB 2: DETALII (EXISTENT) -->
+            <div id="exp-tab-details" style="display:none;">
+              <!-- BULK ACTIONS TOOLBAR -->
+              <div id="exp-bulk-toolbar" style="display:none; padding:10px 20px; background:var(--surface2); border-bottom:1px solid var(--border); align-items:center; gap:10px;">
+                <span id="exp-bulk-count" style="font-size:12px; font-weight:700; color:var(--text); margin-right:10px;">0 selectate</span>
+                <button class="btn-ghost" style="color:var(--text); padding:4px 10px; font-size:11px;" onclick="openBulkEditExpenseModal()">✎ Modifică Selectate</button>
+                <button class="btn-ghost" style="color:var(--red); padding:4px 10px; font-size:11px;" onclick="bulkDeleteExpenses()">🗑 Șterge Selectate</button>
+              </div>
+              <div class="table-scroll">
+              <table class="data-table w-full">
+                <thead>
+                  <tr>
+                    <th style="width:30px; text-align:center;"><input type="checkbox" id="exp-select-all" onclick="toggleAllExpenses(this)" style="cursor:pointer;"></th><th>Nr.</th>
+                    <th onclick="sortExpenses('date')" style="cursor:pointer;" title="Sortează după Dată">Dată ⇅</th>
+                    <th onclick="sortExpenses('location_name')" style="cursor:pointer;" title="Sortează după Locație">Locație ⇅</th>
+                    <th onclick="sortExpenses('department_name')" style="cursor:pointer;" title="Sortează după Departament">Departament ⇅</th>
+                    <th onclick="sortExpenses('expenditure_type_name')" style="cursor:pointer;" title="Sortează după Categorie">Categorie ⇅</th>
+                    <th onclick="sortExpenses('vendor_name')" style="cursor:pointer;" title="Sortează după Furnizor">Furnizor ⇅</th>
+                    <th onclick="sortExpenses('explanation')" style="cursor:pointer;" title="Sortează după Explicație">Explicație ⇅</th>
+                    <th onclick="sortExpenses('amount')" class="num" style="cursor:pointer;" title="Sortează după Sumă">Sumă (RON) ⇅</th>
+                    
+                    <th style="width:50px; text-align:center;">Acțiuni</th>
+                  </tr>
+                </thead>
+                <tbody id="body-rep-cheltuieli"></tbody>
+              </table>
+            </div>
+            <div id="exp-pagination" style="display:flex; justify-content:space-between; align-items:center; padding:12px 20px; border-top:1px solid var(--border); background:var(--surface2);">
+              <div style="display:flex; align-items:center; gap:16px;">
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span style="font-size:11px; color:var(--muted)">Rânduri pe pagină:</span>
+                  <select id="exp-per-page" class="glass-select" style="padding:4px 8px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; font-size:11px; outline:none;" onchange="changeExpPerPage(this.value)">
+                    <option value="25">25</option>
+                    <option value="50" selected>50</option>
+                    <option value="100">100</option>
+                    <option value="500">500</option>
+                    <option value="999999">Toate</option>
+                  </select>
+                </div>
+                <div id="exp-page-info" style="font-size:11px; color:var(--muted)"></div>
+              </div>
+              <div style="display:flex; gap:8px;">
+                <button class="btn-ghost" id="btn-exp-prev" onclick="changeExpPage(-1)" style="padding:4px 8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg></button>
+                <button class="btn-ghost" id="btn-exp-next" onclick="changeExpPage(1)" style="padding:4px 8px;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg></button>
+              </div>
+            </div>
+            </div> <!-- CLOSE EXP-TAB-DETAILS -->
+          </section>
+  </div>
+</div>
 
   <div id="view-rapoarte" class="view-panel" style="overflow-y:auto;">
     <div style="padding:16px;">
@@ -649,7 +817,7 @@
             <div class="table-scroll">
               <table class="data-table">
                 <thead><tr>
-                  <th>Jucător</th><th>Telefon</th><th class="num">Sesiuni (în orele HH)</th><th style="text-align:center;">Joacă doar în HH?</th><th class="num">Ultima Sesiune HH</th>
+                  <th>Nr.</th><th>Jucător</th><th>Telefon</th><th class="num">Sesiuni (în orele HH)</th><th style="text-align:center;">Joacă doar în HH?</th><th class="num">Ultima Sesiune HH</th>
                 </tr></thead>
                 <tbody id="body-hh-players">
                   <tr><td colspan="5" style="text-align:center; padding:24px; color:var(--muted)">Se încarcă jucătorii...</td></tr>
@@ -735,7 +903,7 @@
             <div style="margin-bottom:16px;">
               <div style="position:relative; max-width:320px;">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute; left:16px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                <input type="text" id="clienti-search" placeholder="Caută jucători (nume, telefon)..." style="width:100%; padding:10px 100px 10px 42px; font-size:13px; border-radius:9999px; background:rgba(255,255,255,0.05); border:1px solid var(--border); color:var(--text); outline:none; backdrop-filter:blur(10px); box-shadow:0 4px 12px rgba(0,0,0,0.1); transition:all 0.2s;" onfocus="this.style.background='rgba(255,255,255,0.1)'; this.style.borderColor='var(--accent)';" onblur="this.style.background='rgba(255,255,255,0.05)'; this.style.borderColor='var(--border)';" oninput="filterClientiTable(this.value)">
+                <input type="text" id="clienti-search" class="glass-input" placeholder="Caută jucători (nume, telefon)..." style="width:100%; padding:10px 100px 10px 42px; font-size:13px;" oninput="filterClientiTable(this.value)">
                 <span id="clienti-search-counter" class="search-bubble"></span>
               </div>
             </div>
@@ -773,88 +941,7 @@
 
 
         
-        <!-- ═══ PAGE: CHELTUIELI ═══ -->
-        <div id="rep-page-cheltuieli" class="rep-page" style="display:none;">
-          <section class="card" style="margin-top:0; border-top-left-radius:0; padding:0; overflow:hidden;">
-            <div class="card-header" style="padding:14px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-              <div class="card-title" style="font-size:11px; font-weight:700; color:var(--text); text-transform:uppercase; letter-spacing:.05em;">REGISTRU CHELTUIELI OPERAȚIONALE</div>
-              <div style="display:flex; gap:12px; align-items:center;">
-                <button class="btn-primary" onclick="exportExpensesCSV()" style="padding:6px 14px; font-size:11px; display:flex; align-items:center; gap:6px; background:#16a34a; color:#fff; border:none; border-radius:8px; cursor:pointer; font-weight:600;">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                  Export Excel
-                </button>
-                <button id="btn-exp-settings" onclick="openExpensesSettings()" style="display:none; padding:6px 14px; font-size:11px; align-items:center; gap:6px; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:8px; cursor:pointer; font-weight:600;">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                  Configurare
-                </button>
-                <input type="text" id="exp-search" class="glass-select" placeholder="🔍 Caută (explicație, vendor)..." onkeyup="filterExpenses()" style="padding:6px 12px; background:var(--surface2); color:var(--text); border:1px solid var(--border); border-radius:20px; font-size:11px; width:220px; outline:none;">
-              </div>
-            </div>
-            <!-- FILTRE -->
-            <div style="display:flex; gap:10px; align-items:center; padding:10px 20px; border-bottom:1px solid var(--border); background:var(--surface2); flex-wrap:wrap;">
-              <select id="exp-filter-loc" style="padding:5px 10px; font-size:11px; border-radius:8px; border:1px solid var(--border); background:var(--bg); color:var(--text); outline:none; min-width:130px;" onchange="applyExpFilters()">
-                <option value="">Toate locațiile</option>
-              </select>
-              <select id="exp-filter-dep" style="padding:5px 10px; font-size:11px; border-radius:8px; border:1px solid var(--border); background:var(--bg); color:var(--text); outline:none; min-width:150px;" onchange="applyExpFilters()">
-                <option value="">Toate departamentele</option>
-              </select>
-              <select id="exp-filter-tip" style="padding:5px 10px; font-size:11px; border-radius:8px; border:1px solid var(--border); background:var(--bg); color:var(--text); outline:none; min-width:170px;" onchange="applyExpFilters()">
-                <option value="">Toate tipurile</option>
-              </select>
-              <button onclick="resetExpFilters()" style="padding:5px 12px; font-size:11px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--muted); cursor:pointer;">✕ Reset</button>
-            </div>
-            <!-- GRAFICE -->
-            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; border-bottom:1px solid var(--border);">
-              <div style="padding:14px 20px; border-right:1px solid var(--border);">
-                <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px;">Cheltuieli pe Departament</div>
-                <div style="height:180px; position:relative;"><canvas id="exp-chart-dep"></canvas></div>
-              </div>
-              <div style="padding:14px 20px; border-right:1px solid var(--border);">
-                <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px;">Evoluție în Timp</div>
-                <div style="height:180px; position:relative;"><canvas id="exp-chart-time"></canvas></div>
-              </div>
-              <div style="padding:14px 20px;">
-                <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px;">Top 8 Categorii</div>
-                <div style="height:180px; position:relative;"><canvas id="exp-chart-tip"></canvas></div>
-              </div>
-            </div>
-            <div class="table-scroll">
-              <table class="data-table w-full">
-                <thead>
-                  <tr>
-                    <th>Dată</th>
-                    <th>Locație</th>
-                    <th>Departament</th>
-                    <th>Categorie</th>
-                    <th>Furnizor</th>
-                    <th>Explicație</th>
-                    <th class="num">Sumă (RON)</th>
-                  </tr>
-                </thead>
-                <tbody id="body-rep-cheltuieli"></tbody>
-              </table>
-            </div>
-            <div id="exp-pagination" style="display:flex; justify-content:space-between; align-items:center; padding:12px 20px; border-top:1px solid var(--border); background:var(--surface2);">
-              <div style="display:flex; align-items:center; gap:16px;">
-                <div style="display:flex; align-items:center; gap:6px;">
-                  <span style="font-size:11px; color:var(--muted)">Rânduri pe pagină:</span>
-                  <select id="exp-per-page" class="glass-select" style="padding:4px 8px; background:var(--bg); color:var(--text); border:1px solid var(--border); border-radius:6px; font-size:11px; outline:none;" onchange="changeExpPerPage(this.value)">
-                    <option value="25">25</option>
-                    <option value="50" selected>50</option>
-                    <option value="100">100</option>
-                    <option value="500">500</option>
-                    <option value="999999">Toate</option>
-                  </select>
-                </div>
-                <div id="exp-page-info" style="font-size:11px; color:var(--muted)"></div>
-              </div>
-              <div style="display:flex; gap:8px;">
-                <button class="btn-ghost" id="btn-exp-prev" onclick="changeExpPage(-1)" style="padding:4px 8px; font-size:11px; cursor:pointer;">&lt; Anterioara</button>
-                <button class="btn-ghost" id="btn-exp-next" onclick="changeExpPage(1)" style="padding:4px 8px; font-size:11px; cursor:pointer;">Următoarea &gt;</button>
-              </div>
-            </div>
-          </section>
-        </div>
+        
         <!-- ═══ PAGE: CASHOUT ═══ -->
         <div id="rep-page-cashout" class="rep-page" style="display:none;">
           <section class="card" style="margin-top:0; border-top-left-radius:0; padding:0; overflow:hidden;">
@@ -1245,7 +1332,7 @@
       <h2 style="font-size:24px; margin-bottom:24px;">Gestiune Sloturi & Documente</h2>
       <div style="margin-bottom:20px; display:flex; gap:12px; align-items:center;">
         <div style="position:relative; display:flex; align-items:center;">
-          <input type="text" id="slot-search" placeholder="Caută serial, locație..." class="glass-select" style="padding:10px 16px; width:250px;" oninput="renderSloturi()">
+          <div style="position:relative; display:inline-block;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--text-subtle);"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg><input type="text" id="slot-search" class="glass-input" placeholder="Caută serial, locație..." style="padding-left:32px; padding-top:10px; padding-bottom:10px; width:250px;" oninput="renderSloturi()"></div>
           <span id="slot-search-counter" class="search-bubble"></span>
         </div>
       </div>
@@ -1327,8 +1414,18 @@
       <div id="settings-locations-list" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px;"></div>
 
       <!-- Cheltuieli: 2 panouri -->
-      <div id="settings-exp-section" style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px; padding-top:14px; border-top:1px solid var(--border);">
-        Configurare Cheltuieli
+      <div id="settings-exp-section" style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:12px; padding-top:16px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+        <span>Configurare Cheltuieli</span>
+        <div style="display:flex; gap:8px;">
+          <button class="btn-ghost" onclick="addLocalDepartment()" style="font-size:11px; padding:6px 12px; display:flex; align-items:center; gap:6px; color:var(--accent); border:1px solid color-mix(in srgb, var(--accent) 30%, transparent); background:color-mix(in srgb, var(--accent) 10%, transparent); text-transform:none; letter-spacing:0;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Departament Nou
+          </button>
+          <button class="btn-ghost" onclick="addLocalType()" id="btn-add-local-type" style="font-size:11px; padding:6px 12px; display:flex; align-items:center; gap:6px; color:var(--text); text-transform:none; letter-spacing:0; opacity:0.5; pointer-events:none;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Tip Nou
+          </button>
+        </div>
       </div>
       <div id="settings-exp-grid" style="display:grid; grid-template-columns:230px 1fr; border:1px solid var(--border); border-radius:10px; overflow:hidden; height:420px;">
         <!-- STANGA: Departamente -->
@@ -1540,8 +1637,234 @@
     </div>
   </div>
 </div>
+<!-- ADD EXPENSE MODAL -->
+<div class="settings-modal" id="modal-add-expense" onclick="if(event.target===this) this.classList.remove('show')">
+  <div class="settings-panel" style="width:600px; max-width:95%;">
+    <div class="settings-header">
+      <div class="settings-title">Adaugă Cheltuială Manuală</div>
+      <button class="settings-close" onclick="document.getElementById('modal-add-expense').classList.remove('show')">×</button>
+    </div>
+    <div class="settings-body" style="padding:20px;">
+      <form id="form-add-expense" onsubmit="submitManualExpense(event)">
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+          <div>
+            <label style="display:block; font-size:11px; font-weight:700; color:var(--muted); margin-bottom:6px;">Dată Document</label>
+            <input type="date" id="me-date" class="glass-select" style="width:100%; box-sizing:border-box;" onchange="fetchExpenseFormData()" required>
+          </div>
+          <div>
+            <label style="display:block; font-size:11px; font-weight:700; color:var(--muted); margin-bottom:6px;">Suma Totală (RON)</label>
+            <input type="number" step="0.01" id="me-amount" class="glass-select" placeholder="ex: 150.50" style="width:100%; box-sizing:border-box;" required>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 16px;">
+          <label style="display:block; font-size:11px; font-weight:700; color:var(--muted); margin-bottom:6px;">Explicație</label>
+          <input type="text" id="me-expl" class="glass-select" placeholder="Descrierea cheltuielii..." style="width:100%; box-sizing:border-box;" required>
+        </div>
+
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+          <div>
+            <label style="display:block; font-size:11px; font-weight:700; color:var(--muted); margin-bottom:6px;">Departament</label>
+            <select id="me-dep" class="glass-select" style="width:100%; box-sizing:border-box;" onchange="filterExpenseTypes()" required>
+              <option value="">Alege...</option>
+            </select>
+          </div>
+          <div>
+            <label style="display:block; font-size:11px; font-weight:700; color:var(--muted); margin-bottom:6px;">Categorie / Tip</label>
+            <select id="me-type" class="glass-select" style="width:100%; box-sizing:border-box;" required>
+              <option value="">Alege...</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 16px;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:6px;">
+            <label style="display:block; font-size:11px; font-weight:700; color:var(--muted);">Locații (Puncte de cheltuială)</label>
+            <label style="font-size:11px; color:var(--text); display:flex; align-items:center; gap:4px; cursor:pointer;"><input type="checkbox" id="me-loc-all" onchange="toggleAllLocs(this)"> Selectează Tot</label>
+          </div>
+          <div id="me-locs-container" style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; max-height:150px; overflow-y:auto; padding:10px; background:var(--surface2); border:1px solid var(--border); border-radius:8px;">
+            <!-- Injected via JS -->
+          </div>
+        </div>
+
+        <div id="me-split-strategy" style="display:none; padding:12px; background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.3); border-radius:8px; margin-bottom:16px;">
+          <div style="font-size:11px; font-weight:700; color:var(--accent); margin-bottom:8px;">Ai selectat mai multe locații. Cum împărțim suma?</div>
+          <label style="display:flex; align-items:center; gap:8px; margin-bottom:4px; font-size:12px;">
+            <input type="radio" name="split_mode" value="equal" checked> Împarte în mod egal pe locațiile selectate
+          </label>
+          <label style="display:flex; align-items:center; gap:8px; font-size:12px;">
+            <input type="radio" name="split_mode" value="slots"> Împarte proporțional cu numărul de sloturi din locațiile selectate
+          </label>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end;">
+          <button type="submit" class="btn-primary" style="padding:10px 24px;">Salvează Cheltuiala</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- IMPORT GOOGLE SHEETS MODAL -->
+<div class="settings-modal" id="modal-import-expense" onclick="if(event.target===this) this.classList.remove('show')">
+  <div class="settings-panel" style="width:600px; max-width:95%;">
+    <div class="settings-header">
+      <div class="settings-title">Importă din Google Sheets</div>
+      <button class="settings-close" onclick="document.getElementById('modal-import-expense').classList.remove('show')">×</button>
+    </div>
+    <div class="settings-body" style="padding:20px;">
+      <div style="margin-bottom: 20px; font-size:12px; color:var(--muted); line-height:1.5;">
+        <strong style="color:var(--text);">Instrucțiuni:</strong><br>
+        1. Asigură-te că fișierul tău de Google Sheets este setat ca <b>Public (Oricine are link-ul poate vedea)</b>.<br>
+        2. Datele trebuie să respecte următorul format de coloane.<br>
+        3. Copiază link-ul documentului și lipește-l mai jos.
+      </div>
+      <form id="form-import-expense" onsubmit="submitImportExpense(event)">
+        <div style="margin-bottom: 20px;">
+          <label style="display:block; font-size:11px; font-weight:700; color:var(--muted); margin-bottom:6px;">Link Public Google Sheets</label>
+          <input type="text" id="import-gs-link" class="glass-select" placeholder="https://docs.google.com/spreadsheets/d/..." style="width:100%; box-sizing:border-box;" required>
+        </div>
+        <div id="import-status" style="font-size:12px; font-weight:600; margin-bottom:16px;"></div>
+        <div style="display:flex; justify-content:flex-end;">
+          <button type="submit" class="btn-primary" id="btn-do-import" style="padding:10px 24px; ">Începe Importul</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT SINGLE EXPENSE MODAL -->
+<div class="settings-modal" id="modal-edit-expense" onclick="if(event.target===this) this.classList.remove('show')">
+  <div class="settings-panel" style="width:500px; max-width:95%;">
+    <div class="settings-header">
+      <div class="settings-title">Modifică Cheltuiala</div>
+      <button class="settings-close" onclick="document.getElementById('modal-edit-expense').classList.remove('show')">×</button>
+    </div>
+    <div class="settings-body" style="padding:20px;">
+      <form id="form-edit-expense" onsubmit="submitEditExpense(event)">
+        <input type="hidden" id="edit-exp-id">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+          <div>
+            <label style="display:block; font-size:11px; font-weight:700; color:var(--muted); margin-bottom:6px;">Data (ZZ-LL-AAAA)</label>
+            <input type="date" id="edit-exp-date" class="glass-select" style="width:100%; box-sizing:border-box;" required>
+          </div>
+          <div>
+            <label style="display:block; font-size:11px; font-weight:700; color:var(--muted); margin-bottom:6px;">Suma (RON)</label>
+            <input type="number" id="edit-exp-amount" step="0.01" class="glass-select" style="width:100%; box-sizing:border-box;" required>
+          </div>
+        </div>
+        <div style="margin-bottom:16px;">
+          <label style="display:block; font-size:11px; font-weight:700; color:var(--muted); margin-bottom:6px;">Explicație</label>
+          <input type="text" id="edit-exp-expl" class="glass-select" style="width:100%; box-sizing:border-box;" required>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
+          <div>
+            <label style="display:block; font-size:11px; font-weight:700; color:var(--muted); margin-bottom:6px;">Departament</label>
+            <select id="edit-exp-dep" class="glass-select" style="width:100%; box-sizing:border-box;" onchange="updateEditExpTypes()"></select>
+          </div>
+          <div>
+            <label style="display:block; font-size:11px; font-weight:700; color:var(--muted); margin-bottom:6px;">Categorie</label>
+            <select id="edit-exp-type" class="glass-select" style="width:100%; box-sizing:border-box;"></select>
+          </div>
+        </div>
+        <div style="display:flex; justify-content:flex-end;">
+          <button type="submit" class="btn-primary" style="padding:10px 24px;">Salvează Modificările</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- BULK EDIT EXPENSE MODAL -->
+<div class="settings-modal" id="modal-bulk-edit" onclick="if(event.target===this) this.classList.remove('show')">
+  <div class="settings-panel" style="width:500px; max-width:95%;">
+    <div class="settings-header">
+      <div class="settings-title">Modifică <span id="bulk-edit-count-display"></span> Cheltuieli</div>
+      <button class="settings-close" onclick="document.getElementById('modal-bulk-edit').classList.remove('show')">×</button>
+    </div>
+    <div class="settings-body" style="padding:20px;">
+      <p style="font-size:12px; color:var(--muted); margin-bottom:16px;">Completează doar câmpurile pe care vrei să le suprascrii pentru toate cheltuielile selectate. Ce lași gol rămâne nemodificat.</p>
+      <form id="form-bulk-edit" onsubmit="submitBulkEdit(event)">
+        <div style="margin-bottom:16px;">
+          <label style="display:block; font-size:11px; font-weight:700; color:var(--muted); margin-bottom:6px;">Data (lasă gol pentru a nu modifica)</label>
+          <input type="date" id="bulk-edit-date" class="glass-select" style="width:100%; box-sizing:border-box;">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
+          <div>
+            <label style="display:block; font-size:11px; font-weight:700; color:var(--muted); margin-bottom:6px;">Departament</label>
+            <select id="bulk-edit-dep" class="glass-select" style="width:100%; box-sizing:border-box;" onchange="updateBulkEditTypes()"><option value="">-- Fără modificare --</option></select>
+          </div>
+          <div>
+            <label style="display:block; font-size:11px; font-weight:700; color:var(--muted); margin-bottom:6px;">Categorie</label>
+            <select id="bulk-edit-type" class="glass-select" style="width:100%; box-sizing:border-box;"><option value="">-- Fără modificare --</option></select>
+          </div>
+        </div>
+        <div style="display:flex; justify-content:flex-end;">
+          <button type="submit" class="btn-primary" style="padding:10px 24px;">Aplică Modificările</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
 <script src="game_uuids.js?v=1"></script>
-<script src="app.js?v=20260520141300"></script>
+<script src="app.js?v=135"></script>
+<!-- CUSTOM PROMPT MODAL -->
+<div class="settings-modal" id="modal-custom-prompt" onclick="if(event.target===this) { if(window.customPromptCancel) window.customPromptCancel(); }">
+  <div class="settings-panel" style="width:400px; max-width:90%; background:var(--surface);">
+    <div class="settings-header">
+      <div class="settings-title" id="custom-prompt-title">Introduceți valoarea</div>
+      <button class="settings-close" onclick="if(window.customPromptCancel) window.customPromptCancel()">×</button>
+    </div>
+    <div class="settings-body" style="padding:20px;">
+      <form id="form-custom-prompt" onsubmit="if(window.customPromptSubmit) window.customPromptSubmit(event)">
+        <input type="text" id="custom-prompt-input" class="glass-select" style="width:100%; box-sizing:border-box; margin-bottom:20px; padding:10px 14px;" autocomplete="off">
+        <div style="display:flex; justify-content:flex-end; gap:12px;">
+          <button type="button" class="btn-ghost" style="padding:8px 16px; border-radius:8px;" onclick="if(window.customPromptCancel) window.customPromptCancel()">Anulează</button>
+          <button type="submit" class="btn-primary" style="padding:8px 16px; border-radius:8px; background:var(--accent);">OK</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- CUSTOM CONFIRM MODAL -->
+<div class="settings-modal" id="modal-custom-confirm" onclick="if(event.target===this) { if(window.customConfirmCancel) window.customConfirmCancel(); }">
+  <div class="settings-panel" style="width:400px; max-width:90%; background:var(--surface);">
+    <div class="settings-header">
+      <div class="settings-title" style="color:var(--red);">Confirmare acțiune</div>
+      <button class="settings-close" onclick="if(window.customConfirmCancel) window.customConfirmCancel()">×</button>
+    </div>
+    <div class="settings-body" style="padding:20px;">
+      <p id="custom-confirm-message" style="font-size:14px; color:var(--text); margin-bottom:24px; line-height:1.5;"></p>
+      <div style="display:flex; justify-content:flex-end; gap:12px;">
+        <button type="button" class="btn-ghost" style="padding:8px 16px; border-radius:8px;" onclick="if(window.customConfirmCancel) window.customConfirmCancel()">Anulează</button>
+        <button type="button" class="btn-primary" style="background:var(--red); padding:8px 16px; border-radius:8px; border:none; color:#fff; cursor:pointer;" onclick="if(window.customConfirmSubmit) window.customConfirmSubmit()">Confirmă</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+  <!-- Custom UI Modals -->
+  <div class="settings-modal" id="custom-alert-modal" style="z-index: 9999;">
+    <div class="settings-panel glass-panel" style="width: 400px; text-align:center; padding: 24px;">
+      <h3 id="custom-alert-title" style="margin-bottom: 12px; font-size: 16px;">Atenție</h3>
+      <p id="custom-alert-text" style="color: var(--muted); margin-bottom: 24px;"></p>
+      <button class="btn-primary" onclick="document.getElementById('custom-alert-modal').classList.remove('show')" style="width: 100%;">Am înțeles</button>
+    </div>
+  </div>
+
+  <div class="settings-modal" id="custom-confirm-modal" style="z-index: 9999;">
+    <div class="settings-panel glass-panel" style="width: 400px; text-align:center; padding: 24px;">
+      <h3 id="custom-confirm-title" style="margin-bottom: 12px; font-size: 16px; color: var(--red);">Confirmare</h3>
+      <p id="custom-confirm-text" style="color: var(--muted); margin-bottom: 24px;"></p>
+      <div style="display:flex; justify-content:center; gap: 12px;">
+        <button class="btn-ghost" onclick="document.getElementById('custom-confirm-modal').classList.remove('show')" style="flex: 1;">Anulează</button>
+        <button class="btn-danger" id="custom-confirm-btn" style="flex: 1;">Confirmă</button>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>

@@ -7,6 +7,30 @@ import sqlite3
 import hashlib
 import secrets
 import json
+import csv
+import time
+
+_API_CACHE = {}
+
+def get_cache_key(prefix, req):
+    return f"{prefix}_{req.full_path}"
+
+def get_cached_response(cache_key, includes_today):
+    if cache_key in _API_CACHE:
+        entry = _API_CACHE[cache_key]
+        now = time.time()
+        ttl = 60 if includes_today else 86400  # 1 min for today, 24h for past
+        if now - entry['time'] < ttl:
+            return entry['data']
+    return None
+
+def set_cached_response(cache_key, data):
+    _API_CACHE[cache_key] = {
+        'time': time.time(),
+        'data': data
+    }
+import urllib.request
+from io import StringIO
 from werkzeug.utils import secure_filename
 
 cp2_db.init_db()
@@ -74,10 +98,13 @@ def get_exp_config():
     if os.path.exists(EXP_CFG_FILE):
         try:
             with open(EXP_CFG_FILE, 'r') as f:
-                return json.load(f)
+                data = json.load(f)
+                if 'local_departments' not in data: data['local_departments'] = []
+                if 'local_types' not in data: data['local_types'] = []
+                return data
         except:
             pass
-    return {"excluded_departments": [], "excluded_types": []}
+    return {"excluded_departments": [], "excluded_types": [], "local_departments": [], "local_types": []}
 
 @app.route('/api/admin/expenses_config', methods=['GET'])
 def get_expenses_config():
@@ -95,18 +122,39 @@ def get_expenses_config():
     for r in rows:
         did = r['dep_id']
         if did not in deps:
-            deps[did] = {'id': did, 'name': r['dep_name'], 'types': []}
+            deps[did] = {'id': did, 'name': r['dep_name'], 'types': [], 'is_local': False}
         deps[did]['types'].append({
             'id': r['id'],
             'name': r['type_name'],
-            'is_expense': r['id'] not in excl_types
+            'is_expense': r['id'] not in excl_types,
+            'is_local': False
         })
-    # Compute department is_expense: true if ALL its types are expense
+        
+    for ld in cfg.get('local_departments', []):
+        did = ld['id']
+        if did not in deps:
+            deps[did] = {'id': did, 'name': ld['name'], 'types': [], 'is_local': True}
+            
+    for lt in cfg.get('local_types', []):
+        did = lt.get('department_id', '')
+        if did in deps:
+            deps[did]['types'].append({
+                'id': lt['id'],
+                'name': lt['name'],
+                'is_expense': lt['id'] not in excl_types,
+                'is_local': True
+            })
+
     result = []
     for dep in deps.values():
         all_on = all(t['is_expense'] for t in dep['types']) if dep['types'] else True
         dep['is_expense'] = all_on
         result.append(dep)
+        
+    result.sort(key=lambda x: (x.get('is_local', False), x['name'].lower()))
+    for dep in result:
+        dep['types'].sort(key=lambda x: (x.get('is_local', False), x['name'].lower()))
+        
     return jsonify({'departments': result})
 
 @app.route('/api/admin/expenses_config', methods=['POST'])
@@ -118,6 +166,10 @@ def save_expenses_config():
         cfg['excluded_departments'] = data['excluded_departments']
     if 'excluded_types' in data:
         cfg['excluded_types'] = data['excluded_types']
+    if 'local_departments' in data:
+        cfg['local_departments'] = data['local_departments']
+    if 'local_types' in data:
+        cfg['local_types'] = data['local_types']
         
     with open(EXP_CFG_FILE, 'w') as f:
         json.dump(cfg, f)
@@ -131,9 +183,11 @@ def pg_qry(sql, params=None):
             try:
                 rows = c.fetchall()
                 cols = [desc[0] for desc in c.description]
-                return [dict(zip(cols, r)) for r in rows]
+                res = [dict(zip(cols, r)) for r in rows]
             except Exception as e:
-                return []
+                res = []
+        conn.commit()
+        return res
     finally:
         conn.close()
 
@@ -221,6 +275,15 @@ def filters():
 @app.route('/api/kpi')
 def kpi():
     start, end = period_params(request)
+    
+    # Cache Check
+    today = datetime.now().strftime('%Y-%m-%d')
+    includes_today = (start <= today and end >= today)
+    c_key = get_cache_key('kpi', request)
+    c_data = get_cached_response(c_key, includes_today)
+    if c_data:
+        return jsonify(c_data)
+        
     lf, lp = loc_filter(request)
     row = qry_one("""
         SELECT
@@ -300,7 +363,7 @@ def kpi():
         pg_excl_where += f" AND (department_id IS NULL OR department_id::text NOT IN ({ph_d}))"
     if excl_types:
         ph_t = ','.join([f"'{t}'" for t in excl_types])
-        pg_excl_where += f" AND (type_id IS NULL OR type_id::text NOT IN ({ph_t}))"
+        pg_excl_where += f" AND (expenditure_type_id IS NULL OR expenditure_type_id::text NOT IN ({ph_t}))"
 
     exp_res = pg_qry(f"""
         SELECT SUM(amount) as s 
@@ -309,30 +372,43 @@ def kpi():
     """, pg_params)
     expenses = float(exp_res[0]['s'] or 0) if exp_res else 0.0
 
-    return jsonify(
-        data_start=str(row.get('data_start','') or ''),
-        data_end  =str(row.get('data_end','') or ''),
-        nr_zile=days, aparate=ap, locatii=int(row.get('locatii') or 0),
-        total_in=tin, total_out=tout,
-        ggr=ggr, ggr_eur=round(ggr/EUR_RATE,2),
-        ngr=ngr, ngr_eur=round(ngr/EUR_RATE,2),
-        expenses=expenses, net_profit=ggr - expenses,
-        jackpot=jp, hh=hh, cashback=cb,
-        games=games, bet=bet,
-        hold_pct=round(ggr/tin*100,2) if tin else 0,
-        ngr_pct =round(ngr/tin*100,2) if tin else 0,
-        avg_in_zi   =round(tin/days,2),
-        avg_ggr_zi  =round(ggr/days,2),
-        avg_ngr_zi  =round(ngr/days,2),
-        avg_in_ap_zi=round(tin/(days*ap),2),
-        avg_bet_game=round(bet/games,4) if games else 0,
-        avg_games_zi=round(games/days,2),
-    )
+    resp_data = {
+        "data_start": str(row.get('data_start','') or ''),
+        "data_end": str(row.get('data_end','') or ''),
+        "nr_zile": days, "aparate": ap, "locatii": int(row.get('locatii') or 0),
+        "total_in": tin, "total_out": tout,
+        "ggr": ggr, "ggr_eur": round(ggr/EUR_RATE,2),
+        "ngr": ngr, "ngr_eur": round(ngr/EUR_RATE,2),
+        "expenses": expenses, "net_profit": ggr - expenses,
+        "jackpot": jp, "hh": hh, "cashback": cb,
+        "games": games, "bet": bet,
+        "hold_pct": round(ggr/tin*100,2) if tin else 0,
+        "ngr_pct": round(ngr/tin*100,2) if tin else 0,
+        "avg_in_zi": round(tin/days,2),
+        "avg_ggr_zi": round(ggr/days,2),
+        "avg_ngr_zi": round(ngr/days,2),
+        "avg_in_ap_zi": round(tin/(days*ap),2),
+        "avg_bet_game": round(bet/games,4) if games else 0,
+        "avg_games_zi": round(games/days,2),
+        "exp_total": expenses
+    }
+    
+    set_cached_response(c_key, resp_data)
+    return jsonify(resp_data)
 
 # ─── Trend lunar ────────────────────────────────────────────────────────────
 @app.route('/api/trend')
 def trend():
     start, end = period_params(request)
+    
+    # Cache Check
+    today = datetime.now().strftime('%Y-%m-%d')
+    includes_today = (start <= today and end >= today)
+    c_key = get_cache_key('trend', request)
+    c_data = get_cached_response(c_key, includes_today)
+    if c_data:
+        return jsonify(c_data)
+        
     lf, lp = loc_filter(request)
     res = request.args.get('resolution', 'day')
 
@@ -368,6 +444,8 @@ def trend():
         GROUP BY DATE_FORMAT(mas.date,'{date_format}')
         ORDER BY luna ASC
     """, [start_dt, end_dt] + lp)
+    
+    set_cached_response(c_key, rows)
     return jsonify(rows)
 
 # ─── Per Locație ─────────────────────────────────────────────────────────────
@@ -1346,6 +1424,129 @@ def live_monitor():
         'active_slots': active_count
     })
 
+@app.route('/api/reports/clients')
+def report_clients():
+    try:
+        import datetime as dt_mod
+        start, end = period_params(request)
+        if not start: start = dt_mod.date.today().strftime('%Y-%m-%d')
+        if not end:   end   = start
+
+        try:
+            s_dt = dt_mod.datetime.strptime(start, '%Y-%m-%d')
+            e_dt = dt_mod.datetime.strptime(end,   '%Y-%m-%d')
+        except ValueError:
+            return jsonify({'error': f'Invalid date: {start}/{end}'}), 400
+
+        start_str = start + ' 08:00:00'
+        end_dt_str = (e_dt + dt_mod.timedelta(days=1)).strftime('%Y-%m-%d') + ' 08:00:00'
+
+        loc_where = ''
+        loc_params = []
+        ids_raw = request.args.get('loc_ids', '')
+        if ids_raw:
+            try:
+                ids = [int(x) for x in ids_raw.split(',') if x.strip()]
+                if ids:
+                    placeholders = ','.join(['%s'] * len(ids))
+                    loc_where = f' AND pcl.location_id IN ({placeholders})'
+                    loc_params = ids
+            except ValueError:
+                pass
+
+        # 1. Player logs from Newton
+        q_logs = f"""
+            SELECT pcl.id, p.id as player_id, p.first_name, p.last_name, pcl.params, pcl.created_at, pcl.location_id
+            FROM player_card_logs pcl
+            JOIN players p ON pcl.player_id = p.id
+            WHERE pcl.log_type = 2
+              AND pcl.created_at >= %s AND pcl.created_at <= %s
+              {loc_where}
+        """
+        logs = qry(q_logs, [start_str, end_dt_str] + loc_params)
+
+        # 2. Extract machine IDs and Dates
+        import json
+        m_ids = set()
+        for log in logs:
+            try:
+                p_json = json.loads(log['params'])
+                mid = p_json.get('machine_id')
+                if mid:
+                    log['machine_id'] = mid
+                    m_ids.add(mid)
+            except:
+                log['machine_id'] = None
+
+        pg_reports = []
+        from collections import defaultdict
+        reports_map = defaultdict(lambda: defaultdict(list))
+
+        if m_ids:
+            # 2.1 Get slot_machine_ids for these machines
+            local_machines = qry(f"SELECT id, slot_machine_id FROM machines WHERE id IN ({','.join(['%s']*len(m_ids))})", list(m_ids))
+            slot_to_mid = {r['slot_machine_id']: r['id'] for r in local_machines if r['slot_machine_id']}
+            slot_ids = list(set(slot_to_mid.keys()))
+
+            if slot_ids:
+                # 3. Fetch PG reports
+                pg_q = f"""
+                    SELECT station_serial_nr, event_date_time, bet, profit, game_name, cabinet_name
+                    FROM casino_processed_simple_report
+                    WHERE event_date_time >= %s AND event_date_time <= %s
+                      AND station_serial_nr IN ({','.join(['%s']*len(slot_ids))})
+                """
+                pg_reports = pg_qry(pg_q, [start_str, end_dt_str] + slot_ids)
+
+            # 4. Group PG reports by internal machine ID and date+hour
+            for r in pg_reports:
+                dt_hour = r['event_date_time'].strftime('%Y-%m-%d %H')
+                internal_mid = slot_to_mid.get(r['station_serial_nr'])
+                if internal_mid:
+                    reports_map[internal_mid][dt_hour].append(r)
+
+        # 5. Build final result
+        clients_data = []
+        for log in logs:
+            if not log.get('machine_id'): continue
+            mid = log['machine_id']
+            
+            # Try to match the exact hour of the log
+            dt_hour = log['created_at'].strftime('%Y-%m-%d %H')
+            
+            reps = reports_map[mid].get(dt_hour, [])
+            # If no report for exact hour, fallback to any report from that day for that machine
+            if not reps:
+                dt_day = log['created_at'].strftime('%Y-%m-%d')
+                reps = [r for r_hour, r_list in reports_map[mid].items() if r_hour.startswith(dt_day) for r in r_list]
+
+            bet = sum([r['bet'] for r in reps]) if reps else 0
+            ggr = sum([r['profit'] for r in reps]) if reps else 0
+            
+            games = list(set([r['game_name'] for r in reps if r['game_name']]))
+            cabs = list(set([r['cabinet_name'] for r in reps if r['cabinet_name']]))
+
+            clients_data.append({
+                'player_id': log['player_id'],
+                'first_name': log['first_name'],
+                'last_name': log['last_name'],
+                'date_time': log['created_at'].strftime('%Y-%m-%d %H:%M:%S'),
+                'machine_id': mid,
+                'location_id': log['location_id'],
+                'bet': float(bet),
+                'ggr': float(ggr),
+                'games': ', '.join(games) if games else 'N/A',
+                'cabinets': ', '.join(cabs) if cabs else 'N/A'
+            })
+
+        # Sort by date descending
+        clients_data.sort(key=lambda x: x['date_time'], reverse=True)
+
+        return jsonify({'success': True, 'data': clients_data})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/multigame')
@@ -2388,6 +2589,289 @@ def register_with_invite():
     if not success: return jsonify({"error": "Email-ul exista deja"}), 400
     return jsonify({"success": True})
 
+# ─── EXPENSES MANAGEMENT ──────────────────────────────────────────────────
+
+@app.route('/api/admin/expense_form_data')
+def expense_form_data():
+    date_param = request.args.get('date', '')
+    if not date_param:
+        date_param = datetime.datetime.now().strftime('%Y-%m-%d')
+        
+    deps = pg_qry("SELECT id, name FROM casino_departments ORDER BY name")
+    types = pg_qry("SELECT id, name, department_id FROM casino_expenditure_types ORDER BY name")
+    pg_locs = pg_qry("SELECT id, name FROM casino_locations ORDER BY name")
+    
+    cfg = get_exp_config()
+    for ld in cfg.get('local_departments', []):
+        deps.append({'id': ld['id'], 'name': ld['name']})
+    for lt in cfg.get('local_types', []):
+        types.append({'id': lt['id'], 'name': lt['name'], 'department_id': lt.get('department_id', '')})
+        
+    deps.sort(key=lambda x: x['name'].lower())
+    types.sort(key=lambda x: x['name'].lower())
+    
+    mysql_locs = qry("SELECT id, code FROM locations")
+    pg_name_to_id = {normalize_loc_name(l['name']): str(l['id']) for l in pg_locs}
+    
+    # Check historical slots
+    today = datetime.now().strftime('%Y-%m-%d')
+    if date_param < today:
+        active_m = qry("SELECT location_id, COUNT(DISTINCT machine_id) as c FROM machine_daily_meters WHERE date=%s GROUP BY location_id", (date_param,))
+    else:
+        active_m = qry("SELECT location_id, COUNT(*) as c FROM machines WHERE deleted_at IS NULL GROUP BY location_id")
+        
+    if not active_m and date_param < today:
+        # Fallback if no meters for that day
+        active_m = qry("SELECT location_id, COUNT(*) as c FROM machines WHERE deleted_at IS NULL GROUP BY location_id")
+        
+    mysql_slot_counts = {str(r['location_id']): r['c'] for r in active_m}
+    
+    pg_slots = {str(l['id']): 0 for l in pg_locs}
+    for ml in mysql_locs:
+        norm = normalize_loc_name(ml['code'])
+        if norm in pg_name_to_id:
+            pid = pg_name_to_id[norm]
+            pg_slots[pid] += mysql_slot_counts.get(str(ml['id']), 0)
+            
+    locations = []
+    for l in pg_locs:
+        locations.append({
+            'id': str(l['id']),
+            'name': l['name'],
+            'slots': pg_slots.get(str(l['id']), 0)
+        })
+        
+    return jsonify({
+        'departments': deps,
+        'types': types,
+        'locations': locations
+    })
+
+@app.route('/api/admin/expenses', methods=['POST'])
+def save_manual_expense():
+    user = require_auth()
+    if not user: return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.json
+    loc_ids = data.get('loc_ids', [])
+    if not loc_ids: return jsonify({'error': 'Nicio locatie selectata'}), 400
+    
+    amount = float(data.get('amount', 0))
+    split_mode = data.get('split_mode', 'equal')
+    date_param = data.get('date', '')
+    
+    slots_map = {}
+    if split_mode == 'slots':
+        mysql_locs = qry("SELECT id, code FROM locations")
+        pg_locs = pg_qry("SELECT id, name FROM casino_locations")
+        pg_name_to_id = {normalize_loc_name(l['name']): str(l['id']) for l in pg_locs}
+        
+        today = datetime.now().strftime('%Y-%m-%d')
+        if date_param < today:
+            active_m = qry("SELECT location_id, COUNT(DISTINCT machine_id) as c FROM machine_daily_meters WHERE date=%s GROUP BY location_id", (date_param,))
+        else:
+            active_m = qry("SELECT location_id, COUNT(*) as c FROM machines WHERE deleted_at IS NULL GROUP BY location_id")
+            
+        if not active_m and date_param < today:
+            active_m = qry("SELECT location_id, COUNT(*) as c FROM machines WHERE deleted_at IS NULL GROUP BY location_id")
+            
+        mysql_slot_counts = {str(r['location_id']): r['c'] for r in active_m}
+        
+        pg_slots = {str(l['id']): 0 for l in pg_locs}
+        for ml in mysql_locs:
+            norm = normalize_loc_name(ml['code'])
+            if norm in pg_name_to_id:
+                pid = pg_name_to_id[norm]
+                pg_slots[pid] += mysql_slot_counts.get(str(ml['id']), 0)
+        slots_map = pg_slots
+
+    total_slots = sum([slots_map.get(str(lid), 0) for lid in loc_ids]) if split_mode == 'slots' else 0
+    
+    for lid in loc_ids:
+        lid_str = str(lid)
+        
+        if split_mode == 'slots' and total_slots > 0:
+            s_count = slots_map.get(lid_str, 0)
+            loc_amount = round(amount * (s_count / total_slots), 2)
+        else:
+            loc_amount = round(amount / len(loc_ids), 2)
+            
+        if loc_amount <= 0: continue
+            
+        import uuid
+        pg_qry("""
+            INSERT INTO casino_payments 
+            (id, date, operational_date, explanation, amount, location_id, department_id, expenditure_type_id, direction, details)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 1, %s)
+        """, (
+            str(uuid.uuid4()),
+            data['date'],
+            data['date'],
+            data['explanation'],
+            loc_amount,
+            lid_str,
+            data['department_id'],
+            data['expenditure_type_id'],
+            user.get('name', 'User')
+        ))
+        
+    return jsonify({'success': True})
+
+@app.route('/api/admin/expenses_import', methods=['POST'])
+def import_google_sheets_expense():
+    data = request.json
+    link = data.get('link', '')
+    
+    if '/d/' not in link: return jsonify({'error': 'Link invalid'}), 400
+    sheet_id = link.split('/d/')[1].split('/')[0]
+    
+    csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
+    
+    try:
+        req = urllib.request.Request(csv_url)
+        with urllib.request.urlopen(req) as response:
+            csv_data = response.read().decode('utf-8')
+    except Exception as e:
+        return jsonify({'error': f'Nu s-a putut descărca documentul. Sigur este public? ({str(e)})'}), 400
+        
+    reader = csv.reader(StringIO(csv_data))
+    header = next(reader, None)
+    if not header: return jsonify({'error': 'Fișier gol.'}), 400
+    
+    h_lower = [h.lower().strip() for h in header]
+    try:
+        idx_date = h_lower.index('data') if 'data' in h_lower else h_lower.index('date')
+        idx_expl = h_lower.index('explicatie') if 'explicatie' in h_lower else h_lower.index('explanation')
+        idx_amt = h_lower.index('suma') if 'suma' in h_lower else h_lower.index('amount')
+        idx_loc = h_lower.index('locatie') if 'locatie' in h_lower else h_lower.index('location')
+        idx_dep = h_lower.index('departament') if 'departament' in h_lower else h_lower.index('department')
+        idx_cat = h_lower.index('categorie') if 'categorie' in h_lower else (h_lower.index('tip') if 'tip' in h_lower else -1)
+    except ValueError as e:
+        return jsonify({'error': f'Coloană lipsă. Găsite: {", ".join(h_lower)}. Necesare: Data, Explicatie, Suma, Locatie, Departament.'}), 400
+        
+    pg_locs = pg_qry("SELECT id, name FROM casino_locations")
+    pg_deps = pg_qry("SELECT id, name FROM casino_departments")
+    pg_types = pg_qry("SELECT id, name FROM casino_expenditure_types")
+    
+    loc_map = {normalize_loc_name(l['name']): str(l['id']) for l in pg_locs}
+    dep_map = {d['name'].strip().lower(): str(d['id']) for d in pg_deps}
+    type_map = {t['name'].strip().lower(): str(t['id']) for t in pg_types}
+    
+    inserted = 0
+    import uuid
+    for row in reader:
+        if len(row) <= idx_amt: continue
+        
+        date_str = row[idx_date].strip()
+        expl_str = row[idx_expl].strip()
+        amt_str = row[idx_amt].strip().replace(',', '.')
+        loc_str = row[idx_loc].strip()
+        dep_str = row[idx_dep].strip().lower()
+        cat_str = row[idx_cat].strip().lower() if idx_cat >= 0 and idx_cat < len(row) else ''
+        
+        if not amt_str or not date_str or not loc_str: continue
+            
+        try:
+            amt = float(amt_str)
+        except:
+            continue
+            
+        norm_loc = normalize_loc_name(loc_str)
+        if norm_loc not in loc_map: continue
+        if dep_str not in dep_map: continue
+        
+        loc_id = loc_map[norm_loc]
+        dep_id = dep_map[dep_str]
+        cat_id = type_map[cat_str] if cat_str in type_map else None
+        
+        pg_qry("""
+            INSERT INTO casino_payments 
+            (id, date, operational_date, explanation, amount, location_id, department_id, expenditure_type_id, direction)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 1)
+        """, (
+            str(uuid.uuid4()),
+            date_str,
+            date_str,
+            expl_str,
+            amt,
+            loc_id,
+            dep_id,
+            cat_id
+        ))
+        inserted += 1
+
+    return jsonify({'success': True, 'inserted_count': inserted})
+
+@app.route('/api/admin/expenses/<expense_id>', methods=['DELETE'])
+def delete_expense(expense_id):
+    try:
+        pg_qry("DELETE FROM casino_payments WHERE id = %s", (expense_id,))
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/expenses/<expense_id>', methods=['PUT'])
+def edit_expense(expense_id):
+    data = request.json
+    try:
+        pg_qry("""
+            UPDATE casino_payments 
+            SET date = %s, operational_date = %s, amount = %s, explanation = %s, department_id = %s, expenditure_type_id = %s
+            WHERE id = %s
+        """, (
+            data.get('date'),
+            data.get('date'),
+            float(data.get('amount', 0)),
+            data.get('explanation'),
+            data.get('department_id'),
+            data.get('expenditure_type_id'),
+            expense_id
+        ))
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/expenses/bulk', methods=['DELETE'])
+def bulk_delete_expenses():
+    data = request.json
+    ids = data.get('ids', [])
+    if not ids: return jsonify({'error': 'No ids provided'}), 400
+    try:
+        ph = ','.join(['%s'] * len(ids))
+        pg_qry(f"DELETE FROM casino_payments WHERE id IN ({ph})", tuple(ids))
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/expenses/bulk', methods=['PUT'])
+def bulk_edit_expenses():
+    data = request.json
+    ids = data.get('ids', [])
+    if not ids: return jsonify({'error': 'No ids provided'}), 400
+    
+    updates, params = [], []
+    if 'date' in data and data['date']:
+        updates.append("date = %s")
+        updates.append("operational_date = %s")
+        params.extend([data['date'], data['date']])
+    if 'department_id' in data and data['department_id']:
+        updates.append("department_id = %s")
+        params.append(data['department_id'])
+    if 'expenditure_type_id' in data and data['expenditure_type_id']:
+        updates.append("expenditure_type_id = %s")
+        params.append(data['expenditure_type_id'])
+        
+    if not updates: return jsonify({'success': True})
+        
+    try:
+        ph = ','.join(['%s'] * len(ids))
+        sql = f"UPDATE casino_payments SET {', '.join(updates)} WHERE id IN ({ph})"
+        params.extend(ids)
+        pg_qry(sql, tuple(params))
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/reports/expenses')
 def api_expenses():
     start, end = period_params(request)
@@ -2435,6 +2919,7 @@ def api_expenses():
 
     rows = pg_qry(f"""
         SELECT
+            p.id,
             p.date,
             p.operational_date,
             p.explanation,
@@ -2444,34 +2929,62 @@ def api_expenses():
             pt.name AS type_name,
             et.name AS expenditure_type_name,
             v.name AS vendor_name,
-            p.other_info
+            p.other_info,
+            p.department_id,
+            p.expenditure_type_id,
+            p.details,
+            u.first_name,
+            u.last_name
         FROM casino_payments p
         LEFT JOIN casino_locations cl ON p.location_id = cl.id
         LEFT JOIN casino_departments cd ON p.department_id = cd.id
         LEFT JOIN casino_payment_types pt ON p.type_id = pt.id
         LEFT JOIN casino_expenditure_types et ON p.expenditure_type_id = et.id
         LEFT JOIN casino_vendors v ON p.vendor_id = v.id
+        LEFT JOIN users u ON p.created_by_id = u.id
         WHERE p.direction = 1 AND p.date >= %s AND p.date <= %s
         {pg_loc_where} {pg_excl_where}
         ORDER BY p.date DESC
     """, pg_params)
     
     data = []
+    cfg = get_exp_config()
+    ld_map = {ld['id']: ld['name'] for ld in cfg.get('local_departments', [])}
+    lt_map = {lt['id']: lt['name'] for lt in cfg.get('local_types', [])}
+    
     for r in rows:
+        d_name = r['department_name']
+        t_name = r['expenditure_type_name']
+        
+        if not d_name and r['department_id'] in ld_map:
+            d_name = ld_map[r['department_id']]
+        if not t_name and r['expenditure_type_id'] in lt_map:
+            t_name = lt_map[r['expenditure_type_id']]
+            
+        added_by = '-'
+        if r['first_name'] or r['last_name']:
+            added_by = f"{r['first_name'] or ''} {r['last_name'] or ''}".strip()
+        elif r['details']:
+            added_by = r['details']
+            
         data.append({
+            'id': r['id'],
             'date': str(r['date'])[:10] if r['date'] else '-',
             'explanation': r['explanation'] or '-',
             'amount': float(r['amount'] or 0),
             'location_name': r['location_name'] or '-',
-            'department_name': r['department_name'] or '-',
+            'department_name': d_name or '-',
             'type_name': r['type_name'] or '-',
-            'expenditure_type_name': r['expenditure_type_name'] or '-',
-            'vendor_name': r['vendor_name'] or '-'
+            'expenditure_type_name': t_name or '-',
+            'vendor_name': r['vendor_name'] or '-',
+            'added_by': added_by,
+            'is_manual': not bool(r['other_info'])
         })
         
     return jsonify(data)
 
 if __name__ == '__main__':
-    print(" CyberSlot Analytics Dashboard → http://localhost:5050")
-    app.run(host='0.0.0.0', port=5050, debug=False)
-
+    import os
+    port = int(os.environ.get('PORT', 5050))
+    print(f" CyberSlot Analytics Dashboard → listening on port {port}")
+    app.run(host='0.0.0.0', port=port, debug=False)

@@ -1,3 +1,20 @@
+
+window.showAlert = function(text, title="Atenție") {
+  document.getElementById("custom-alert-title").innerText = title;
+  document.getElementById("custom-alert-text").innerText = text;
+  document.getElementById("custom-alert-modal").classList.add("show");
+};
+
+window.showConfirm = function(text, callback) {
+  document.getElementById("custom-confirm-text").innerText = text;
+  const btn = document.getElementById("custom-confirm-btn");
+  btn.onclick = () => {
+    document.getElementById("custom-confirm-modal").classList.remove("show");
+    if (callback) callback();
+  };
+  document.getElementById("custom-confirm-modal").classList.add("show");
+};
+
 const API = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:5050' : '';
 let trendChart=null,pieChart=null,barChart=null,cabChart=null;
 let filtersData={},dailyData={},calViewDate=new Date();
@@ -12,7 +29,7 @@ function fmtK(v){return fmt(v,0);}
 function pill(v){const c=v>=3?'pill-green':v>0?'pill-blue':'pill-red';return`<span class="pill ${c}">${fmt(v,2)}%</span>`;}
 function bonusCost(v){const c=v<=1?'bonus-cost-low':v<=2?'bonus-cost-mid':'bonus-cost-high';return`<span class="bonus-cost ${c}">${fmt(v,1)}%</span>`;}
 function getProviderLogo(name) {
-  const n = (name||'').toLowerCase();
+  const n = (name||'').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   let domain = '';
   if(n.includes('egt') || n.includes('amusnet')) domain = 'amusnet.com';
   else if(n.includes('novomatic')) domain = 'novomatic.com';
@@ -54,7 +71,7 @@ function gameThumbUrl(name, id) {
 
   if (!name) return 'https://cdn.cashpot.ro/cashpot/t1/thumbnail_games/placeholder.png';
   
-  let slug = name.toLowerCase()
+  let slug = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]/g, '-')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
@@ -193,6 +210,7 @@ const tableStates = {
   tipuri: { page: 1, limit: dLimit, rows: [] },
   cabinete: { page: 1, limit: dLimit, rows: [] },
   aparate: { page: 1, limit: dLimit, rows: [] },
+  clienti: { page: 1, limit: dLimit, rows: [] },
   'rep-hourly': { page: 1, limit: dLimit, rows: [] },
   'rep-clienti': { page: 1, limit: dLimit, rows: [] },
   'hh-players': { page: 1, limit: dLimit, rows: [] }
@@ -242,8 +260,8 @@ function renderTablePaginated(key) {
       if (typeof valA === 'number' && typeof valB === 'number') {
         return st.sortDir === 'asc' ? valA - valB : valB - valA;
       }
-      valA = String(valA||'').toLowerCase();
-      valB = String(valB||'').toLowerCase();
+      valA = String(valA||'').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      valB = String(valB||'').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       return st.sortDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
     });
     
@@ -271,21 +289,27 @@ function renderTablePaginated(key) {
     const endNum = st.limit === 'all' ? st.rows.length : Math.min(st.page*st.limit, st.rows.length);
     
     pgWrap.innerHTML = `
-      <div class="pg-info">Afișare ${st.rows.length > 0 ? startNum : 0} - ${endNum} din ${st.rows.length}</div>
-      <div class="pg-controls">
-        <button class="settings-btn" onclick="exportToExcel('${key}')" style="padding:4px 12px; font-size:11px; margin-right:8px; border:1px solid var(--border);">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Excel
-        </button>
-        <select onchange="changeLimit('${key}', this.value)" class="glass-select" style="padding:4px 8px; font-size:11px;">
-          <option value="10" ${st.limit==10?'selected':''}>10 / pag</option>
-          <option value="20" ${st.limit==20?'selected':''}>20 / pag</option>
-          <option value="50" ${st.limit==50?'selected':''}>50 / pag</option>
-          <option value="100" ${st.limit==100?'selected':''}>100 / pag</option>
-          <option value="all" ${st.limit==='all'?'selected':''}>Toate</option>
+      <div class="pg-controls" style="gap:12px;">
+        <span class="pg-info" style="font-size:12px;">Afișează</span>
+        <select onchange="changeLimit('${key}', this.value)" class="glass-select" style="padding:4px 30px 4px 12px; font-size:12px; background-color: transparent;">
+          <option value="10" ${st.limit==10?'selected':''}>10</option>
+          <option value="15" ${st.limit==15?'selected':''}>15</option>
+          <option value="25" ${st.limit==25?'selected':''}>25</option>
+          <option value="50" ${st.limit==50?'selected':''}>50</option>
+          <option value="all" ${st.limit==='all'?'selected':''}>Toți</option>
         </select>
-        <button class="btn-pg" onclick="changePage('${key}', -1)" ${st.page<=1?'disabled':''}>&lsaquo;</button>
-        <span class="pg-page">${st.page} / ${totalPages}</span>
-        <button class="btn-pg" onclick="changePage('${key}', 1)" ${st.page>=totalPages?'disabled':''}>&rsaquo;</button>
+        <button class="settings-btn" onclick="exportToExcel('${key}')" style="padding:4px 12px; font-size:11px; margin-left:8px; border:1px solid var(--border);">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px; vertical-align:-2px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Excel
+        </button>
+      </div>
+      <div class="pg-controls" style="gap:8px;">
+        <span class="pg-info" style="margin-right:8px; font-size:12px;">Pagina ${st.page} din ${totalPages}</span>
+        <button class="btn-pg" onclick="changePage('${key}', -1)" ${st.page<=1?'disabled':''} style="border-radius:var(--radius-full);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+        <button class="btn-pg" onclick="changePage('${key}', 1)" ${st.page>=totalPages?'disabled':''} style="border-radius:var(--radius-full);">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </button>
       </div>
     `;
   }
@@ -863,7 +887,7 @@ async function loadKPI(s,e){
   document.getElementById('v-betgame').textContent='Bet/Game: '+fmt(d.avg_bet_game,2);
   document.getElementById('v-ap').textContent=d.aparate;
   document.getElementById('v-ap-day').textContent='Drop/ap/zi: '+fmt(d.avg_in_ap_zi)+' RON';
-  updateTime();
+
   
   const renderTrend = (id, curr, prev, daysText) => {
     const el = document.getElementById(id);
@@ -1259,38 +1283,6 @@ async function loadCabinets(s,e){
     </tr>`;
   });
   renderTablePaginated('cabinete');
-  if(cabChart)cabChart.destroy();
-  cabChart=new Chart(document.getElementById('cab-bar').getContext('2d'),{
-    type:'bar',
-    data:{labels:data.map(r=>`[${r.provider||'?'}] ${r.cabinet}`),datasets:[{label:'GGR',data:data.map(r=>r.ggr),backgroundColor:data.map((r,i)=>+r.ggr<0?'rgba(239, 68, 68, 0.8)':CHART_COLORS[i%CHART_COLORS.length]),borderWidth:0,borderRadius:6}]},
-    options:{
-      responsive:true,maintainAspectRatio:false,indexAxis:'y',
-      plugins:{
-        legend:{display:false},
-        datalabels: {
-          display: true, color: Chart.defaults.color, align: 'right', anchor: 'end',
-          font: { size: 10, weight: 'bold' },
-          formatter: v => fmtK(v)
-        }
-      },
-      layout: { padding: { right: 40 } },
-      scales:{
-        x:{ticks:{color:'#64748b',callback:v=>(v/1000).toFixed(0)+'k'},grid:{color:'rgba(255,255,255,.04)'}},
-        y:{
-          ticks:{
-            color:'#94a3b8',
-            font:{size:10},
-            callback: function(val, index) {
-              let label = this.getLabelForValue(val);
-              return label.length > 20 ? label.substring(0, 18) + '...' : label;
-            }
-          },
-          grid:{display:false}
-        }
-      }
-    },
-    plugins: [window.ChartDataLabels]
-  });
 }
 
 async function loadMachines(){
@@ -1347,12 +1339,121 @@ function switchTab(name,btn){
   if(btn)btn.classList.add('active');
 }
 
+function getLocName(id) {
+  if (!filtersData || !filtersData.locations) return id;
+  const l = filtersData.locations.find(x => String(x.id) === String(id));
+  return l ? l.name : id;
+}
+
+async function loadDashClienti(s, e) {
+  try {
+    const res = await api(`/api/reports/clients?start=${s}&end=${e}${locParam()}`);
+    if (res.error) throw new Error(res.error);
+    const data = res.data || [];
+    
+    let grouped = {};
+    data.forEach(r => {
+      const pName = `${r.first_name || ''} ${r.last_name || ''}`;
+      if (!grouped[pName]) {
+        grouped[pName] = {
+           name: pName,
+           last_session: r.date_time,
+           location_id: r.location_id,
+           cabinets: new Set(),
+           games: new Set(),
+           bet: 0,
+           ggr: 0,
+           sessions_count: 0
+        };
+      }
+      let g = grouped[pName];
+      if (r.date_time > g.last_session) {
+         g.last_session = r.date_time;
+         g.location_id = r.location_id; 
+      }
+      if (r.cabinets && r.cabinets !== 'N/A') {
+         r.cabinets.split(', ').forEach(c => g.cabinets.add(c));
+      }
+      if (r.games && r.games !== 'N/A') {
+         r.games.split(', ').forEach(gm => g.games.add(gm));
+      }
+      g.bet += r.bet;
+      g.ggr += r.ggr;
+      g.sessions_count += 1;
+    });
+
+    window._dashClientiRaw = Object.values(grouped);
+    if (!window._dashClientiSortField) {
+       window._dashClientiSortField = 'sessions_count';
+       window._dashClientiSortAsc = false;
+    }
+
+    const totalBet = window._dashClientiRaw.reduce((a,b)=>a+b.bet,0);
+    const totalGgr = window._dashClientiRaw.reduce((a,b)=>a+b.ggr,0);
+    const cGgr = totalGgr >= 0 ? 'var(--green)' : 'var(--red)';
+    document.getElementById('foot-clienti').innerHTML = `
+      <tr>
+        <td colspan="8" style="font-weight:bold; text-align:right;">TOTAL</td>
+        <td class="num" style="font-weight:bold;">${fmt(totalBet)}</td>
+        <td class="num" style="font-weight:bold; color:${cGgr};">${fmt(totalGgr)}</td>
+      </tr>
+    `;
+
+    window.renderDashClientiTable();
+  } catch(e) {
+    console.error('Eroare loadDashClienti', e);
+  }
+}
+
+window.renderDashClientiTable = function() {
+  if (!window._dashClientiRaw) return;
+  const data = [...window._dashClientiRaw];
+  const field = window._dashClientiSortField;
+  const asc = window._dashClientiSortAsc;
+
+  data.sort((a, b) => {
+    let va = a[field], vb = b[field];
+    if (typeof va === 'string') return asc ? va.localeCompare(vb) : vb.localeCompare(va);
+    return asc ? va - vb : vb - va;
+  });
+
+  tableStates['clienti'].rows = data.map(r => {
+    const ggrColor = r.ggr >= 0 ? 'var(--green)' : 'var(--red)';
+    const cabs = r.cabinets.size > 0 ? Array.from(r.cabinets).join(', ') : '-';
+    const gams = r.games.size > 0 ? Array.from(r.games).join(', ') : '-';
+    return `<tr>
+      <td>${i+1}</td><td style="font-weight:600; color:var(--text);">${r.name}</td>
+      <td class="num" style="font-weight:600; color:var(--blue);">${r.sessions_count}</td>
+      <td><span style="background:var(--surface2); padding:2px 6px; border-radius:4px; font-size:10px;">${r.last_session}</span></td>
+      <td style="color:var(--muted);">${getLocName(r.location_id)}</td>
+      <td style="max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${cabs}">${cabs}</td>
+      <td style="max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${gams}">${gams}</td>
+      <td class="num">${fmt(r.bet)}</td>
+      <td class="num" style="color:${ggrColor}; font-weight:700;">${fmt(r.ggr)}</td>
+    </tr>`;
+  });
+
+  renderTablePaginated('clienti');
+
+  document.querySelectorAll('#tab-clienti thead th').forEach(th => {
+    th.textContent = th.textContent.replace(' ▲','').replace(' ▼','');
+  });
+  const h = document.getElementById('th-clienti-' + field);
+  if (h) h.textContent += asc ? ' ▲' : ' ▼';
+};
+
+window.sortDashClienti = function(field) {
+  if (window._dashClientiSortField === field) window._dashClientiSortAsc = !window._dashClientiSortAsc;
+  else { window._dashClientiSortField = field; window._dashClientiSortAsc = false; }
+  window.renderDashClientiTable();
+};
+
 async function loadAll(){
   const{s,e}=getPeriod();
   if(!s||!e)return;
   showLoader(true);
   try{
-    await Promise.all([loadKPI(s,e),loadTrend(s,e),loadLocations(s,e),loadProviders(s,e),loadTypes(s,e),loadCabinets(s,e),loadCalendars(s,e),loadMachines(),loadTop10Games()]);
+    await Promise.all([loadKPI(s,e),loadTrend(s,e),loadLocations(s,e),loadProviders(s,e),loadTypes(s,e),loadCabinets(s,e),loadCalendars(s,e),loadMachines(),loadTop10Games(),loadDashClienti(s,e)]);
     if (document.getElementById('view-rapoarte') && document.getElementById('view-rapoarte').classList.contains('active')) {
       const hh  = document.getElementById('rep-page-hh');
       const mg  = document.getElementById('rep-page-multigame');
@@ -1368,6 +1469,9 @@ async function loadAll(){
     }
     if (document.getElementById('view-live')?.classList.contains('active')) {
       loadLive();
+    }
+    if (document.getElementById('view-cheltuieli')?.classList.contains('active')) {
+      loadExpensesReport();
     }
   }
   catch(err){console.error('loadAll error:', err);}
@@ -1539,6 +1643,12 @@ window.addEventListener('hashchange', () => {
   const tlSection = document.querySelector('.timeline-section');
   if(tlSection) tlSection.style.display = mainHash === 'live' ? 'none' : '';
 
+  if(mainHash === 'cheltuieli') {
+    loadExpensesReport();
+    const btnExpSettings = document.getElementById('btn-exp-settings');
+    if (btnExpSettings) btnExpSettings.style.display = (currentUser && currentUser.role === 'Super Admin') ? 'inline-flex' : 'none';
+  }
+
   if(mainHash === 'rapoarte') {
     document.getElementById('subnav-rapoarte').style.display = 'block';
     if(window.innerWidth <= 1024) toggleSidebar();
@@ -1550,7 +1660,7 @@ window.addEventListener('hashchange', () => {
         subLink.classList.add('active');
       }
       
-document.querySelectorAll('.rep-page').forEach(p => p.style.display = 'none');
+      document.querySelectorAll('.rep-page').forEach(p => p.style.display = 'none');
       const repTarget = document.getElementById('rep-page-' + subHash);
       if (repTarget) repTarget.style.display = 'block';
       
@@ -1567,9 +1677,9 @@ document.querySelectorAll('.rep-page').forEach(p => p.style.display = 'none');
         if(kpiExp)   kpiExp.style.display   = 'block';
         if(kpiGrid)  kpiGrid.style.gridTemplateColumns = 'repeat(4,1fr)';
       } else {
-        if(kpiJp)    kpiJp.style.display    = 'flex';
-        if(kpiGames) kpiGames.style.display = 'flex';
-        if(kpiAp)    kpiAp.style.display    = 'flex';
+        if(kpiJp)    kpiJp.style.display    = 'block';
+        if(kpiGames) kpiGames.style.display = 'block';
+        if(kpiAp)    kpiAp.style.display    = 'block';
         if(kpiExp)   kpiExp.style.display   = 'none';
         if(kpiGrid)  kpiGrid.style.gridTemplateColumns = '';
       }
@@ -1625,6 +1735,25 @@ document.querySelectorAll('.rep-page').forEach(p => p.style.display = 'none');
   }
   if(mainHash === 'live') loadLive();
   if(mainHash === 'dashboard') loadAll();
+
+  // Show/Hide kpi-profit (Expenses & Net Profit) based on context
+  const kpiProfit = document.getElementById('kpi-profit');
+  const globalKpiGrid = document.querySelector('.kpi-grid');
+  if (mainHash === 'dashboard' || (mainHash === 'rapoarte' && subHash === 'cheltuieli')) {
+    if (kpiProfit) kpiProfit.style.display = '';
+    if (globalKpiGrid && mainHash === 'dashboard') {
+      globalKpiGrid.style.gridTemplateColumns = '';
+    }
+  } else {
+    if (kpiProfit) kpiProfit.style.display = 'none';
+    if (globalKpiGrid) {
+      if (window.innerWidth > 1200) {
+        globalKpiGrid.style.gridTemplateColumns = 'repeat(5, 1fr)';
+      } else {
+        globalKpiGrid.style.gridTemplateColumns = '';
+      }
+    }
+  }
 });
 
 let hourlyTrendChart = null;
@@ -2110,9 +2239,9 @@ document.querySelectorAll('.rep-page').forEach(p => p.style.display = 'none');
         if(kpiExp) kpiExp.style.display = 'block';
         if(kpiGrid2) kpiGrid2.style.gridTemplateColumns = 'repeat(4,1fr)';
       } else {
-        if(kpiJp) kpiJp.style.display = 'flex';
-        if(kpiGames2) kpiGames2.style.display = 'flex';
-        if(kpiAp2) kpiAp2.style.display = 'flex';
+        if(kpiJp) kpiJp.style.display = 'block';
+        if(kpiGames2) kpiGames2.style.display = 'block';
+        if(kpiAp2) kpiAp2.style.display = 'block';
         if(kpiExp) kpiExp.style.display = 'none';
         if(kpiGrid2) kpiGrid2.style.gridTemplateColumns = '';
       }
@@ -2146,28 +2275,10 @@ window.closeLocAnalysisPage = function() {
   if (prevHash.startsWith('#rapoarte/')) {
       document.getElementById('view-rapoarte').classList.add('active');
       const subHash = prevHash.replace('#rapoarte/', '');
-document.querySelectorAll('.rep-page').forEach(p => p.style.display = 'none');
+      document.querySelectorAll('.rep-page').forEach(p => p.style.display = 'none');
       const repTarget = document.getElementById('rep-page-' + subHash);
       if (repTarget) repTarget.style.display = 'block';
       
-      const kpiJp = document.getElementById('kpi-jp');
-      const kpiExp = document.getElementById('kpi-total-expenses');
-      const kpiGrid2 = document.querySelector('.kpi-grid');
-      const kpiGames2 = document.getElementById('kpi-games');
-      const kpiAp2 = document.getElementById('kpi-aparate');
-      if (subHash === 'cheltuieli') {
-        if(kpiJp) kpiJp.style.display = 'none';
-        if(kpiGames2) kpiGames2.style.display = 'none';
-        if(kpiAp2) kpiAp2.style.display = 'none';
-        if(kpiExp) kpiExp.style.display = 'block';
-        if(kpiGrid2) kpiGrid2.style.gridTemplateColumns = 'repeat(4,1fr)';
-      } else {
-        if(kpiJp) kpiJp.style.display = 'flex';
-        if(kpiGames2) kpiGames2.style.display = 'flex';
-        if(kpiAp2) kpiAp2.style.display = 'flex';
-        if(kpiExp) kpiExp.style.display = 'none';
-        if(kpiGrid2) kpiGrid2.style.gridTemplateColumns = '';
-      }
       const prevNav = document.querySelector(`.nav-item[href="#rapoarte"]`);
       if (prevNav) prevNav.classList.add('active');
       const subLink = document.querySelector(`.subnav-group .nav-item[href="#rapoarte/${subHash}"]`);
@@ -3192,7 +3303,7 @@ window.loadMultigameReport = window.loadMultigame = async function() {
 };
 
 window.filterClientiTable = function(q) {
-  const norm = str => (str||'').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const norm = str => (str||'').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   q = norm(q);
   const st = tableStates['rep-clienti'];
   if (!st || !st.allRows) return;
@@ -3784,7 +3895,7 @@ window.loadClientiReport = async function() {
     // Apply existing search filter if any
     const searchVal = document.getElementById('clienti-search').value;
     if (searchVal) {
-      const norm = str => (str||'').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      const norm = str => (str||'').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       tableStates['rep-clienti'].rows = htmlRows.filter(r => norm(r).includes(norm(searchVal)));
     } else {
       tableStates['rep-clienti'].rows = [...htmlRows];
@@ -3844,7 +3955,7 @@ window.loadRapoarteCashout = async function() {
 
 window.filterCashoutTable = function() {
   const data = window._cashoutRawData || [];
-  const q = (document.getElementById('csh-search')?.value || '').toLowerCase();
+  const q = (document.getElementById('csh-search')?.value || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const locF = document.getElementById('csh-filter-loc')?.value || '';
   const tipF = document.getElementById('csh-filter-tip')?.value || '';
   
@@ -3860,7 +3971,7 @@ window.filterCashoutTable = function() {
     if (locF && r.locatie !== locF) return false;
     if (tipF && tip !== tipF) return false;
     if (q) {
-      const haystack = [r.player_name, r.locatie, r.serial_nr, String(r.machine_id), r.producator].join(' ').toLowerCase();
+      const haystack = [r.player_name, r.locatie, r.serial_nr, String(r.machine_id), r.producator].join(' ').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       if (!haystack.includes(q)) return false;
     }
     return true;
@@ -4001,9 +4112,10 @@ async function checkAuth() {
       avatarEl.textContent = initials;
     }
     
-    // Hide admin sections if not Super Admin
+    // Hide admin sections if not Super Admin, except on localhost for local development
     const adminLinks = document.querySelectorAll('a[href^="#admin"]');
-    if (currentUser.role !== 'Super Admin') {
+    const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (currentUser.role !== 'Super Admin' && !isLocalHost) {
       adminLinks.forEach(el => el.style.display = 'none');
       document.querySelector('.nav-section-title').style.display = 'none';
       
@@ -4026,6 +4138,11 @@ async function checkAuth() {
     } else {
       adminLinks.forEach(el => el.style.display = 'flex');
       document.querySelector('.nav-section-title').style.display = 'block';
+      if (isLocalHost) {
+        document.querySelectorAll('a.nav-item').forEach(link => {
+          link.style.display = '';
+        });
+      }
     }
   } catch (err) {
     // handled by apiAuth
@@ -4045,7 +4162,8 @@ window.toggleLoginPassword = function() {
 }
 
 window.doLogin = async function(e) {
-  // Allow native submit to hidden iframe
+  if (e) e.preventDefault();
+  
   const email = document.getElementById('login-email').value;
   const pwd = document.getElementById('login-password').value;
   const remember = document.getElementById('login-remember')?.checked;
@@ -4184,7 +4302,7 @@ function renderUtilizatori() {
 
 window.copyInv = function(code) {
   const link = window.location.origin + window.location.pathname + '#invite/' + code;
-  navigator.clipboard.writeText(link).then(() => alert('Link copiat!'));
+  navigator.clipboard.writeText(link).then(() => showAlert('Link copiat!'));
 }
 
 window.deleteInv = async function(code) {
@@ -4268,14 +4386,14 @@ window.saveEditedUser = async function() {
   const locations = Array.from(document.querySelectorAll('.eu-loc-cb:checked')).map(cb => parseInt(cb.value, 10));
   const permissions = JSON.stringify({ pages, locations, avatar });
   const name = nume + (prenume ? ' ' + prenume : '');
-  if (!nume || !email) return alert('Numele și Email-ul sunt obligatorii!');
+  if (!nume || !email) return showAlert('Numele și Email-ul sunt obligatorii!');
   try {
     const res = await apiAuth(`/api/users/${id}`, {
       method: 'PUT',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({name, email, phone, permissions})
     });
-    if (res.error) alert(res.error);
+    if (res.error) showAlert(res.error);
     else {
       document.getElementById('edit-user-modal').classList.remove('show');
       loadAdminUtilizatori();
@@ -4298,9 +4416,10 @@ window.saveEditedUser = async function() {
   } catch(e) { console.error(e); }
 };
 
-async function deleteUser(id) {
-  if (!confirm('Sigur ștergi acest utilizator?')) return;
-  try { await apiAuth(`/api/users/${id}`, {method: 'DELETE'}); loadAdminUtilizatori(); } catch(e) { console.error(e); }
+function deleteUser(id) {
+  showConfirm("Sigur ștergi acest utilizator?", async () => {
+    try { await apiAuth(`/api/users/${id}`, {method: 'DELETE'}); loadAdminUtilizatori(); } catch(e) { console.error(e); }
+  });
 }
 
 // ─── ADMIN SLOTURI ────────────────────────────────────────────────────────────
@@ -4311,14 +4430,14 @@ async function loadAdminSloturi() {
 }
 
 window.renderSloturi = function() {
-  const q = document.getElementById('slot-search')?.value.toLowerCase() || '';
+  const q = document.getElementById('slot-search')?.value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") || '';
   const globalLocEl = document.getElementById('global-loc-select');
   const locId = globalLocEl ? globalLocEl.value : '';
   if (!tableStates['admin-sloturi']) tableStates['admin-sloturi'] = { page: 1, limit: 50, rows: [] };
   let filtered = allSlots.filter(s => {
     if (locId && locId !== 'all' && String(s.location_id) !== String(locId)) return false;
     if (q) {
-      const txt = `${s.serial_nr} ${s.locatie} ${s.mix} ${s.provider} ${s.cabinet}`.toLowerCase();
+      const txt = `${s.serial_nr} ${s.locatie} ${s.mix} ${s.provider} ${s.cabinet}`.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
       if (!txt.includes(q)) return false;
     }
     return true;
@@ -4471,7 +4590,7 @@ window.generateInvite = async function() {
   const locations = Array.from(document.querySelectorAll('.nu-loc-cb:checked')).map(cb => parseInt(cb.value, 10));
   const permissions = JSON.stringify({ pages, locations });
 
-  if (!email) return alert("Scrie adresa de email!");
+  if (!email) return showAlert("Scrie adresa de email!");
   
   document.getElementById('nu-generate-btn').innerText = 'Se genereaza...';
   
@@ -4482,7 +4601,7 @@ window.generateInvite = async function() {
       body: JSON.stringify({email, role, permissions})
     });
     if (res.error) {
-      alert(res.error);
+      showAlert(res.error);
     } else {
       const link = window.location.origin + window.location.pathname + '#invite/' + res.code;
       document.getElementById('nu-link-copy').value = link;
@@ -4498,7 +4617,7 @@ window.copyInviteLink = function() {
   const linkInput = document.getElementById('nu-link-copy');
   linkInput.select();
   document.execCommand('copy');
-  alert('Link-ul a fost copiat în clipboard!');
+  showAlert('Link-ul a fost copiat în clipboard!');
 }
 
 async function handleInviteHash(code) {
@@ -4549,7 +4668,7 @@ window.doRegister = async function(e) {
       errEl.textContent = data.error;
     } else {
       // successful registration
-      alert("Cont creat cu succes! Acum te poți autentifica.");
+      showAlert("Cont creat cu succes! Acum te poți autentifica.");
       window.location.hash = '';
       window.location.reload();
     }
@@ -4748,8 +4867,8 @@ window.changeExpPerPage = function(val) {
   window.renderExpensesTable();
 }
 window.changeExpPage = function(dir) {
-  const q = (document.getElementById('exp-search')?.value || '').toLowerCase();
-  const filtered = _expensesData.filter(r => !q || [r.explanation, r.location_name, r.department_name, r.vendor_name, r.expenditure_type_name].join(' ').toLowerCase().includes(q));
+  const q = (document.getElementById('exp-search')?.value || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const filtered = _expensesData.filter(r => !q || [r.explanation, r.location_name, r.department_name, r.vendor_name, r.expenditure_type_name].join(' ').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(q));
   const totalPages = _expPerPage >= 999999 ? 1 : Math.ceil(filtered.length / _expPerPage);
   _expPage = Math.max(1, Math.min(_expPage + dir, totalPages));
   window.renderExpensesTable();
@@ -4767,6 +4886,7 @@ window.loadExpensesReport = async function() {
     populateExpFilterOptions();
     window.renderExpensesTable();
     window.renderExpCharts();
+    window.renderExpSummary();
     
     // Update Total Cheltuieli KPI directly from data (no extra API call needed)
     const totalExp = _expensesData.reduce((sum, r) => sum + (r.amount || 0), 0);
@@ -4785,16 +4905,113 @@ window.loadExpensesReport = async function() {
   }
 }
 
+window.switchExpTab = function(tab) {
+  document.getElementById('exp-tab-btn-summary').style.borderBottomColor = (tab === 'summary') ? 'var(--accent)' : 'transparent';
+  document.getElementById('exp-tab-btn-summary').style.color = (tab === 'summary') ? 'var(--accent)' : 'var(--muted)';
+  
+  document.getElementById('exp-tab-btn-details').style.borderBottomColor = (tab === 'details') ? 'var(--accent)' : 'transparent';
+  document.getElementById('exp-tab-btn-details').style.color = (tab === 'details') ? 'var(--accent)' : 'var(--muted)';
+  
+  document.getElementById('exp-tab-summary').style.display = (tab === 'summary') ? 'block' : 'none';
+  document.getElementById('exp-tab-details').style.display = (tab === 'details') ? 'block' : 'none';
+}
 
-window.filterExpensesTable = function() { window.renderExpensesTable(); }
+window.renderExpSummary = function() {
+  const q = (document.getElementById('exp-search')?.value || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const filtered = typeof getExpFiltered === 'function' ? getExpFiltered() : _expensesData.filter(r => !q || [r.explanation, r.location_name, r.department_name, r.vendor_name, r.expenditure_type_name].join(' ').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(q));
+
+  // Get unique departments and locations
+  const depsMap = {};
+  const locsMap = {};
+  
+  for (const r of filtered) {
+    const dName = r.department_name || 'Fără Dep.';
+    const lName = r.location_name || 'Fără Locație';
+    
+    if (!depsMap[dName]) depsMap[dName] = 0;
+    if (!locsMap[lName]) locsMap[lName] = {};
+    if (!locsMap[lName][dName]) locsMap[lName][dName] = 0;
+    
+    depsMap[dName] += r.amount;
+    locsMap[lName][dName] += r.amount;
+  }
+  
+  const deps = Object.keys(depsMap).sort();
+  const locs = Object.keys(locsMap).sort();
+  
+  const thead = document.getElementById('head-exp-summary');
+  const tbody = document.getElementById('body-exp-summary');
+  if (!thead || !tbody) return;
+  
+  let thHtml = '<tr><th>Locație</th>';
+  for (const d of deps) {
+    thHtml += `<th class="num">${d}</th>`;
+  }
+  thHtml += '<th class="num">Total</th></tr>';
+  thead.innerHTML = thHtml;
+  
+  let tbHtml = '';
+  let grandTotal = 0;
+  
+  for (const l of locs) {
+    let locTotal = 0;
+    tbHtml += `<tr><td style="font-weight:600; color:var(--accent);">${l}</td>`;
+    
+    for (const d of deps) {
+      const amt = locsMap[l][d] || 0;
+      locTotal += amt;
+      tbHtml += `<td class="num">${amt > 0 ? fmt(amt) : '-'}</td>`;
+    }
+    
+    grandTotal += locTotal;
+    tbHtml += `<td class="num" style="font-weight:700; color:var(--red);">${fmt(locTotal)}</td></tr>`;
+  }
+  
+  // Total row
+  if (locs.length > 0) {
+    tbHtml += `<tr style="background:var(--surface2);"><td style="font-weight:700;">TOTAL GENERAL</td>`;
+    for (const d of deps) {
+      tbHtml += `<td class="num" style="font-weight:700;">${fmt(depsMap[d])}</td>`;
+    }
+    tbHtml += `<td class="num" style="font-weight:800; color:var(--red);">${fmt(grandTotal)}</td></tr>`;
+  } else {
+    tbHtml += `<tr><td colspan="${deps.length + 2}" style="text-align:center; color:var(--muted); padding:20px;">Nu există date conform filtrelor selectate.</td></tr>`;
+  }
+  
+  tbody.innerHTML = tbHtml;
+}
+
+
+window.filterExpensesTable = function() { 
+  window.renderExpensesTable(); 
+  window.renderExpSummary();
+}
 window.filterExpenses = window.filterExpensesTable;
 
+window.deleteExpense = async function(id) {
+  appConfirm('Ești sigur că vrei să ștergi această cheltuială? Această acțiune este ireversibilă.', async () => {
+    try {
+      const r = await fetch(API + '/api/admin/expenses/' + id, { method: 'DELETE' });
+      const res = await r.json();
+      if (res.success) {
+        if (typeof loadExpensesData !== 'undefined') loadExpensesData();
+        else if (typeof window.loadExpensesReport === 'function') window.loadExpensesReport();
+      } else {
+        appAlert('Eroare: ' + (res.error || 'Nu s-a putut șterge.'));
+      }
+    } catch(e) {
+      console.error(e);
+      appAlert('Eroare la ștergere.');
+    }
+  });
+}
+
 window.exportExpensesCSV = function() {
-  if (!_expensesData || !_expensesData.length) { alert('Nu există date de exportat.'); return; }
-  const q = (document.getElementById('exp-search')?.value || '').toLowerCase();
+  if (!_expensesData || !_expensesData.length) { showAlert('Nu există date de exportat.'); return; }
+  const q = (document.getElementById('exp-search')?.value || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const rows = _expensesData.filter(r => {
     if (!q) return true;
-    return [r.explanation, r.location_name, r.department_name, r.vendor_name, r.expenditure_type_name].join(' ').toLowerCase().includes(q);
+    return [r.explanation, r.location_name, r.department_name, r.vendor_name, r.expenditure_type_name].join(' ').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(q);
   });
   const bom = '\uFEFF';
   const header = ['Data','Locatie','Departament','Categorie','Furnizor','Explicatie','Suma (RON)'];
@@ -4808,13 +5025,57 @@ window.exportExpensesCSV = function() {
   a.click();
 }
 
+let _expSortCol = 'date';
+let _expSortDir = 'desc';
+
+window.sortExpenses = function(col) {
+  if (_expSortCol === col) {
+    _expSortDir = _expSortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    _expSortCol = col;
+    _expSortDir = 'asc';
+  }
+  _expPage = 1;
+  window.renderExpensesTable();
+}
+
 window.renderExpensesTable = function() {
   const tbody = document.getElementById('body-rep-cheltuieli');
   if (!tbody) return;
-  const q = (document.getElementById('exp-search')?.value || '').toLowerCase();
+  const q = (document.getElementById('exp-search')?.value || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   
   // Filter (includes dropdown filters)
-  const filtered = typeof getExpFiltered === 'function' ? getExpFiltered() : _expensesData.filter(r => !q || [r.explanation, r.location_name, r.department_name, r.vendor_name, r.expenditure_type_name].join(' ').toLowerCase().includes(q));
+  let filtered = typeof getExpFiltered === 'function' ? getExpFiltered() : _expensesData.filter(r => !q || [r.explanation, r.location_name, r.department_name, r.vendor_name, r.expenditure_type_name].join(' ').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(q));
+  
+  
+  // Actualizare Bula Search
+  const searchInput = document.getElementById('exp-search');
+  const searchBubble = document.getElementById('exp-search-counter');
+  if (searchInput && searchBubble) {
+    if (q.trim() !== "") {
+      searchBubble.style.display = "inline-block";
+      searchBubble.textContent = filtered.length;
+    } else {
+      searchBubble.style.display = "none";
+    }
+  }
+
+// Sort
+filtered.sort((a, b) => {
+    let valA = a[_expSortCol] || '';
+    let valB = b[_expSortCol] || '';
+    
+    if (typeof valA === 'number' && typeof valB === 'number') {
+      return _expSortDir === 'asc' ? valA - valB : valB - valA;
+    }
+    
+    valA = String(valA).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    valB = String(valB).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    
+    if (valA < valB) return _expSortDir === 'asc' ? -1 : 1;
+    if (valA > valB) return _expSortDir === 'asc' ? 1 : -1;
+    return 0;
+  });
   
   // Pagination
   const perPage = _expPerPage >= 999999 ? filtered.length : _expPerPage;
@@ -4838,13 +5099,21 @@ window.renderExpensesTable = function() {
     
     html += `
       <tr>
+        <td style="text-align:center;">${r.is_manual ? `<input type="checkbox" class="exp-row-cb" value="${r.id}" onclick="updateExpBulkToolbar()" style="cursor:pointer;">` : ''}</td>
         <td style="white-space:nowrap;font-size:11px;color:var(--muted)">${r.date}</td>
-        <td style="color:var(--accent);font-weight:600">${r.location_name}</td>
-        <td>${r.department_name}</td>
-        <td>${r.expenditure_type_name}</td>
-        <td>${r.vendor_name}</td>
-        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.explanation}">${r.explanation}</td>
+        <td style="color:var(--accent);font-weight:600">${r.location_name || '-'}</td>
+        <td>${r.department_name || '-'}</td>
+        <td>${r.expenditure_type_name || '-'}</td>
+        <td>${r.vendor_name || '-'}</td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.explanation}">${r.explanation || '-'}</td>
         <td class="num" style="color:var(--red);font-weight:700">${fmt(r.amount)}</td>
+        
+        <td style="text-align:center;">
+          ${r.id && r.is_manual ? `<div style="display:flex; justify-content:center; gap:4px;">
+            <button onclick="openEditExpense('${r.id}')" style="background:none;border:none;cursor:pointer;color:var(--text);padding:4px;border-radius:4px;display:flex;align-items:center;justify-content:center;transition:background 0.2s;" onmouseover="this.style.background='var(--surface)'" onmouseout="this.style.background='none'" title="Modifică">✎</button>
+            <button onclick="deleteExpense('${r.id}')" style="background:none;border:none;cursor:pointer;color:var(--red);padding:4px;border-radius:4px;display:flex;align-items:center;justify-content:center;transition:background 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.1)'" onmouseout="this.style.background='none'" title="Șterge"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>
+          </div>` : ''}
+        </td>
       </tr>
     `;
   }
@@ -4854,20 +5123,22 @@ window.renderExpensesTable = function() {
   const totalAll = _expensesData.reduce((s, r) => s + r.amount, 0); // all data (no filter)
   const isFiltered = filtered.length < _expensesData.length;
   
-  if (!html) html = `<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">Nu s-au găsit cheltuieli.</td></tr>`;
+  if (!html) html = `<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--muted)">Nu s-au găsit cheltuieli.</td></tr>`;
   else {
     const showPageTotal = perPage < filtered.length; // only show page total if there's more than 1 page
     html += `
       ${showPageTotal ? `
       <tr style="background:var(--surface2)">
-        <td colspan="6" style="text-align:right;font-weight:600;color:var(--muted);padding:6px 12px;font-size:11px;">Total Pagina ${_expPage}:</td>
+        <td colspan="7" style="text-align:right;font-weight:600;color:var(--muted);padding:6px 12px;font-size:11px;">Total Pagina ${_expPage}:</td>
         <td class="num" style="color:var(--muted);font-weight:700;font-size:12px;padding:6px 12px;">${fmt(total)} RON</td>
-      </tr>` : ''}
+        <td></td>
+</tr>` : ''}
       <tr style="background:var(--surface2); border-top:2px solid var(--border)">
-        <td colspan="6" style="text-align:right;font-weight:800;color:var(--text);padding:10px 12px;">${isFiltered ? 'Total Filtrat:' : 'Total General:'}</td>
+        <td colspan="7" style="text-align:right;font-weight:800;color:var(--text);padding:10px 12px;">${isFiltered ? 'Total Filtrat:' : 'Total General:'}</td>
         <td class="num" style="color:var(--red);font-weight:800;font-size:14px;padding:10px 12px;">${fmt(totalGeneral)} RON</td>
-      </tr>
-      ${isFiltered ? `<tr style="background:var(--surface2)"><td colspan="6" style="text-align:right;font-size:11px;color:var(--muted);padding:4px 12px;">Total General (fara filtre):</td><td class="num" style="font-size:11px;color:var(--muted);padding:4px 12px;">${fmt(totalAll)} RON</td></tr>` : ''}
+        <td></td>
+</tr>
+${isFiltered ? `<tr style="background:var(--surface2)"><td colspan="7" style="text-align:right;font-size:11px;color:var(--muted);padding:4px 12px;">Total General (fara filtre):</td><td class="num" style="font-size:11px;color:var(--muted);padding:4px 12px;">${fmt(totalAll)} RON</td><td></td></tr>` : ''}
     `;
   }
   
@@ -4887,15 +5158,15 @@ window.resetExpFilters = function() {
 }
 
 function getExpFiltered() {
-  const q   = (document.getElementById('exp-search')?.value || '').toLowerCase();
+  const q   = (document.getElementById('exp-search')?.value || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const loc = document.getElementById('exp-filter-loc')?.value || '';
   const dep = document.getElementById('exp-filter-dep')?.value || '';
   const tip = document.getElementById('exp-filter-tip')?.value || '';
   return _expensesData.filter(r => {
-    if (q && ![r.explanation, r.location_name, r.department_name, r.vendor_name, r.expenditure_type_name].join(' ').toLowerCase().includes(q)) return false;
-    if (loc && (r.location_name||'').toLowerCase() !== loc) return false;
-    if (dep && (r.department_name||'').toLowerCase() !== dep) return false;
-    if (tip && (r.expenditure_type_name||'').toLowerCase() !== tip) return false;
+    if (q && ![r.explanation, r.location_name, r.department_name, r.vendor_name, r.expenditure_type_name].join(' ').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(q)) return false;
+    if (loc && (r.location_name||'').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") !== loc) return false;
+    if (dep && (r.department_name||'').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") !== dep) return false;
+    if (tip && (r.expenditure_type_name||'').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") !== tip) return false;
     return true;
   });
 }
@@ -4907,54 +5178,115 @@ function populateExpFilterOptions() {
   const locEl = document.getElementById('exp-filter-loc');
   const depEl = document.getElementById('exp-filter-dep');
   const tipEl = document.getElementById('exp-filter-tip');
-  if (locEl) locEl.innerHTML = '<option value="">Toate locațiile</option>' + locs.map(l => `<option value="${l.toLowerCase()}">${l}</option>`).join('');
-  if (depEl) depEl.innerHTML = '<option value="">Toate departamentele</option>' + deps.map(d => `<option value="${d.toLowerCase()}">${d}</option>`).join('');
-  if (tipEl) tipEl.innerHTML = '<option value="">Toate tipurile</option>' + tips.map(t => `<option value="${t.toLowerCase()}">${t}</option>`).join('');
+  if (locEl) locEl.innerHTML = '<option value="">Toate locațiile</option>' + locs.map(l => `<option value="${l.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")}">${l}</option>`).join('');
+  if (depEl) depEl.innerHTML = '<option value="">Toate departamentele</option>' + deps.map(d => `<option value="${d.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")}">${d}</option>`).join('');
+  if (tipEl) tipEl.innerHTML = '<option value="">Toate tipurile</option>' + tips.map(t => `<option value="${t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")}">${t}</option>`).join('');
 }
 
 window.renderExpCharts = function() {
   const data = getExpFiltered();
-  const COLORS = ['#8b5cf6','#6366f1','#3b82f6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#14b8a6','#84cc16'];
+  // Vibrant, highly distinct UI colors for charts
+  const COLORS = ['#FF3366', '#20D6B5', '#F5A623', '#9B51E0', '#3498DB', '#F1C40F', '#E74C3C', '#2ECC71', '#34495E', '#1ABC9C'];
 
-  // Chart 1: per department (horizontal bar sorted desc)
+  // Chart 0: per location (Doughnut)
+  const locMap = {};
+  data.forEach(r => { const l = r.location_name||'Altele'; locMap[l] = (locMap[l]||0) + r.amount; });
+  const loc8 = Object.entries(locMap).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const c0 = document.getElementById('exp-chart-loc');
+  if (c0) {
+    if (window._expChartLoc) window._expChartLoc.destroy();
+    window._expChartLoc = new Chart(c0, { type:'doughnut',
+      data:{ labels:loc8.map(([k])=>k.length>14?k.slice(0,12)+'…':k), datasets:[{data:loc8.map(([,v])=>v), backgroundColor:COLORS, borderWidth:0}] },
+      options:{ 
+        responsive:true, maintainAspectRatio:false, cutout:'65%', 
+        plugins:{legend:{position:'right', labels:{color:'#94a3b8', font:{size:9}, boxWidth:8}}},
+        onHover: (e, elements) => { e.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
+        onClick: (e, elements) => {
+          if (elements.length > 0) {
+            const idx = elements[0].index;
+            const clickedLoc = loc8[idx][0].toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            const filterEl = document.getElementById('exp-filter-loc');
+            if (filterEl && clickedLoc !== 'altele' && clickedLoc !== 'fără locație') {
+              filterEl.value = clickedLoc;
+              applyExpFilters();
+            }
+          }
+        }
+      }
+    });
+  }
+
+  // Chart 1: per department (horizontal bar sorted desc) -> Premium Bar
   const depMap = {};
   data.forEach(r => { const d = r.department_name||'Altele'; depMap[d] = (depMap[d]||0) + r.amount; });
   const dep10 = Object.entries(depMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
   const c1 = document.getElementById('exp-chart-dep');
   if (c1) {
-    if (_expChartDep) _expChartDep.destroy();
-    _expChartDep = new Chart(c1, { type:'bar', indexAxis:'y',
-      data:{ labels:dep10.map(([k])=>k.length>18?k.slice(0,16)+'…':k), datasets:[{data:dep10.map(([,v])=>v), backgroundColor:COLORS, borderRadius:4}] },
-      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
-        scales:{ x:{ticks:{font:{size:9},color:'#94a3b8', callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}}, y:{ticks:{font:{size:9},color:'#94a3b8'}} } }
+    if (window._expChartDep) window._expChartDep.destroy();
+    window._expChartDep = new Chart(c1, { type:'bar', indexAxis:'y',
+      data:{ labels:dep10.map(([k])=>k.length>18?k.slice(0,16)+'…':k), datasets:[{data:dep10.map(([,v])=>v), backgroundColor:COLORS, borderRadius:6, barPercentage: 0.7}] },
+      options:{ 
+        responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+        scales:{ x:{grid:{color:'rgba(255,255,255,0.05)'}, ticks:{font:{size:9},color:'#94a3b8', callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}}, y:{grid:{display:false}, ticks:{font:{size:9, weight:'600'},color:'#cbd5e1'}} },
+        onHover: (e, elements) => { e.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
+        onClick: (e, elements) => {
+          if (elements.length > 0) {
+            const idx = elements[0].index;
+            const clickedDep = dep10[idx][0].toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            const filterEl = document.getElementById('exp-filter-dep');
+            if (filterEl && clickedDep !== 'altele' && clickedDep !== 'fără dep.') {
+              filterEl.value = clickedDep;
+              applyExpFilters();
+            }
+          }
+        }
+      }
     });
   }
 
-  // Chart 2: evolution in time
+  // Chart 2: evolution in time -> Beautiful line with gradient
   const timeMap = {};
   data.forEach(r => { timeMap[r.date] = (timeMap[r.date]||0) + r.amount; });
   const times = Object.entries(timeMap).sort((a,b)=>a[0].localeCompare(b[0]));
   const c2 = document.getElementById('exp-chart-time');
   if (c2) {
-    if (_expChartTime) _expChartTime.destroy();
-    _expChartTime = new Chart(c2, { type:'line',
-      data:{ labels:times.map(([k])=>k.slice(5)), datasets:[{data:times.map(([,v])=>v), borderColor:'#8b5cf6', backgroundColor:'rgba(139,92,246,0.12)', fill:true, tension:0.4, pointRadius:2, borderWidth:2}] },
-      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
-        scales:{ x:{ticks:{font:{size:9},color:'#94a3b8',maxRotation:50}}, y:{ticks:{font:{size:9},color:'#94a3b8', callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}} } }
+    const ctx = c2.getContext('2d');
+    const grad = ctx.createLinearGradient(0,0,0,180);
+    grad.addColorStop(0, 'rgba(16, 185, 129, 0.3)');
+    grad.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+    if (window._expChartTime) window._expChartTime.destroy();
+    window._expChartTime = new Chart(ctx, { type:'line',
+      data:{ labels:times.map(([k])=>k.slice(5)), datasets:[{data:times.map(([,v])=>v), borderColor:'#10b981', backgroundColor:grad, fill:true, tension:0.4, pointRadius:3, pointBackgroundColor:'#fff', pointBorderColor:'#10b981', borderWidth:3}] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{mode:'index', intersect:false}},
+        scales:{ x:{grid:{display:false}, ticks:{font:{size:9},color:'#94a3b8',maxRotation:40}}, y:{grid:{color:'rgba(255,255,255,0.05)'}, ticks:{font:{size:9},color:'#94a3b8', callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}} } }
     });
   }
 
-  // Chart 3: top 8 types (bar)
+  // Chart 3: top 8 types (bar) -> Vertical bars
   const tipMap = {};
   data.forEach(r => { const t = r.expenditure_type_name||'Necategorizat'; tipMap[t] = (tipMap[t]||0) + r.amount; });
   const tip8 = Object.entries(tipMap).sort((a,b)=>b[1]-a[1]).slice(0,8);
   const c3 = document.getElementById('exp-chart-tip');
   if (c3) {
-    if (_expChartTip) _expChartTip.destroy();
-    _expChartTip = new Chart(c3, { type:'bar',
-      data:{ labels:tip8.map(([k])=>k.length>14?k.slice(0,12)+'…':k), datasets:[{data:tip8.map(([,v])=>v), backgroundColor:COLORS, borderRadius:4}] },
-      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
-        scales:{ x:{ticks:{font:{size:9},color:'#94a3b8',maxRotation:40}}, y:{ticks:{font:{size:9},color:'#94a3b8', callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}} } }
+    if (window._expChartTip) window._expChartTip.destroy();
+    window._expChartTip = new Chart(c3, { type:'bar',
+      data:{ labels:tip8.map(([k])=>k.length>14?k.slice(0,12)+'…':k), datasets:[{data:tip8.map(([,v])=>v), backgroundColor:COLORS, borderRadius:6, barPercentage: 0.6}] },
+      options:{ 
+        responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+        scales:{ x:{grid:{display:false}, ticks:{font:{size:9},color:'#94a3b8',maxRotation:40}}, y:{grid:{color:'rgba(255,255,255,0.05)'}, ticks:{font:{size:9},color:'#94a3b8', callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}} },
+        onHover: (e, elements) => { e.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
+        onClick: (e, elements) => {
+          if (elements.length > 0) {
+            const idx = elements[0].index;
+            const clickedTip = tip8[idx][0].toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            const filterEl = document.getElementById('exp-filter-tip');
+            if (filterEl && clickedTip !== 'necategorizat') {
+              filterEl.value = clickedTip;
+              applyExpFilters();
+            }
+          }
+        }
+      }
     });
   }
 }
@@ -4976,12 +5308,18 @@ window.loadExpensesConfig = async function() {
       <div class="exp-dep-row" data-id="${dep.id}"
         style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border-bottom:1px solid var(--border); cursor:pointer; transition:background .15s;"
         onclick="expSelectDep('${dep.id}', this)">
-        <span style="font-size:12px; color:var(--text); font-weight:500;">${dep.name}</span>
-        <label class="toggle" onclick="event.stopPropagation()">
-          <input type="checkbox" class="cfg-dep" value="${dep.id}" ${dep.is_expense ? 'checked' : ''}
-            onchange="onExpDepToggle('${dep.id}', this.checked)">
-          <span class="toggle-slider"></span>
-        </label>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <span style="font-size:12px; color:var(--text); font-weight:500;">${dep.name}</span>
+          ${dep.is_local ? `<span style="font-size:8px; background:var(--accent); color:#fff; padding:1px 4px; border-radius:3px;">LOCAL</span>` : ''}
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          ${dep.is_local ? `<button onclick="deleteLocalDepartment('${dep.id}', event)" style="background:none; border:none; cursor:pointer; color:var(--red); padding:0; display:flex; align-items:center; justify-content:center;" title="Șterge departament">×</button>` : ''}
+          <label class="toggle" onclick="event.stopPropagation()">
+            <input type="checkbox" class="cfg-dep" value="${dep.id}" ${dep.is_expense ? 'checked' : ''}
+              onchange="onExpDepToggle('${dep.id}', this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
       </div>
     `).join('');
 
@@ -5004,6 +5342,13 @@ window.expSelectDep = function(depId, el) {
   const typesEl = document.getElementById('set-exp-types');
   if (!typesEl || !dep) return;
 
+  // Întotdeauna activăm butonul Tip Nou când este selectat un departament
+  const btnType = document.getElementById('btn-add-local-type');
+  if (btnType) {
+    btnType.style.opacity = '1';
+    btnType.style.pointerEvents = 'auto';
+  }
+
   if (!dep.types || dep.types.length === 0) {
     typesEl.innerHTML = '<div style="padding:20px; text-align:center; font-size:12px; color:var(--muted);">Nicio categorie definită.</div>';
     return;
@@ -5014,13 +5359,19 @@ window.expSelectDep = function(depId, el) {
   if (masterT) masterT.checked = dep.types.length > 0 && dep.types.every(t => t.is_expense);
 
   typesEl.innerHTML = dep.types.map(t => `
-    <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 14px; border-bottom:1px solid var(--border);">
-      <span style="font-size:12px; color:var(--text);">${t.name}</span>
-      <label class="toggle">
-        <input type="checkbox" class="cfg-type" value="${t.id}" data-dep="${dep.id}" ${t.is_expense ? 'checked' : ''}
-          onchange="onExpTypeToggle('${dep.id}','${t.id}',this.checked)">
-        <span class="toggle-slider"></span>
-      </label>
+    <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border-bottom:1px solid var(--border);">
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="font-size:12px; color:var(--text);">${t.name}</span>
+        ${t.is_local ? '<span style="font-size:8px; background:var(--accent); color:#fff; padding:1px 4px; border-radius:3px;">LOCAL</span>' : ''}
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        ${t.is_local ? `<button onclick="deleteLocalType('${dep.id}', '${t.id}', event)" style="background:none; border:none; cursor:pointer; color:var(--red); padding:0; display:flex; align-items:center; justify-content:center;" title="Șterge tip">×</button>` : ''}
+        <label class="toggle">
+          <input type="checkbox" class="cfg-type" value="${t.id}" data-dep="${dep.id}" ${t.is_expense ? 'checked' : ''}
+            onchange="onExpTypeToggle('${dep.id}','${t.id}',this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
     </div>
   `).join('');
 }
@@ -5061,14 +5412,614 @@ window.expTypesAll = function(isChecked) {
 
 
 window.saveExpensesConfig = async function() {
-  const exclTypes = []; _expConfigDeps.forEach(d => (d.types||[]).forEach(t => { if(!t.is_expense && !exclTypes.includes(t.id)) exclTypes.push(t.id); }));
+  const exclTypes = []; 
+  const localDeps = [];
+  const localTypes = [];
+  
+  _expConfigDeps.forEach(d => {
+    if (d.is_local) localDeps.push({id: d.id, name: d.name});
+    (d.types||[]).forEach(t => { 
+      if(!t.is_expense && !exclTypes.includes(t.id)) exclTypes.push(t.id); 
+      if(t.is_local) localTypes.push({id: t.id, name: t.name, department_id: d.id});
+    }); 
+  });
+  
   try {
     const r = await fetch(API + '/api/admin/expenses_config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ excluded_departments: [], excluded_types: exclTypes })
+      body: JSON.stringify({ 
+        excluded_departments: [], 
+        excluded_types: exclTypes,
+        local_departments: localDeps,
+        local_types: localTypes
+      })
     });
     const res = await r.json();
     if(!res.success) console.error('Eroare la salvare configuratie cheltuieli');
   } catch(e) { console.error(e); }
+}
+
+let _promptResolve = null;
+window.customPrompt = function(title) {
+  return new Promise(resolve => {
+    _promptResolve = resolve;
+    document.getElementById('custom-prompt-title').textContent = title;
+    const input = document.getElementById('custom-prompt-input');
+    input.value = '';
+    document.getElementById('modal-custom-prompt').classList.add('show');
+    setTimeout(() => input.focus(), 50);
+  });
+}
+window.customPromptCancel = function() {
+  document.getElementById('modal-custom-prompt').classList.remove('show');
+  if(_promptResolve) { _promptResolve(null); _promptResolve = null; }
+}
+window.customPromptSubmit = function(e) {
+  if(e) e.preventDefault();
+  document.getElementById('modal-custom-prompt').classList.remove('show');
+  const val = document.getElementById('custom-prompt-input').value;
+  if(_promptResolve) { _promptResolve(val); _promptResolve = null; }
+}
+
+let _confirmResolve = null;
+window.customConfirm = function(message) {
+  return new Promise(resolve => {
+    _confirmResolve = resolve;
+    document.getElementById('custom-confirm-message').textContent = message;
+    document.getElementById('modal-custom-confirm').classList.add('show');
+  });
+}
+window.customConfirmCancel = function() {
+  document.getElementById('modal-custom-confirm').classList.remove('show');
+  if(_confirmResolve) { _confirmResolve(false); _confirmResolve = null; }
+}
+window.customConfirmSubmit = function() {
+  document.getElementById('modal-custom-confirm').classList.remove('show');
+  if(_confirmResolve) { _confirmResolve(true); _confirmResolve = null; }
+}
+
+window.addLocalDepartment = async function() {
+  const name = await customPrompt("Nume departament local:");
+  if (!name || name.trim() === '') return;
+  const id = crypto.randomUUID();
+  _expConfigDeps.push({ id: id, name: name.trim(), types: [], is_local: true, is_expense: true });
+  _expConfigDeps.sort((a,b) => {
+     if(a.is_local !== b.is_local) return a.is_local ? 1 : -1;
+     return a.name.localeCompare(b.name);
+  });
+  const depEl = document.getElementById('set-exp-deps');
+  if(depEl) {
+    depEl.innerHTML = _expConfigDeps.map(dep => `
+      <div class="exp-dep-row" data-id="${dep.id}"
+        style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border-bottom:1px solid var(--border); cursor:pointer; transition:background .15s;"
+        onclick="expSelectDep('${dep.id}', this)">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <span style="font-size:12px; color:var(--text); font-weight:500;">${dep.name}</span>
+          ${dep.is_local ? '<span style="font-size:8px; background:var(--accent); color:#fff; padding:1px 4px; border-radius:3px;">LOCAL</span>' : ''}
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          ${dep.is_local ? `<button onclick="deleteLocalDepartment('${dep.id}', event)" style="background:none; border:none; cursor:pointer; color:var(--red); padding:0; display:flex; align-items:center; justify-content:center;" title="Șterge departament">×</button>` : ''}
+          <label class="toggle" onclick="event.stopPropagation()">
+            <input type="checkbox" class="cfg-dep" value="${dep.id}" ${dep.is_expense ? 'checked' : ''}
+              onchange="onExpDepToggle('${dep.id}', this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+    `).join('');
+  }
+  saveExpensesConfig();
+}
+
+window.deleteLocalDepartment = async function(id, event) {
+  event.stopPropagation();
+  const ok = await customConfirm('Ștergi acest departament local și toate tipurile lui?');
+  if(!ok) return;
+  _expConfigDeps = _expConfigDeps.filter(d => d.id !== id);
+  const depEl = document.getElementById('set-exp-deps');
+  if(depEl) {
+    depEl.innerHTML = _expConfigDeps.map(dep => `
+      <div class="exp-dep-row" data-id="${dep.id}"
+        style="display:flex; align-items:center; justify-content:space-between; padding:8px 10px; border-bottom:1px solid var(--border); cursor:pointer; transition:background .15s;"
+        onclick="expSelectDep('${dep.id}', this)">
+        <div style="display:flex; align-items:center; gap:6px;">
+          <span style="font-size:12px; color:var(--text); font-weight:500;">${dep.name}</span>
+          ${dep.is_local ? '<span style="font-size:8px; background:var(--accent); color:#fff; padding:1px 4px; border-radius:3px;">LOCAL</span>' : ''}
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          ${dep.is_local ? `<button onclick="deleteLocalDepartment('${dep.id}', event)" style="background:none; border:none; cursor:pointer; color:var(--red); padding:0; display:flex; align-items:center; justify-content:center;" title="Șterge departament">×</button>` : ''}
+          <label class="toggle" onclick="event.stopPropagation()">
+            <input type="checkbox" class="cfg-dep" value="${dep.id}" ${dep.is_expense ? 'checked' : ''}
+              onchange="onExpDepToggle('${dep.id}', this.checked)">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+    `).join('');
+    document.getElementById('set-exp-types').innerHTML = '';
+  }
+  saveExpensesConfig();
+}
+
+window.addLocalType = async function() {
+  let depId = null;
+  document.querySelectorAll('.exp-dep-row').forEach(r => {
+    if (r.style.background && r.style.background !== '') depId = r.dataset.id;
+  });
+  if (!depId) {
+    showAlert("Selectează mai întâi un departament din stânga!");
+    return;
+  }
+  const dep = _expConfigDeps.find(d => d.id === depId);
+  if (!dep) return;
+  const name = await customPrompt("Nume tip cheltuială local:");
+  if (!name || name.trim() === '') return;
+  const id = crypto.randomUUID();
+  dep.types.push({ id: id, name: name.trim(), is_expense: true, is_local: true });
+  dep.types.sort((a,b) => {
+     if(a.is_local !== b.is_local) return a.is_local ? 1 : -1;
+     return a.name.localeCompare(b.name);
+  });
+  expSelectDep(depId, document.querySelector(`.exp-dep-row[data-id="${depId}"]`));
+  saveExpensesConfig();
+}
+
+window.deleteLocalType = async function(depId, typeId, event) {
+  event.stopPropagation();
+  const ok = await customConfirm('Ștergi acest tip local?');
+  if(!ok) return;
+  const dep = _expConfigDeps.find(d => d.id === depId);
+  if (dep) {
+    dep.types = dep.types.filter(t => t.id !== typeId);
+    expSelectDep(depId, document.querySelector(`.exp-dep-row[data-id="${depId}"]`));
+    saveExpensesConfig();
+  }
+}
+
+// ─── MANUAL EXPENSES & IMPORTS ──────────────────────────────────────────────
+
+window._expenseTypes = [];
+
+window.openAddExpenseModal = async function() {
+  const dateInput = document.getElementById('me-date');
+  if (!dateInput.value) dateInput.value = new Date().toISOString().split('T')[0];
+  document.getElementById('modal-add-expense').classList.add('show');
+  await window.fetchExpenseFormData();
+}
+
+window.fetchExpenseFormData = async function() {
+  const dateVal = document.getElementById('me-date').value || new Date().toISOString().split('T')[0];
+  try {
+    const data = await api('/api/admin/expense_form_data?date=' + dateVal);
+    
+    window._expenseTypes = data.types || [];
+    
+    let depHtml = '<option value="">Alege...</option>';
+    data.departments.forEach(d => depHtml += `<option value="${d.id}">${d.name}</option>`);
+    const depSelect = document.getElementById('me-dep');
+    const selectedDep = depSelect.value;
+    depSelect.innerHTML = depHtml;
+    if (data.departments.find(d => d.id === selectedDep)) depSelect.value = selectedDep;
+
+    window.filterExpenseTypes();
+
+    let locsHtml = '';
+    const selectedLocs = Array.from(document.querySelectorAll('input[name="me-loc"]:checked')).map(c => c.value);
+    
+    data.locations.forEach(l => {
+      const isChecked = selectedLocs.includes(l.id) ? 'checked' : '';
+      locsHtml += `<label style="display:flex; align-items:center; gap:6px; font-size:11px; cursor:pointer;"><input type="checkbox" name="me-loc" value="${l.id}" data-slots="${l.slots||0}" onchange="checkLocsSelection()" ${isChecked}> <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${l.name}">${l.name}</span> <span style="color:var(--accent); font-size:10px; font-weight:bold;">${l.slots > 0 ? `(${l.slots} sloturi)` : ''}</span></label>`;
+    });
+    document.getElementById('me-locs-container').innerHTML = locsHtml;
+    
+    // Uncheck "Selectează Tot" since we are rendering the boxes again, but preserve actual checkboxes state above
+    const allCb = document.getElementById('me-loc-all');
+    if (allCb) allCb.checked = false;
+    
+    checkLocsSelection();
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+window.filterExpenseTypes = function() {
+  const depId = document.getElementById('me-dep').value;
+  const typeSelect = document.getElementById('me-type');
+  const selectedType = typeSelect.value;
+  
+  let typeHtml = '<option value="">Alege...</option>';
+  const filtered = window._expenseTypes.filter(t => t.department_id === depId);
+  filtered.forEach(t => typeHtml += `<option value="${t.id}">${t.name}</option>`);
+  
+  typeSelect.innerHTML = typeHtml;
+  if (filtered.find(t => t.id === selectedType)) {
+    typeSelect.value = selectedType;
+  }
+}
+
+window.toggleAllLocs = function(cb) {
+  const cbs = document.querySelectorAll('input[name="me-loc"]');
+  cbs.forEach(c => c.checked = cb.checked);
+  checkLocsSelection();
+}
+
+window.checkLocsSelection = function() {
+  const cbs = document.querySelectorAll('input[name="me-loc"]:checked');
+  const strat = document.getElementById('me-split-strategy');
+  if (cbs.length > 1) {
+    strat.style.display = 'block';
+  } else {
+    strat.style.display = 'none';
+  }
+}
+
+window.submitManualExpense = async function(e) {
+  e.preventDefault();
+  const cbs = document.querySelectorAll('input[name="me-loc"]:checked');
+  if (cbs.length === 0) return showAlert('Te rog selectează cel puțin o locație.');
+  
+  const loc_ids = Array.from(cbs).map(c => c.value);
+  let split_mode = 'equal';
+  const radios = document.getElementsByName('split_mode');
+  for (let r of radios) { if (r.checked) split_mode = r.value; }
+
+  const payload = {
+    date: document.getElementById('me-date').value,
+    amount: parseFloat(document.getElementById('me-amount').value),
+    explanation: document.getElementById('me-expl').value,
+    department_id: document.getElementById('me-dep').value,
+    expenditure_type_id: document.getElementById('me-type').value,
+    loc_ids: loc_ids,
+    split_mode: loc_ids.length > 1 ? split_mode : 'equal'
+  };
+
+  const btn = e.target.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  btn.innerText = 'Se salvează...';
+
+  try {
+    const r = await fetch(API + '/api/admin/expenses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const res = await r.json();
+    if (res.success) {
+      document.getElementById('modal-add-expense').classList.remove('show');
+      e.target.reset();
+      if (typeof loadExpensesData !== 'undefined') loadExpensesData();
+      else if (typeof window.loadExpensesReport === 'function') window.loadExpensesReport();
+    } else {
+      showAlert('Eroare: ' + (res.error || 'Necunoscută'));
+    }
+  } catch(err) {
+    showAlert('Eroare la salvare.');
+  } finally {
+    btn.disabled = false;
+    btn.innerText = 'Salvează Cheltuiala';
+  }
+}
+
+window.openImportExpenseModal = function() {
+  document.getElementById('import-gs-link').value = '';
+  document.getElementById('import-status').innerText = '';
+  document.getElementById('modal-import-expense').classList.add('show');
+}
+
+window.submitImportExpense = async function(e) {
+  e.preventDefault();
+  const link = document.getElementById('import-gs-link').value;
+  if (!link.includes('docs.google.com/spreadsheets')) return showAlert('Te rog introdu un link valid de Google Sheets.');
+
+  const btn = document.getElementById('btn-do-import');
+  const stat = document.getElementById('import-status');
+  btn.disabled = true;
+  btn.innerText = 'Se procesează...';
+  stat.innerText = 'Se importă datele din document. Te rog așteaptă...';
+  stat.style.color = 'var(--text)';
+
+  try {
+    const r = await fetch(API + '/api/admin/expenses_import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ link: link })
+    });
+    const res = await r.json();
+    if (res.success) {
+      stat.innerText = `Succes! Au fost importate ${res.inserted_count} înregistrări.`;
+      stat.style.color = 'var(--green)';
+      setTimeout(() => {
+        document.getElementById('modal-import-expense').classList.remove('show');
+        if (typeof loadExpensesData !== 'undefined') loadExpensesData();
+      }, 2000);
+    } else {
+      stat.innerText = 'Eroare: ' + (res.error || 'Structura fișierului este incorectă.');
+      stat.style.color = 'var(--red)';
+    }
+  } catch(err) {
+    stat.innerText = 'Eroare la procesarea importului.';
+    stat.style.color = 'var(--red)';
+  } finally {
+    btn.disabled = false;
+    btn.innerText = 'Începe Importul';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (document.getElementById('edit-exp-dep')) {
+    updateEditExpTypes();
+  }
+  if (document.getElementById('bulk-edit-dep')) {
+    updateBulkEditTypes();
+  }
+});
+
+// ============================================
+// EXPENSE EDIT & BULK ACTIONS
+// ============================================
+
+window.toggleAllExpenses = function(cb) {
+  const checkboxes = document.querySelectorAll('.exp-row-cb');
+  checkboxes.forEach(c => c.checked = cb.checked);
+  updateExpBulkToolbar();
+}
+
+window.updateExpBulkToolbar = function() {
+  const count = document.querySelectorAll('.exp-row-cb:checked').length;
+  const toolbar = document.getElementById('exp-bulk-toolbar');
+  const countSpan = document.getElementById('exp-bulk-count');
+  
+  if (count > 0) {
+    toolbar.style.display = 'flex';
+    countSpan.innerText = count + ' selectate';
+  } else {
+    toolbar.style.display = 'none';
+    const selectAll = document.getElementById('exp-select-all');
+    if(selectAll) selectAll.checked = false;
+  }
+}
+
+window.openEditExpense = async function(id) {
+  const exp = _expensesData.find(e => String(e.id) === String(id));
+  if (!exp) return appAlert('Nu am găsit cheltuiala.');
+  
+  // Fetch form data for dropdowns
+  const data = await api('/api/admin/expense_form_data?date=' + exp.date);
+  window._expenseTypes = data.types || [];
+  const departments = data.departments || [];
+  
+  document.getElementById('edit-exp-id').value = exp.id;
+  document.getElementById('edit-exp-date').value = exp.date;
+  document.getElementById('edit-exp-amount').value = exp.amount;
+  document.getElementById('edit-exp-expl').value = exp.explanation;
+  
+  const depSel = document.getElementById('edit-exp-dep');
+  depSel.innerHTML = '';
+  for (let d of departments) {
+    const opt = document.createElement('option');
+    opt.value = d.id;
+    opt.textContent = d.name;
+    if (d.name === exp.department_name) opt.selected = true;
+    depSel.appendChild(opt);
+  }
+  
+  updateEditExpTypes();
+  const typeSel = document.getElementById('edit-exp-type');
+  for (let t of Array.from(typeSel.options)) {
+    if (t.textContent === exp.expenditure_type_name) t.selected = true;
+  }
+  
+  document.getElementById('modal-edit-expense').classList.add('show');
+}
+
+window.updateEditExpTypes = function() {
+  const did = document.getElementById('edit-exp-dep').value;
+  const sel = document.getElementById('edit-exp-type');
+  sel.innerHTML = '';
+  for (let t of (window._expenseTypes || []).filter(x => String(x.department_id) === String(did))) {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = t.name;
+    sel.appendChild(opt);
+  }
+}
+
+window.submitEditExpense = async function(e) {
+  e.preventDefault();
+  const id = document.getElementById('edit-exp-id').value;
+  const payload = {
+    date: document.getElementById('edit-exp-date').value,
+    amount: parseFloat(document.getElementById('edit-exp-amount').value),
+    explanation: document.getElementById('edit-exp-expl').value,
+    department_id: document.getElementById('edit-exp-dep').value,
+    expenditure_type_id: document.getElementById('edit-exp-type').value
+  };
+
+  const btn = e.target.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  btn.innerText = 'Se salvează...';
+
+  try {
+    const r = await fetch(API + '/api/admin/expenses/' + id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const res = await r.json();
+    if (res.success) {
+      document.getElementById('modal-edit-expense').classList.remove('show');
+      if (typeof window.loadExpensesReport === 'function') window.loadExpensesReport();
+    } else {
+      showAlert('Eroare: ' + (res.error || 'Necunoscută'));
+    }
+  } catch(err) {
+    showAlert('Eroare la salvare.');
+  } finally {
+    btn.disabled = false;
+    btn.innerText = 'Salvează Modificările';
+  }
+}
+
+window.bulkDeleteExpenses = async function() {
+  const checked = document.querySelectorAll('.exp-row-cb:checked');
+  if (checked.length === 0) return;
+  
+  appConfirm(`Ești sigur că vrei să ștergi ${checked.length} cheltuieli?`, async () => {
+    const ids = Array.from(checked).map(c => c.value);
+    
+    try {
+      const r = await fetch(API + '/api/admin/expenses/bulk', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: ids })
+      });
+      const res = await r.json();
+      if (res.success) {
+        document.getElementById('exp-bulk-toolbar').style.display = 'none';
+        if(document.getElementById('exp-select-all')) document.getElementById('exp-select-all').checked = false;
+        if (typeof window.loadExpensesReport === 'function') window.loadExpensesReport();
+      } else {
+        appAlert('Eroare: ' + (res.error || 'Nu s-a putut șterge.'));
+      }
+    } catch(e) {
+      console.error(e);
+      appAlert('Eroare la ștergerea bulk.');
+    }
+  });
+}
+
+window.openBulkEditExpenseModal = function() {
+  const checked = document.querySelectorAll('.exp-row-cb:checked');
+  if (checked.length === 0) return;
+  
+  document.getElementById('bulk-edit-count-display').innerText = checked.length;
+  
+  const depSel = document.getElementById('bulk-edit-dep');
+  depSel.innerHTML = '<option value="">-- Fără modificare --</option>';
+  for (let d of _departments) {
+    const opt = document.createElement('option');
+    opt.value = d.id;
+    opt.textContent = d.name;
+    depSel.appendChild(opt);
+  }
+  
+  document.getElementById('bulk-edit-date').value = '';
+  document.getElementById('bulk-edit-type').innerHTML = '<option value="">-- Fără modificare --</option>';
+  
+  document.getElementById('modal-bulk-edit').classList.add('show');
+}
+
+window.updateBulkEditTypes = function() {
+  const did = document.getElementById('bulk-edit-dep').value;
+  const sel = document.getElementById('bulk-edit-type');
+  sel.innerHTML = '<option value="">-- Fără modificare --</option>';
+  if (!did) return;
+  
+  for (let t of _expTypes.filter(x => x.department_id === did)) {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = t.name;
+    sel.appendChild(opt);
+  }
+}
+
+window.submitBulkEdit = async function(e) {
+  e.preventDefault();
+  const checked = document.querySelectorAll('.exp-row-cb:checked');
+  const ids = Array.from(checked).map(c => c.value);
+  
+  const payload = {
+    ids: ids,
+    date: document.getElementById('bulk-edit-date').value,
+    department_id: document.getElementById('bulk-edit-dep').value,
+    expenditure_type_id: document.getElementById('bulk-edit-type').value
+  };
+
+  const btn = e.target.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  btn.innerText = 'Se aplică...';
+
+  try {
+    const r = await fetch(API + '/api/admin/expenses/bulk', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const res = await r.json();
+    if (res.success) {
+      document.getElementById('modal-bulk-edit').classList.remove('show');
+      document.getElementById('exp-bulk-toolbar').style.display = 'none';
+      if(document.getElementById('exp-select-all')) document.getElementById('exp-select-all').checked = false;
+      if (typeof window.loadExpensesReport === 'function') window.loadExpensesReport();
+    } else {
+      appAlert('Eroare: ' + (res.error || 'Necunoscută'));
+    }
+  } catch(err) {
+    appAlert('Eroare la bulk edit.');
+  } finally {
+    btn.disabled = false;
+    btn.innerText = 'Aplică Modificările';
+  }
+}
+
+// ============================================
+// CUSTOM POPUPS
+// ============================================
+window.appConfirm = function(msg, callback) {
+  let modal = document.getElementById('app-confirm-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.className = 'settings-modal';
+    modal.id = 'app-confirm-modal';
+    modal.innerHTML = `
+      <div class="settings-panel" style="width:400px; max-width:90%;">
+        <div class="settings-header">
+          <div class="settings-title">Confirmare</div>
+          <button class="settings-close" onclick="document.getElementById('app-confirm-modal').classList.remove('show')">×</button>
+        </div>
+        <div class="settings-body" style="padding:20px; text-align:center;">
+          <p id="app-confirm-msg" style="margin-bottom:24px; font-size:14px; color:var(--text);"></p>
+          <div style="display:flex; justify-content:center; gap:12px;">
+            <button class="btn-ghost" style="color:var(--text);" onclick="document.getElementById('app-confirm-modal').classList.remove('show')">Anulează</button>
+            <button class="btn-primary" id="app-confirm-btn" style="background:var(--red); border-color:var(--red);">Confirmă</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+  document.getElementById('app-confirm-msg').innerText = msg;
+  const btn = document.getElementById('app-confirm-btn');
+  btn.onclick = () => {
+    modal.classList.remove('show');
+    if (callback) callback();
+  };
+  modal.classList.add('show');
+}
+
+window.appAlert = function(msg) {
+  let modal = document.getElementById('app-alert-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.className = 'settings-modal';
+    modal.id = 'app-alert-modal';
+    modal.innerHTML = `
+      <div class="settings-panel" style="width:400px; max-width:90%;">
+        <div class="settings-header">
+          <div class="settings-title">Mesaj</div>
+          <button class="settings-close" onclick="document.getElementById('app-alert-modal').classList.remove('show')">×</button>
+        </div>
+        <div class="settings-body" style="padding:20px; text-align:center;">
+          <p id="app-alert-msg" style="margin-bottom:24px; font-size:14px; color:var(--text);"></p>
+          <div style="display:flex; justify-content:center;">
+            <button class="btn-primary" onclick="document.getElementById('app-alert-modal').classList.remove('show')">OK</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+  document.getElementById('app-alert-msg').innerText = msg;
+  modal.classList.add('show');
 }
