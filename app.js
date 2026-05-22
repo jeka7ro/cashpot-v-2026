@@ -158,7 +158,11 @@ window.reloadCurrentView = function() {
   else if (hash.startsWith('#rapoarte/marketing')) { loadAll(); loadMarketingReport(); }
   else if (hash.startsWith('#rapoarte/clienti')) { loadAll(); loadClientiReport(); }
   else if (hash.startsWith('#rapoarte/cashout')) { loadAll(); loadRapoarteCashout(); }
-  else if (hash.startsWith('#rapoarte/cheltuieli')) { loadAll(); window.loadExpensesReport(); }
+  else if (hash.startsWith('#rapoarte/cheltuieli')) {
+    const {s: ks, e: ke} = getPeriod();
+    if (ks && ke) loadKPI(ks, ke).catch(console.error);
+    window.loadExpensesReport();
+  }
   else if (hash.startsWith('#rapoarte/multigame')) {
     loadAll();
     window.loadMultigameReport ? loadMultigameReport() : loadMultigame();
@@ -1594,6 +1598,8 @@ document.querySelectorAll('.rep-page').forEach(p => p.style.display = 'none');
       }
       else if (subHash === 'cashout') loadRapoarteCashout();
       else if (subHash === 'cheltuieli') {
+        const {s: cs, e: ce} = getPeriod();
+        if (cs && ce) loadKPI(cs, ce).catch(console.error);
         loadExpensesReport();
         const btnExpSettings = document.getElementById('btn-exp-settings');
         if (btnExpSettings) btnExpSettings.style.display = (currentUser && currentUser.role === 'Super Admin') ? 'inline-flex' : 'none';
