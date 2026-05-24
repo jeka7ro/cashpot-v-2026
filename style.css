@@ -247,7 +247,7 @@ td.cell-neg-3 { background:rgba(239,68,68,.38) !important; }
 .btn-ghost:hover { border-color:var(--text); color:var(--text); }
 
 /* ─── Loader ───────────────────────────────────────────────────────────────── */
-.loader-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:999; align-items:center; justify-content:center; }
+.loader-overlay { display:none; position:fixed; inset:0; background:transparent; z-index:99999; align-items:center; justify-content:center; }
 .loader-overlay.show { display:flex; }
 .spinner { width:44px; height:44px; border:3px solid rgba(255,255,255,.1); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; }
 @keyframes spin { to { transform:rotate(360deg); } }

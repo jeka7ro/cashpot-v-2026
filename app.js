@@ -180,6 +180,9 @@ window.reloadCurrentView = function() {
     if (ks && ke) loadKPI(ks, ke).catch(console.error);
     window.loadExpensesReport();
   }
+  else if (hash === '#pl' || hash.startsWith('#pl/')) {
+    loadPLData();
+  }
   else if (hash.startsWith('#rapoarte/multigame')) {
     loadAll();
     window.loadMultigameReport ? loadMultigameReport() : loadMultigame();
@@ -403,10 +406,19 @@ function autoSetTrend() {
   const s = document.getElementById('date-start').value;
   const e = document.getElementById('date-end').value;
   const toggles = document.querySelectorAll('.chart-toggles .settings-btn');
+  if (!toggles || toggles.length < 3) return;
+  
   if (s === e) {
     setTrendGroup('hour', toggles[0]);
   } else {
-    setTrendGroup('day', toggles[1]);
+    const dStart = new Date(s);
+    const dEnd = new Date(e);
+    const diffDays = (dEnd - dStart) / (1000 * 60 * 60 * 24);
+    if (diffDays > 31) {
+      setTrendGroup('month', toggles[2]);
+    } else {
+      setTrendGroup('day', toggles[1]);
+    }
   }
 }
 
@@ -526,8 +538,9 @@ function renderMonthCalendar(){
       let htmlTip = `
         <div class="tt-header">${k}</div>
         <div class="tt-row"><span class="tt-label">Total IN</span><span class="tt-val">${fmt(row.tin)}</span></div>
-        <div class="tt-row"><span class="tt-label">GGR</span><span class="tt-val ${ggr>=0?'pos':'neg'}">${fmt(ggr)}</span></div>
-        <div class="tt-row"><span class="tt-label">Happy Hour</span><span class="tt-val hl">${fmt(row.hh)}</span></div>
+        <div class="tt-row"><span class="tt-label">NGR (Net)</span><span class="tt-val ${ggr>=0?'pos':'neg'}">${fmt(ggr)}</span></div>
+        <div class="tt-row"><span class="tt-label">GGR Brut</span><span class="tt-val">${fmt(row.raw_ggr)}</span></div>
+        <div class="tt-row"><span class="tt-label">Cheltuieli</span><span class="tt-val hl">${fmt(row.exp)}</span></div>
         <div class="tt-row"><span class="tt-label">Total BET</span><span class="tt-val">${fmt(row.bet)}</span></div>
       `;
       if(row.locs && row.locs.length > 1) {
@@ -631,21 +644,38 @@ function renderHourCalendar(selectedDate) {
   });
 }
 
-async function loadCalendars(s,e){
-  const d = new Date(e);
-  const mStart = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
-  const lastDay = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate();
-  const mEnd = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
+async function updateMonthCalendarData(y, m) {
+  const mStart = `${y}-${String(m+1).padStart(2,'0')}-01`;
+  const lastDay = new Date(y, m+1, 0).getDate();
+  const mEnd = `${y}-${String(m+1).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
+  
+  const [dMonth, dExp] = await Promise.all([
+    api(`/api/daily?res=day&start=${mStart}&end=${mEnd}${locParam()}`),
+    api(`/api/reports/expenses?start=${mStart}&end=${mEnd}${locParam()}`)
+  ]);
+  
+  const expByDate = {};
+  if (dExp) {
+    dExp.forEach(ex => {
+      expByDate[ex.date] = (expByDate[ex.date] || 0) + ex.amount;
+    });
+  }
 
-  const dMonth = await api(`/api/daily?res=day&start=${mStart}&end=${mEnd}${locParam()}`);
   dailyMonthData = {};
-  let lastDataDate = e;
   let maxValidDate = '0000-00-00';
   dMonth.forEach(r => { 
-    dailyMonthData[r.date] = {ggr:r.ggr, tin:r.total_in, hh:r.hh, bet:r.bet||0, locs:r.loc_details||[]}; 
+    const exp = expByDate[r.date] || 0;
+    dailyMonthData[r.date] = {ggr: r.ggr - exp, raw_ggr: r.ggr, exp: exp, tin:r.total_in, hh:r.hh, bet:r.bet||0, locs:r.loc_details||[]}; 
     if (r.date > maxValidDate && r.total_in > 0) { maxValidDate = r.date; }
   });
+  return maxValidDate;
+}
+
+async function loadCalendars(s,e){
+  const d = new Date(e);
+  const maxValidDate = await updateMonthCalendarData(d.getFullYear(), d.getMonth());
   
+  let lastDataDate = e;
   if (s !== e && maxValidDate !== '0000-00-00' && maxValidDate <= e) {
     lastDataDate = maxValidDate;
   }
@@ -658,16 +688,18 @@ async function loadCalendars(s,e){
   renderMonthCalendar();
   renderHourCalendar(lastDataDate);
 }
-document.getElementById('cal-prev').addEventListener('click',()=>{
+document.getElementById('cal-prev').addEventListener('click', async ()=>{
   let m=calViewDate.getMonth()-1;let y=calViewDate.getFullYear();
   if(m<0){m=11;y--;}
   calViewDate=new Date(y,m,1);
+  await updateMonthCalendarData(y, m);
   renderMonthCalendar();
 });
-document.getElementById('cal-next').addEventListener('click',()=>{
+document.getElementById('cal-next').addEventListener('click', async ()=>{
   let m=calViewDate.getMonth()+1;let y=calViewDate.getFullYear();
   if(m>11){m=0;y++;}
   calViewDate=new Date(y,m,1);
+  await updateMonthCalendarData(y, m);
   renderMonthCalendar();
 });
 
@@ -1647,6 +1679,10 @@ window.addEventListener('hashchange', () => {
     loadExpensesReport();
     const btnExpSettings = document.getElementById('btn-exp-settings');
     if (btnExpSettings) btnExpSettings.style.display = (currentUser && currentUser.role === 'Super Admin') ? 'inline-flex' : 'none';
+  }
+
+  if(mainHash === 'pl') {
+    loadPLData();
   }
 
   if(mainHash === 'rapoarte') {
@@ -4070,6 +4106,10 @@ async function checkAuth() {
   if (!token) {
     document.getElementById('view-login').style.display = 'flex';
     document.getElementById('app-content').style.display = 'none';
+    const globalHeader = document.getElementById('global-header');
+    if (globalHeader) globalHeader.style.display = 'none';
+    const appBody = document.getElementById('app-body');
+    if (appBody) appBody.style.display = 'none';
     document.querySelector('.sidebar').style.display = 'none';
     return;
   }
@@ -4077,6 +4117,10 @@ async function checkAuth() {
     currentUser = await apiAuth('/api/me');
     document.getElementById('view-login').style.display = 'none';
     document.getElementById('app-content').style.display = 'flex';
+    const globalHeader = document.getElementById('global-header');
+    if (globalHeader) globalHeader.style.display = 'flex';
+    const appBody = document.getElementById('app-body');
+    if (appBody) appBody.style.display = 'flex';
     document.querySelector('.sidebar').style.display = 'flex';
     
     await loadFilters();
@@ -4183,10 +4227,12 @@ window.doLogin = async function(e) {
       localStorage.setItem('cp2_token', data.token);
       if (remember) {
         localStorage.setItem('cp2_saved_email', email);
+        localStorage.setItem('cp2_saved_pwd', pwd);
       } else {
         localStorage.removeItem('cp2_saved_email');
+        localStorage.removeItem('cp2_saved_pwd');
       }
-      setTimeout(() => window.location.reload(), 1500);
+      checkAuth();
     }
   } catch (err) {
     errEl.textContent = 'Eroare retea. Verifica daca serverul ruleaza.';
@@ -4196,10 +4242,13 @@ window.doLogin = async function(e) {
 // Pre-fill saved email on login page
 (function() {
   const saved = localStorage.getItem('cp2_saved_email');
+  const savedPwd = localStorage.getItem('cp2_saved_pwd');
   if (saved) {
     const el = document.getElementById('login-email');
     const rem = document.getElementById('login-remember');
+    const pwdEl = document.getElementById('login-password');
     if (el) el.value = saved;
+    if (pwdEl && savedPwd) pwdEl.value = savedPwd;
     if (rem) { rem.checked = true; rem.dispatchEvent(new Event('change')); }
   }
 })();
@@ -4855,6 +4904,280 @@ window.toggleHourlyMachineGames = async function(td, serial, dt) {
 }
 
 
+// ─── P&L (PROFIT & LOSS) ─────────────────────────────────────────
+window.loadPLData = async function() {
+  const { s, e } = getPeriod();
+  const locEl = document.getElementById('global-loc-select');
+  const locId = locEl ? locEl.value : 'all';
+  let p = `start=${s}&end=${e}`;
+  if(locId !== 'all') p += `&loc_ids=${locId}`;
+  else p += locParam();
+
+  showLoader(true);
+  try {
+    const locRes = await api(`/api/locations?${p}`);
+    if (locRes.error) throw new Error(locRes.error);
+    
+    const expRes = await api(`/api/reports/expenses?${p}`);
+    const expData = expRes || [];
+
+    const norm = n => n.toLowerCase().replace(/[\(\)]/g, '').replace(/\s+/g, ' ').trim();
+
+    const locRevMap = {};
+    const locNormMap = {};
+    locRes.forEach(r => { 
+      locRevMap[r.locatie] = r; 
+      locNormMap[norm(r.locatie)] = r.locatie;
+    });
+
+    const expMap = {};
+    expData.forEach(exp => {
+       const rawName = exp.location_name || 'Fără Locație';
+       const normalized = norm(rawName);
+       // Match expense location to canonical revenue location if possible
+       const lName = locNormMap[normalized] || rawName;
+       expMap[lName] = (expMap[lName] || 0) + (exp.amount || 0);
+    });
+
+    let tIn = 0, tOut = 0, tGgr = 0, tBonus = 0, tNgr = 0, tExp = 0, tNet = 0;
+    let html = '';
+    
+    const allLocNames = new Set(locRes.map(r => r.locatie));
+    Object.keys(expMap).forEach(k => allLocNames.add(k));
+    
+    const rows = Array.from(allLocNames).map(lName => {
+       const rev = locRevMap[lName] || {};
+       const inVal = rev.total_in || 0;
+       const outVal = rev.total_out || 0;
+       const ggr = rev.ggr || (inVal - outVal);
+       const jp = rev.jackpot || 0;
+       const hh = rev.hh || 0;
+       const cb = rev.cashback || 0;
+       const bonus = jp + hh + cb;
+       
+       const ngr = ggr + bonus;
+       
+       const exp = expMap[lName] || 0;
+       const net = ggr - exp;
+       
+       tIn += inVal; tOut += outVal; tGgr += ggr; tBonus += bonus; tNgr += ngr; tExp += exp; tNet += net;
+       
+       return { name: lName, inVal, outVal, ggr, bonus, ngr, exp, net };
+    });
+    
+    rows.sort((a,b) => b.net - a.net);
+    
+    rows.forEach(r => {
+       html += `
+         <tr style="border-bottom: 1px solid var(--border);">
+           <td style="font-weight:700; color:var(--text);">${r.name}</td>
+           <td class="num">${fmt(r.inVal)}</td>
+           <td class="num" style="color:var(--muted);">${fmt(r.outVal)}</td>
+           <td class="num" style="font-weight:600;">${fmt(r.ggr)}</td>
+           <td class="num" style="color:var(--muted);">${fmt(r.bonus)}</td>
+           <td class="num" style="font-weight:600;">${fmt(r.ngr)}</td>
+           <td class="num" style="color:var(--red); font-weight:600;">${fmt(r.exp)}</td>
+           <td class="num" style="font-weight:800; color:${r.net >= 0 ? 'var(--green)' : 'var(--red)'};">${fmt(r.net)}</td>
+         </tr>
+       `;
+    });
+    
+    if(rows.length === 0) {
+      html = '<tr><td colspan="8" style="text-align:center; color:var(--muted); padding:24px;">Nu există date pentru această selecție.</td></tr>';
+    }
+
+    const tbody = document.getElementById('body-pl');
+    if (tbody) tbody.innerHTML = html;
+    
+    const tfoot = document.getElementById('foot-pl');
+    if (tfoot) {
+      tfoot.innerHTML = `
+        <tr style="background:var(--surface2); border-top:2px solid var(--border); height: 48px;">
+          <td style="text-align:left; font-weight:800; font-size:12px; color:var(--text); text-transform:uppercase; letter-spacing:0.05em;">Total P&L</td>
+          <td class="num" style="font-weight:800; color:var(--green);">${fmt(tIn)}</td>
+          <td class="num" style="font-weight:800; color:var(--muted);">${fmt(tOut)}</td>
+          <td class="num" style="font-weight:800;">${fmt(tGgr)}</td>
+          <td class="num" style="font-weight:800; color:var(--muted);">${fmt(tBonus)}</td>
+          <td class="num" style="font-weight:800;">${fmt(tNgr)}</td>
+          <td class="num" style="font-weight:800; color:var(--red);">${fmt(tExp)}</td>
+          <td class="num" style="font-weight:900; font-size:14px; color:${tNet >= 0 ? 'var(--green)' : 'var(--red)'};">${fmt(tNet)}</td>
+        </tr>
+      `;
+    }
+
+    // Trigger KPI load for dashboard KPIs if they still show "—"
+    const vIn = document.getElementById('v-in');
+    if (vIn && (vIn.textContent === '—' || vIn.textContent.trim() === '—')) {
+      if (s && e) loadKPI(s, e).catch(console.error);
+    }
+
+    // Render Charts
+    if (window._plChartNet) window._plChartNet.destroy();
+    if (window._plChartStruct) window._plChartStruct.destroy();
+
+    const chartRows = [...rows].filter(r => r.name !== 'Fără Locație').slice(0, 10);
+    const labels = chartRows.map(r => r.name.substring(0, 15));
+    const netData = chartRows.map(r => r.net);
+    const expDataChart = chartRows.map(r => r.exp);
+    const ngrDataChart = chartRows.map(r => r.ngr);
+
+    const ctxNet = document.getElementById('pl-chart-net');
+    if (ctxNet) {
+      window._plChartNet = new Chart(ctxNet, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Profit Net',
+              data: netData,
+              backgroundColor: netData.map(v => v >= 0 ? '#10b981' : '#ef4444'),
+              borderRadius: 4,
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af', font: { size: 10 } } },
+            x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 10 } } }
+          }
+        }
+      });
+    }
+
+    const ctxStruct = document.getElementById('pl-chart-struct');
+    if (ctxStruct) {
+      window._plChartStruct = new Chart(ctxStruct, {
+        type: 'bar',
+        data: {
+          labels: labels.slice(0, 5),
+          datasets: [
+            {
+              label: 'NGR',
+              data: ngrDataChart.slice(0, 5),
+              backgroundColor: '#3b82f6',
+              borderRadius: 4,
+            },
+            {
+              label: 'Cheltuieli',
+              data: expDataChart.slice(0, 5),
+              backgroundColor: '#ef4444',
+              borderRadius: 4,
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: true, labels: { color: '#9ca3af', font: { size: 10 }, boxWidth: 12 } } },
+          scales: {
+            y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3af', font: { size: 10 } } },
+            x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 10 } } }
+          }
+        }
+      });
+    }
+
+    // --- Heatmap (Last 12 Months) ---
+    api(`/api/reports/pl_heatmap?${p}`).then(heatRes => {
+      const monthsSet = new Set();
+      const locData = {}; // { 'Locatia': { '2023-01': net } }
+      
+      const rev = heatRes.revenue || [];
+      const exp = heatRes.expenses || [];
+      const dynNormMap = { ...locNormMap };
+      const getCanonical = (name) => {
+         const n = norm(name);
+         if (!dynNormMap[n]) {
+            dynNormMap[n] = name;
+         }
+         return dynNormMap[n];
+      };
+
+      rev.forEach(r => {
+        if (!r.month) return;
+        monthsSet.add(r.month);
+        const lName = getCanonical(r.location_name);
+        if (!locData[lName]) locData[lName] = {};
+        if (!locData[lName][r.month]) locData[lName][r.month] = 0;
+        locData[lName][r.month] += parseFloat(r.ggr || r.ngr || 0); // Profitul se calculeaza din GGR
+      });
+      
+      exp.forEach(r => {
+        if (!r.month) return;
+        monthsSet.add(r.month);
+        const lName = getCanonical(r.location_name);
+        if (!locData[lName]) locData[lName] = {};
+        if (!locData[lName][r.month]) locData[lName][r.month] = 0;
+        locData[lName][r.month] -= parseFloat(r.expenses || 0);
+      });
+      
+      const months = Array.from(monthsSet).sort();
+      let thead = '<tr><th style="text-align:left; position:sticky; left:0; background:var(--surface); z-index:2;">Locație</th>';
+      months.forEach(m => { thead += `<th style="text-align:center; font-size:11px;">${m}</th>`; });
+      thead += '<th style="text-align:center; font-size:11px;">Total 12M</th></tr>';
+      
+      let tbody = '';
+      const locNames = Object.keys(locData).sort();
+      const monthTotals = {};
+      months.forEach(m => monthTotals[m] = 0);
+      let grandTotal = 0;
+
+      locNames.forEach(lName => {
+        if (lName === 'Fără Locație') return; // Skip dummy if empty
+        let rTot = 0;
+        tbody += `<tr><td style="text-align:left; font-weight:700; position:sticky; left:0; background:var(--surface); z-index:1;">${lName}</td>`;
+        months.forEach(m => {
+          const net = locData[lName][m] || 0;
+          rTot += net;
+          monthTotals[m] += net;
+          grandTotal += net;
+          let bg = 'transparent';
+          let col = 'var(--text)';
+          if (net > 0) {
+            bg = `rgba(16, 185, 129, ${Math.min(0.8, 0.1 + net/200000)})`;
+            col = '#fff';
+          } else if (net < 0) {
+            bg = `rgba(239, 68, 68, ${Math.min(0.8, 0.1 + Math.abs(net)/200000)})`;
+            col = '#fff';
+          }
+          tbody += `<td style="background:${bg}; color:${col}; font-weight:600; text-align:center; padding: 12px 4px; font-size:12px;" title="${lName} / ${m} / ${fmt(net)}">${fmtK(net)}</td>`;
+        });
+        tbody += `<td style="text-align:center; font-weight:800; color:${rTot >= 0 ? 'var(--green)' : 'var(--red)'}">${fmtK(rTot)}</td></tr>`;
+      });
+      
+      // Add Total Row
+      tbody += `<tr><td style="text-align:left; font-weight:800; color:var(--text); text-transform:uppercase; letter-spacing:0.05em; position:sticky; left:0; background:var(--surface2); z-index:1; border-top:2px solid var(--border); height: 48px;">TOTAL</td>`;
+      months.forEach(m => {
+          const mTot = monthTotals[m];
+          tbody += `<td style="text-align:center; font-weight:800; border-top:2px solid var(--border); background:var(--surface2); color:${mTot >= 0 ? 'var(--green)' : 'var(--red)'};">${fmtK(mTot)}</td>`;
+      });
+      tbody += `<td style="text-align:center; font-weight:900; font-size:14px; border-top:2px solid var(--border); background:var(--surface2); color:${grandTotal >= 0 ? 'var(--green)' : 'var(--red)'};">${fmtK(grandTotal)}</td></tr>`;
+      
+      
+      const elHead = document.getElementById('pl-heatmap-head');
+      const elBody = document.getElementById('pl-heatmap-body');
+      if (elHead) elHead.innerHTML = thead;
+      if (elBody) elBody.innerHTML = tbody;
+      
+    }).catch(err => {
+      console.error('Heatmap error:', err);
+      const elBody = document.getElementById('pl-heatmap-body');
+      if (elBody) elBody.innerHTML = '<tr><td colspan="15" style="color:var(--red);">Eroare încărcare heatmap.</td></tr>';
+    });
+
+  } catch(err) {
+    console.error('loadPLData error:', err);
+    const tbody = document.getElementById('body-pl');
+    if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="color:var(--red); text-align:center; padding: 24px; font-weight: 600;">Eroare la încărcarea datelor P&L</td></tr>';
+  } finally {
+    showLoader(false);
+  }
+};
+
 // ─── RAPOARTE CHELTUIELI ──────────────────────────────────────────
 let _expensesData = [];
 let _expPage = 1;
@@ -4912,8 +5235,25 @@ window.switchExpTab = function(tab) {
   document.getElementById('exp-tab-btn-details').style.borderBottomColor = (tab === 'details') ? 'var(--accent)' : 'transparent';
   document.getElementById('exp-tab-btn-details').style.color = (tab === 'details') ? 'var(--accent)' : 'var(--muted)';
   
+  const plBtn = document.getElementById('exp-tab-btn-pl');
+  if(plBtn) {
+    plBtn.style.borderBottomColor = (tab === 'pl') ? 'var(--accent)' : 'transparent';
+    plBtn.style.color = (tab === 'pl') ? 'var(--accent)' : 'var(--muted)';
+  }
+  
   document.getElementById('exp-tab-summary').style.display = (tab === 'summary') ? 'block' : 'none';
   document.getElementById('exp-tab-details').style.display = (tab === 'details') ? 'block' : 'none';
+  
+  const plTab = document.getElementById('exp-tab-pl');
+  if(plTab) {
+    plTab.style.display = (tab === 'pl') ? 'block' : 'none';
+    if(tab === 'pl') loadPLData();
+  }
+  
+  const bulkToolbar = document.getElementById('exp-bulk-toolbar');
+  if(bulkToolbar) {
+    bulkToolbar.style.display = (tab === 'details') ? 'flex' : 'none';
+  }
 }
 
 window.renderExpSummary = function() {
@@ -5106,6 +5446,7 @@ filtered.sort((a, b) => {
         <td>${r.expenditure_type_name || '-'}</td>
         <td>${r.vendor_name || '-'}</td>
         <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${r.explanation}">${r.explanation || '-'}</td>
+        <td>${r.details || '-'}</td>
         <td class="num" style="color:var(--red);font-weight:700">${fmt(r.amount)}</td>
         
         <td style="text-align:center;">
@@ -5129,16 +5470,16 @@ filtered.sort((a, b) => {
     html += `
       ${showPageTotal ? `
       <tr style="background:var(--surface2)">
-        <td colspan="7" style="text-align:right;font-weight:600;color:var(--muted);padding:6px 12px;font-size:11px;">Total Pagina ${_expPage}:</td>
+        <td colspan="8" style="text-align:right;font-weight:600;color:var(--muted);padding:6px 12px;font-size:11px;">Total Pagina ${_expPage}:</td>
         <td class="num" style="color:var(--muted);font-weight:700;font-size:12px;padding:6px 12px;">${fmt(total)} RON</td>
         <td></td>
 </tr>` : ''}
       <tr style="background:var(--surface2); border-top:2px solid var(--border)">
-        <td colspan="7" style="text-align:right;font-weight:800;color:var(--text);padding:10px 12px;">${isFiltered ? 'Total Filtrat:' : 'Total General:'}</td>
+        <td colspan="8" style="text-align:right;font-weight:800;color:var(--text);padding:10px 12px;">${isFiltered ? 'Total Filtrat:' : 'Total General:'}</td>
         <td class="num" style="color:var(--red);font-weight:800;font-size:14px;padding:10px 12px;">${fmt(totalGeneral)} RON</td>
         <td></td>
 </tr>
-${isFiltered ? `<tr style="background:var(--surface2)"><td colspan="7" style="text-align:right;font-size:11px;color:var(--muted);padding:4px 12px;">Total General (fara filtre):</td><td class="num" style="font-size:11px;color:var(--muted);padding:4px 12px;">${fmt(totalAll)} RON</td><td></td></tr>` : ''}
+${isFiltered ? `<tr style="background:var(--surface2)"><td colspan="8" style="text-align:right;font-size:11px;color:var(--muted);padding:4px 12px;">Total General (fara filtre):</td><td class="num" style="font-size:11px;color:var(--muted);padding:4px 12px;">${fmt(totalAll)} RON</td><td></td></tr>` : ''}
     `;
   }
   
@@ -5245,9 +5586,29 @@ window.renderExpCharts = function() {
   }
 
   // Chart 2: evolution in time -> Beautiful line with gradient
+  const sDate = document.getElementById('date-start').value;
+  const eDate = document.getElementById('date-end').value;
+  let useMonth = false;
+  if (sDate && eDate) {
+    const diff = (new Date(eDate) - new Date(sDate)) / (1000 * 60 * 60 * 24);
+    if (diff > 31) useMonth = true;
+  }
+  
   const timeMap = {};
-  data.forEach(r => { timeMap[r.date] = (timeMap[r.date]||0) + r.amount; });
+  data.forEach(r => { 
+    let key = r.date;
+    if (useMonth && key) key = key.substring(0, 7);
+    timeMap[key] = (timeMap[key]||0) + r.amount; 
+  });
   const times = Object.entries(timeMap).sort((a,b)=>a[0].localeCompare(b[0]));
+  const formatTimeKey = (k) => {
+    if (k.length === 7) {
+      const parts = k.split('-');
+      const mo = ['Ian','Feb','Mar','Apr','Mai','Iun','Iul','Aug','Sep','Oct','Nov','Dec'];
+      return `${mo[parseInt(parts[1],10)-1]} '${parts[0].slice(-2)}`;
+    }
+    return k.length === 10 ? k.slice(5) : k;
+  };
   const c2 = document.getElementById('exp-chart-time');
   if (c2) {
     const ctx = c2.getContext('2d');
@@ -5256,7 +5617,7 @@ window.renderExpCharts = function() {
     grad.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
     if (window._expChartTime) window._expChartTime.destroy();
     window._expChartTime = new Chart(ctx, { type:'line',
-      data:{ labels:times.map(([k])=>k.slice(5)), datasets:[{data:times.map(([,v])=>v), borderColor:'#10b981', backgroundColor:grad, fill:true, tension:0.4, pointRadius:3, pointBackgroundColor:'#fff', pointBorderColor:'#10b981', borderWidth:3}] },
+      data:{ labels:times.map(([k])=>formatTimeKey(k)), datasets:[{data:times.map(([,v])=>v), borderColor:'#10b981', backgroundColor:grad, fill:true, tension:0.4, pointRadius:3, pointBackgroundColor:'#fff', pointBorderColor:'#10b981', borderWidth:3}] },
       options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{mode:'index', intersect:false}},
         scales:{ x:{grid:{display:false}, ticks:{font:{size:9},color:'#94a3b8',maxRotation:40}}, y:{grid:{color:'rgba(255,255,255,0.05)'}, ticks:{font:{size:9},color:'#94a3b8', callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}} } }
     });
@@ -5704,6 +6065,9 @@ window.submitManualExpense = async function(e) {
 window.openImportExpenseModal = function() {
   document.getElementById('import-gs-link').value = '';
   document.getElementById('import-status').innerText = '';
+  document.getElementById('import-preview-container').style.display = 'none';
+  document.getElementById('btn-confirm-import').style.display = 'none';
+  document.getElementById('btn-do-import').style.display = 'block';
   document.getElementById('modal-import-expense').classList.add('show');
 }
 
@@ -5716,23 +6080,45 @@ window.submitImportExpense = async function(e) {
   const stat = document.getElementById('import-status');
   btn.disabled = true;
   btn.innerText = 'Se procesează...';
-  stat.innerText = 'Se importă datele din document. Te rog așteaptă...';
+  stat.innerText = 'Se preiau datele din document. Te rog așteaptă...';
   stat.style.color = 'var(--text)';
+  
+  document.getElementById('import-preview-container').style.display = 'none';
+  document.getElementById('btn-confirm-import').style.display = 'none';
 
   try {
     const r = await fetch(API + '/api/admin/expenses_import', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ link: link })
+      body: JSON.stringify({ link: link, preview: true })
     });
     const res = await r.json();
     if (res.success) {
-      stat.innerText = `Succes! Au fost importate ${res.inserted_count} înregistrări.`;
-      stat.style.color = 'var(--green)';
-      setTimeout(() => {
-        document.getElementById('modal-import-expense').classList.remove('show');
-        if (typeof loadExpensesData !== 'undefined') loadExpensesData();
-      }, 2000);
+      if (res.preview_data && res.preview_data.length > 0) {
+        stat.innerText = `S-au găsit ${res.preview_data.length} rânduri valide. Verifică datele și confirmă salvarea.`;
+        stat.style.color = 'var(--blue)';
+        
+        let html = '';
+        for (const p of res.preview_data) {
+          html += `<tr>
+            <td>${p.date}</td>
+            <td>${p.location_name}</td>
+            <td>${p.department_name}</td>
+            <td>${p.category_name}</td>
+            <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${p.explanation}">${p.explanation}</td>
+            <td>${p.details || '-'}</td>
+            <td class="num">${fmt(p.amount)}</td>
+          </tr>`;
+        }
+        document.getElementById('import-preview-body').innerHTML = html;
+        document.getElementById('import-preview-container').style.display = 'block';
+        
+        btn.style.display = 'none';
+        document.getElementById('btn-confirm-import').style.display = 'block';
+      } else {
+        stat.innerText = 'Nu s-au găsit date valide în fișier (sau coloanele nu corespund).';
+        stat.style.color = 'var(--orange)';
+      }
     } else {
       stat.innerText = 'Eroare: ' + (res.error || 'Structura fișierului este incorectă.');
       stat.style.color = 'var(--red)';
@@ -5742,7 +6128,46 @@ window.submitImportExpense = async function(e) {
     stat.style.color = 'var(--red)';
   } finally {
     btn.disabled = false;
-    btn.innerText = 'Începe Importul';
+    btn.innerText = 'Preia Datele';
+  }
+}
+
+window.confirmImportExpense = async function() {
+  const link = document.getElementById('import-gs-link').value;
+  const btnC = document.getElementById('btn-confirm-import');
+  const stat = document.getElementById('import-status');
+  
+  btnC.disabled = true;
+  btnC.innerText = 'Se salvează...';
+  stat.innerText = 'Se salvează datele în baza de date. Te rog așteaptă...';
+  stat.style.color = 'var(--text)';
+  
+  try {
+    const r = await fetch(API + '/api/admin/expenses_import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ link: link, preview: false })
+    });
+    const res = await r.json();
+    if (res.success) {
+      stat.innerText = `Succes! Au fost importate ${res.inserted_count} înregistrări.`;
+      stat.style.color = 'var(--green)';
+      setTimeout(() => {
+        document.getElementById('modal-import-expense').classList.remove('show');
+        if (typeof loadExpensesData !== 'undefined') loadExpensesData();
+        else if (typeof window.loadExpensesReport === 'function') window.loadExpensesReport();
+      }, 2000);
+    } else {
+      stat.innerText = 'Eroare: ' + (res.error || 'A apărut o problemă la salvare.');
+      stat.style.color = 'var(--red)';
+      btnC.disabled = false;
+      btnC.innerText = 'Confirmă și Salvează';
+    }
+  } catch(err) {
+    stat.innerText = 'Eroare la salvare.';
+    stat.style.color = 'var(--red)';
+    btnC.disabled = false;
+    btnC.innerText = 'Confirmă și Salvează';
   }
 }
 

@@ -36,77 +36,6 @@
 </style>
 </head>
 <body>
-<div id="app" class="app-layout">
-  
-  <!-- SIDEBAR -->
-  <aside class="sidebar">
-    <div class="sidebar-card" id="logo-card">
-      <div class="sidebar-header" style="display:flex; justify-content:center; align-items:center; padding: 12px 16px;">
-        <img src="/logo_cashpot.png" alt="Cashpot" style="height:26px; object-fit:contain; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5));">
-      </div>
-    </div>
-    <div class="sidebar-card" style="flex:1; display:flex; flex-direction:column; padding-top:16px; margin-bottom:0;">
-      <nav class="sidebar-nav" style="flex:1;">
-      <a href="#dashboard" class="nav-item active">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
-        Dashboard
-      </a>
-        <a href="#cheltuieli" class="nav-item">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-          Cheltuieli
-        </a>
-      <a href="#rapoarte" class="nav-item" onclick="document.getElementById('subnav-rapoarte').style.display = document.getElementById('subnav-rapoarte').style.display === 'none' ? 'block' : 'none';">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-        Rapoarte
-      </a>
-      <div id="subnav-rapoarte" class="subnav-group" style="display:none; padding-left: 12px; margin-bottom: 8px;">
-        <a href="#rapoarte/ore" class="nav-item sub-item active">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
-          Evolutie pe Ore
-        </a>
-        <a href="#rapoarte/hh" class="nav-item sub-item">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          Happy Hour
-        </a>
-        <a href="#rapoarte/marketing" class="nav-item sub-item">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-          Marketing
-        </a>
-        <a href="#rapoarte/clienti" class="nav-item sub-item" id="rep-nav-clienti">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          Clienti
-        </a>
-        <a href="#rapoarte/cashout" class="nav-item sub-item" id="rep-nav-cashout">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-          Cashout
-        </a>
-        <a href="#rapoarte/multigame" class="nav-item sub-item">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
-          Multigame
-        </a>
-      </div>
-
-      <a href="#dispozitive" class="nav-item">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
-        Dispozitive
-      </a>
-      <a href="#live" class="nav-item">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3" fill="currentColor"></circle><circle cx="12" cy="12" r="8"></circle><line x1="12" y1="2" x2="12" y2="4"></line><line x1="12" y1="20" x2="12" y2="22"></line><line x1="2" y1="12" x2="4" y2="12"></line><line x1="20" y1="12" x2="22" y2="12"></line></svg>
-        Live
-      </a>
-        <div class="nav-section-title">ADMINISTRARE</div>
-        <a href="#admin/sloturi" class="nav-item">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><line x1="8" y1="6" x2="16" y2="6"></line><line x1="8" y1="10" x2="16" y2="10"></line></svg>
-          Sloturi
-        </a>
-        <a href="#admin/utilizatori" class="nav-item">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-          Utilizatori
-        </a>
-      </nav>
-    </div>
-      
-  </aside>
 
   <!-- ═══ VIEW: LOGIN ═══ -->
   <div id="view-login" class="view" style="display:none; align-items:center; justify-content:center; height:100vh; width:100vw; position:fixed; top:0; left:0; z-index:9999; background: url('https://images.unsplash.com/photo-1579546929518-9e396f3cc809?q=80&w=2000&auto=format&fit=crop') center/cover no-repeat; overflow: hidden;">
@@ -164,6 +93,8 @@
     <div style="position:absolute; bottom:32px; font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:2px; font-weight:600;">Secured by Cashpot Core</div>
   </div>
 
+  </div>
+
   <!-- ═══ VIEW: REGISTER ═══ -->
   <div id="view-register" class="view" style="display:none; align-items:center; justify-content:center; height:100vh; width:100vw; position:fixed; top:0; left:0; z-index:9999; background: radial-gradient(circle at top right, #1a1a2e, #0f0f1a, #000000); overflow: hidden;">
     
@@ -218,18 +149,20 @@
     </div>
   </div>
 
-  <!-- MAIN CONTENT -->
-  <div class="main-content" id="app-content" style="display:none;">
+  <div id="app" class="app-wrapper" style="display:flex; flex-direction:column; height:100vh; padding:16px; gap:16px; box-sizing:border-box;">
     
-    <!-- HEADER -->
-    <header class="header">
+    <!-- HEADER GLOBAL -->
+    <header class="header" id="global-header" style="display:none; align-items:center; justify-content:space-between; background:var(--surface); border:1px solid var(--border); border-radius:24px; padding:12px 24px; box-shadow:0 8px 32px rgba(0,0,0,0.1); flex-shrink:0;">
       <div class="header-left" style="display:flex; align-items:center; gap:16px;">
+        <div id="logo-card" style="padding:4px 12px; border-radius:12px; display:flex; align-items:center;">
+          <img src="/logo_cashpot.png" alt="Cashpot" style="height:26px; object-fit:contain; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5));">
+        </div>
         <button onclick="toggleSidebar()" class="settings-btn" style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:50%; padding:0; background:var(--surface); border:1px solid var(--border);" title="Toggle Sidebar">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
         </button>
         <span class="badge" id="db-status" style="margin:0;">● Live</span>
       </div>
-      <div class="header-right">
+      <div class="header-right" style="display:flex; align-items:center;">
         <button id="theme-toggle" class="settings-btn" style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:50%; padding:0;" title="Schimbă tema">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
         </button>
@@ -251,10 +184,80 @@
       </div>
     </header>
 
-    <!-- PERIOD SELECTOR: CELL-BASED MONTH GRID -->
-    <div class="timeline-section">
+  <!-- LOWER SECTION: SIDEBAR + CONTENT -->
+  <div class="app-layout" id="app-body" style="display:none; flex:1; gap:16px; padding:0; height:auto; overflow:hidden;">
+    
+    <!-- SIDEBAR -->
+    <aside class="sidebar" style="height:100%;">
+      <div class="sidebar-card" style="flex:1; display:flex; flex-direction:column; padding-top:16px; margin-bottom:0;">
+        <nav class="sidebar-nav" style="flex:1;">
+        <a href="#dashboard" class="nav-item active">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>
+          Dashboard
+        </a>
+          <a href="#cheltuieli" class="nav-item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+            Cheltuieli
+          </a>
+          <a href="#pl" class="nav-item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+            Profit & Loss
+          </a>
+        <a href="#rapoarte" class="nav-item" onclick="document.getElementById('subnav-rapoarte').style.display = document.getElementById('subnav-rapoarte').style.display === 'none' ? 'block' : 'none';">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+          Rapoarte
+        </a>
+        <div id="subnav-rapoarte" class="subnav-group" style="display:none; padding-left: 12px; margin-bottom: 8px;">
+          <a href="#rapoarte/ore" class="nav-item sub-item active">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            Evolutie pe Ore
+          </a>
+          <a href="#rapoarte/hh" class="nav-item sub-item">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            Happy Hour
+          </a>
+          <a href="#rapoarte/marketing" class="nav-item sub-item">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+            Marketing
+          </a>
+          <a href="#rapoarte/clienti" class="nav-item sub-item" id="rep-nav-clienti">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Clienti
+          </a>
+          <a href="#rapoarte/cashout" class="nav-item sub-item" id="rep-nav-cashout">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+            Cashout
+          </a>
+          <a href="#rapoarte/multigame" class="nav-item sub-item">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
+            Multigame
+          </a>
+        </div>
+  
+        <a href="#dispozitive" class="nav-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+          Dispozitive
+        </a>
+        <a href="#live" class="nav-item">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3" fill="currentColor"></circle><circle cx="12" cy="12" r="8"></circle><line x1="12" y1="2" x2="12" y2="4"></line><line x1="12" y1="20" x2="12" y2="22"></line><line x1="2" y1="12" x2="4" y2="12"></line><line x1="20" y1="12" x2="22" y2="12"></line></svg>
+          Live
+        </a>
+        
+        <a href="#admin" class="nav-item" id="nav-admin" style="display:none; color:var(--orange);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+          Gestiune Useri
+        </a>
+        </nav>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <div class="main-content" id="app-content" style="display:flex; height:100%;">
+      
+      <!-- PERIOD SELECTOR: CELL-BASED MONTH GRID -->
+      <div class="timeline-section">
     <div class="timeline-top-row">
-      <div class="timeline-label" style="display:flex; align-items:center;">
+      <div class="timeline-label" style="display:none; align-items:center;">
         <div><span id="tl-range-display" class="tl-range-text">—</span></div>
       </div>
       <div class="timeline-presets">
@@ -642,13 +645,14 @@
               <table class="data-table w-full">
                 <thead>
                   <tr>
-                    <th style="width:30px; text-align:center;"><input type="checkbox" id="exp-select-all" onclick="toggleAllExpenses(this)" style="cursor:pointer;"></th><th>Nr.</th>
+                    <th style="width:30px; text-align:center;"><input type="checkbox" id="exp-select-all" onclick="toggleAllExpenses(this)" style="cursor:pointer;"></th>
                     <th onclick="sortExpenses('date')" style="cursor:pointer;" title="Sortează după Dată">Dată ⇅</th>
                     <th onclick="sortExpenses('location_name')" style="cursor:pointer;" title="Sortează după Locație">Locație ⇅</th>
                     <th onclick="sortExpenses('department_name')" style="cursor:pointer;" title="Sortează după Departament">Departament ⇅</th>
                     <th onclick="sortExpenses('expenditure_type_name')" style="cursor:pointer;" title="Sortează după Categorie">Categorie ⇅</th>
                     <th onclick="sortExpenses('vendor_name')" style="cursor:pointer;" title="Sortează după Furnizor">Furnizor ⇅</th>
                     <th onclick="sortExpenses('explanation')" style="cursor:pointer;" title="Sortează după Explicație">Explicație ⇅</th>
+                    <th onclick="sortExpenses('details')" style="cursor:pointer;" title="Sortează după Sursă/Persoană">Sursă/Persoană ⇅</th>
                     <th onclick="sortExpenses('amount')" class="num" style="cursor:pointer;" title="Sortează după Sumă">Sumă (RON) ⇅</th>
                     
                     <th style="width:50px; text-align:center;">Acțiuni</th>
@@ -680,6 +684,65 @@
           </section>
   </div>
 </div>
+
+<!-- ═══ VIEW: P&L ═══ -->
+<div id="view-pl" class="view-panel" style="overflow-y:auto;">
+  <div style="padding:16px;">
+    <section class="card" style="margin-top:0; padding:0; overflow:hidden;">
+      <div class="card-header" style="display:flex; align-items:center; border-bottom:1px solid var(--border); padding:16px 20px;">
+        <div style="font-size: 16px; font-weight: 700; color: var(--text);">Profit & Loss (P&L) pe Locații</div>
+      </div>
+      <div style="padding: 24px 24px 0 24px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+          <!-- Chart 1: Profit Net pe Locatii -->
+          <div style="padding: 16px; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px;">
+            <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 16px;">Evoluție (Profit Net vs Cheltuieli)</div>
+            <div style="height: 250px; position: relative;"><canvas id="pl-chart-net"></canvas></div>
+          </div>
+          <!-- Chart 2: Pondere Cheltuieli vs NGR -->
+          <div style="padding: 16px; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px;">
+            <div style="font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 16px;">Structură (NGR vs Cheltuieli) - Top 5 Locații</div>
+            <div style="height: 250px; position: relative;"><canvas id="pl-chart-struct"></canvas></div>
+          </div>
+        </div>
+      </div>
+      <div style="padding:24px;">
+        <div class="table-scroll">
+          <table class="data-table w-full">
+            <thead>
+              <tr>
+                <th style="text-align:left;">Locație</th>
+                <th class="num">Total IN</th>
+                <th class="num">Total OUT</th>
+                <th class="num">GGR</th>
+                <th class="num">Bonusuri / Mkt</th>
+                <th class="num">NGR</th>
+                <th class="num">Cheltuieli</th>
+                <th class="num">Profit Net</th>
+              </tr>
+            </thead>
+            <tbody id="body-pl">
+              <tr><td colspan="8" style="text-align:center; color:var(--muted)">Încărcare date P&L...</td></tr>
+            </tbody>
+            <tfoot id="foot-pl">
+            </tfoot>
+          </table>
+        </div>
+      </div>
+      <div style="padding: 24px; border-top: 1px solid var(--border);">
+        <div style="font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 16px;">Heatmap Profit Net (Ultimele 12 Luni)</div>
+        <div class="table-scroll">
+          <table class="data-table w-full" style="text-align:center;">
+            <thead id="pl-heatmap-head"></thead>
+            <tbody id="pl-heatmap-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+
 
   <div id="view-rapoarte" class="view-panel" style="overflow-y:auto;">
     <div style="padding:16px;">
@@ -1397,7 +1460,9 @@
     </div>
   </div>
 
-</div> <!-- /app -->
+  </div> <!-- /app-content -->
+</div> <!-- /app-body -->
+</div> <!-- /app-wrapper -->
 
 <div id="loader" class="loader-overlay"><div class="spinner"></div></div>
 
@@ -1725,8 +1790,28 @@
           <input type="text" id="import-gs-link" class="glass-select" placeholder="https://docs.google.com/spreadsheets/d/..." style="width:100%; box-sizing:border-box;" required>
         </div>
         <div id="import-status" style="font-size:12px; font-weight:600; margin-bottom:16px;"></div>
-        <div style="display:flex; justify-content:flex-end;">
-          <button type="submit" class="btn-primary" id="btn-do-import" style="padding:10px 24px; ">Începe Importul</button>
+        
+        <div id="import-preview-container" style="display:none; margin-bottom:16px; border:1px solid var(--border); border-radius:8px; max-height:300px; overflow-y:auto;">
+          <table class="data-table w-full" style="font-size:11px;">
+            <thead style="position:sticky; top:0; background:var(--surface2); z-index:1;">
+              <tr>
+                <th>Dată</th>
+                <th>Locație</th>
+                <th>Dep.</th>
+                <th>Cat.</th>
+                <th>Explicație</th>
+                <th>Sursă/Persoană</th>
+                <th class="num">Sumă</th>
+              </tr>
+            </thead>
+            <tbody id="import-preview-body">
+            </tbody>
+          </table>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:8px;">
+          <button type="submit" class="btn-primary" id="btn-do-import" style="padding:10px 24px;">Preia Datele</button>
+          <button type="button" class="btn-primary" id="btn-confirm-import" style="padding:10px 24px; display:none; background:var(--green);" onclick="confirmImportExpense()">Confirmă și Salvează</button>
         </div>
       </form>
     </div>

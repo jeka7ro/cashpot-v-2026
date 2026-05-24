@@ -2721,6 +2721,7 @@ def save_manual_expense():
 def import_google_sheets_expense():
     data = request.json
     link = data.get('link', '')
+    is_preview = data.get('preview', False)
     
     if '/d/' not in link: return jsonify({'error': 'Link invalid'}), 400
     sheet_id = link.split('/d/')[1].split('/')[0]
@@ -2758,6 +2759,7 @@ def import_google_sheets_expense():
     type_map = {t['name'].strip().lower(): str(t['id']) for t in pg_types}
     
     inserted = 0
+    preview_data = []
     import uuid
     for row in reader:
         if len(row) <= idx_amt: continue
@@ -2780,14 +2782,25 @@ def import_google_sheets_expense():
         if norm_loc not in loc_map: continue
         if dep_str not in dep_map: continue
         
+        if is_preview:
+            preview_data.append({
+                'date': date_str,
+                'explanation': expl_str,
+                'amount': amt,
+                'location_name': norm_loc.upper(),
+                'department_name': dep_str.upper(),
+                'category_name': cat_str.upper() if cat_str else '-'
+            })
+            continue
+
         loc_id = loc_map[norm_loc]
         dep_id = dep_map[dep_str]
         cat_id = type_map[cat_str] if cat_str in type_map else None
         
         pg_qry("""
             INSERT INTO casino_payments 
-            (id, date, operational_date, explanation, amount, location_id, department_id, expenditure_type_id, direction)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 1)
+            (id, date, operational_date, explanation, amount, location_id, department_id, expenditure_type_id, direction, details)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 1, 'Google Sheet')
         """, (
             str(uuid.uuid4()),
             date_str,
@@ -2799,6 +2812,9 @@ def import_google_sheets_expense():
             cat_id
         ))
         inserted += 1
+
+    if is_preview:
+        return jsonify({'success': True, 'preview_data': preview_data})
 
     return jsonify({'success': True, 'inserted_count': inserted})
 
@@ -2871,6 +2887,53 @@ def bulk_edit_expenses():
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+@app.route('/api/reports/pl_heatmap')
+def api_pl_heatmap():
+    lf, lp = loc_filter(request, alias='mas')
+    
+    mysql_sql = f"""
+        SELECT 
+            DATE_FORMAT(mas.date, '%%Y-%%m') AS month,
+            COALESCE(l.display_code, l.code) AS location_name,
+            SUM(mas.`in`-mas.`out`) as ngr
+        FROM machine_audit_summaries mas
+        JOIN locations l ON mas.location_id = l.id
+        WHERE mas.date >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+        {lf}
+        GROUP BY month, location_name
+    """
+    rev_rows = qry(mysql_sql, lp)
+    
+    cfg = get_exp_config()
+    excl_types = cfg.get('excluded_types', [])
+    pg_excl = ""
+    if excl_types:
+        ph_t = ','.join([f"'{t}'" for t in excl_types])
+        pg_excl = f" AND (p.expenditure_type_id IS NULL OR p.expenditure_type_id::text NOT IN ({ph_t}))"
+
+    pg_locs = pg_qry("SELECT id, name FROM casino_locations")
+    pg_name_map = {str(l['id']): l['name'] for l in pg_locs}
+
+    pg_sql = f"""
+        SELECT 
+            SUBSTRING(p.date::text FROM 1 FOR 7) AS month,
+            p.location_id,
+            SUM(p.amount) as expenses
+        FROM casino_payments p
+        WHERE p.direction = 1 AND p.date >= CURRENT_DATE - INTERVAL '12 months'
+        {pg_excl}
+        GROUP BY month, p.location_id
+    """
+    exp_rows = pg_qry(pg_sql)
+    for r in exp_rows:
+        r['location_name'] = pg_name_map.get(str(r['location_id']), 'Unknown')
+        r['expenses'] = float(r['expenses'] or 0)
+    
+    return jsonify({
+        "revenue": rev_rows,
+        "expenses": exp_rows
+    })
+
 
 @app.route('/api/reports/expenses')
 def api_expenses():
