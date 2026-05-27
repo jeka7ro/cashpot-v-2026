@@ -4447,7 +4447,10 @@ function logout(callApi = true) {
   }
   localStorage.removeItem('cp2_token');
   window.location.hash = '';
-  window.location.reload();
+  document.getElementById('app-container').style.display = 'none';
+  document.getElementById('view-login').style.display = 'flex';
+  document.getElementById('view-register').style.display = 'none';
+  currentUser = null;
 }
 
 // ─── ADMIN UTILIZATORI ────────────────────────────────────────────────────────
