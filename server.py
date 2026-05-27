@@ -368,7 +368,9 @@ def kpi():
     exp_res = pg_qry(f"""
         SELECT SUM(amount) as s 
         FROM casino_payments 
-        WHERE direction = 1 AND date >= %s AND date <= %s {pg_loc_where} {pg_excl_where}
+        WHERE direction = 1
+          AND (is_deleted = false OR is_deleted IS NULL)
+          AND date >= %s AND date <= %s {pg_loc_where} {pg_excl_where}
     """, pg_params)
     expenses = float(exp_res[0]['s'] or 0) if exp_res else 0.0
 
@@ -970,6 +972,13 @@ def eur_rate():
     return jsonify(rate=_bnr_cache['rate'], date=_bnr_cache['date'])
 
 # ─── Serve frontend ──────────────────────────────────────────────────────────
+@app.after_request
+def add_header(r):
+    r.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    r.headers["Pragma"] = "no-cache"
+    r.headers["Expires"] = "0"
+    return r
+
 @app.route('/')
 def index():
     return send_from_directory(BASE_DIR, 'index.html')
@@ -2906,13 +2915,41 @@ def api_pl_heatmap():
     
     cfg = get_exp_config()
     excl_types = cfg.get('excluded_types', [])
+    
+    # Build PG location filter matching the active MySQL loc_ids
+    mysql_locs = qry("SELECT id, code FROM locations")
+    pg_locs = pg_qry("SELECT id, name FROM casino_locations")
+    pg_name_to_id = {normalize_loc_name(l['name']): str(l['id']) for l in pg_locs}
+    mysql_to_pg_map = {}
+    for ml in mysql_locs:
+        norm_name = normalize_loc_name(ml['code'])
+        if norm_name in pg_name_to_id:
+            mysql_to_pg_map[str(ml['id'])] = pg_name_to_id[norm_name]
+
+    ids_raw = request.args.get('loc_ids', '')
+    pg_loc_ids = []
+    if ids_raw:
+        for i in [x.strip() for x in ids_raw.split(',') if x.strip()]:
+            if i in mysql_to_pg_map:
+                pg_loc_ids.append(mysql_to_pg_map[i])
+    else:
+        pg_loc_ids = list(mysql_to_pg_map.values())
+
+    pg_loc_where = ""
+    pg_params = []
+    if pg_loc_ids:
+        ph = ','.join(['%s'] * len(pg_loc_ids))
+        pg_loc_where = f" AND p.location_id IN ({ph})"
+        pg_params.extend(pg_loc_ids)
+    else:
+        pg_loc_where = " AND 1=0"
+
+    pg_name_map = {str(l['id']): l['name'] for l in pg_locs}
+
     pg_excl = ""
     if excl_types:
         ph_t = ','.join([f"'{t}'" for t in excl_types])
         pg_excl = f" AND (p.expenditure_type_id IS NULL OR p.expenditure_type_id::text NOT IN ({ph_t}))"
-
-    pg_locs = pg_qry("SELECT id, name FROM casino_locations")
-    pg_name_map = {str(l['id']): l['name'] for l in pg_locs}
 
     pg_sql = f"""
         SELECT 
@@ -2921,10 +2958,10 @@ def api_pl_heatmap():
             SUM(p.amount) as expenses
         FROM casino_payments p
         WHERE p.direction = 1 AND p.date >= CURRENT_DATE - INTERVAL '12 months'
-        {pg_excl}
+        {pg_loc_where}{pg_excl}
         GROUP BY month, p.location_id
     """
-    exp_rows = pg_qry(pg_sql)
+    exp_rows = pg_qry(pg_sql, pg_params)
     for r in exp_rows:
         r['location_name'] = pg_name_map.get(str(r['location_id']), 'Unknown')
         r['expenses'] = float(r['expenses'] or 0)
@@ -3005,8 +3042,10 @@ def api_expenses():
         LEFT JOIN casino_expenditure_types et ON p.expenditure_type_id = et.id
         LEFT JOIN casino_vendors v ON p.vendor_id = v.id
         LEFT JOIN users u ON p.created_by_id = u.id
-        WHERE p.direction = 1 AND p.date >= %s AND p.date <= %s
-        {pg_loc_where} {pg_excl_where}
+        WHERE p.direction = 1
+          AND (p.is_deleted = false OR p.is_deleted IS NULL)
+          AND p.date >= %s AND p.date <= %s
+          {pg_loc_where} {pg_excl_where}
         ORDER BY p.date DESC
     """, pg_params)
     

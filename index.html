@@ -265,12 +265,20 @@
         <input type="date" id="native-date-end" class="date-picker-input">
         <button class="preset-btn" data-preset="today">Azi</button>
         <button class="preset-btn" data-preset="yesterday">Ieri</button>
-        <button class="preset-btn" data-preset="7d">7 zile</button>
         <button class="preset-btn active" data-preset="month">Luna curentă</button>
         <button class="preset-btn" data-preset="prev_month">Luna anterioară</button>
-        <select id="preset-month-select" class="preset-btn" style="padding-right:8px; appearance:auto; min-width:140px;" onchange="selectPresetMonth(this.value)">
-           <option value="" disabled selected>Alege luna...</option>
-        </select>
+        <button class="preset-btn" data-preset="q">Trimestrul actual</button>
+        
+        <div style="position:relative; display:inline-block;" id="multi-month-container">
+          <button id="btn-month-multi" class="preset-btn" onclick="toggleMonthMulti(event)" style="min-width:140px; display:flex; justify-content:space-between; align-items:center;">
+             <span>Alege luna...</span>
+             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+          <div id="dropdown-month-multi" class="glass-panel" style="display:none; position:absolute; top:calc(100% + 4px); left:0; width:220px; z-index:9999; padding:8px; border:1px solid var(--border); border-radius:8px; max-height:280px; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.3); background:var(--surface); flex-direction:column; gap:4px;">
+            <!-- JS will populate -->
+          </div>
+        </div>
+
         <button class="preset-btn" data-preset="ytd">An curent</button>
       </div>
     </div>
@@ -300,9 +308,20 @@
         <div class="kpi-sub" id="v-ggr-day">AVG/zi: —</div>
       </div>
     </div>
+    <div class="kpi-card" id="kpi-ngr" style="display:none;">
+      <div class="kpi-label">NGR</div>
+      <div style="display:flex; align-items:center; flex-wrap:wrap; gap:8px;">
+        <div class="kpi-value" id="v-ngr">—</div>
+        <div class="kpi-trend" id="t-ngr" style="display:none"></div>
+      </div>
+      <div class="kpi-sub" id="v-ngr-day">AVG/zi: —</div>
+    </div>
     <div class="kpi-card" id="kpi-profit">
       <div class="kpi-label">Profit Net</div>
-      <div class="kpi-value" id="v-profit">—</div>
+      <div style="display:flex; align-items:center; flex-wrap:wrap; gap:8px;">
+        <div class="kpi-value" id="v-profit">—</div>
+        <div class="kpi-trend" id="t-profit" style="display:none"></div>
+      </div>
       <div class="kpi-sub" id="v-expenses">Cheltuieli: —</div>
     </div>
 
@@ -314,9 +333,25 @@
 
         <div class="kpi-card" id="kpi-total-expenses" style="display:none; border-left: 4px solid var(--red);">
           <div class="kpi-label">TOTAL CHELTUIELI</div>
-          <div class="kpi-value" id="v-only-expenses" style="color:var(--red);">—</div>
-          <div class="kpi-sub" id="v-only-profit">Profit Net: —</div>
+          <div style="display:flex; align-items:center; flex-wrap:wrap; gap:8px;">
+            <div class="kpi-value" id="v-only-expenses" style="color:var(--red);">—</div>
+            <div class="kpi-trend" id="t-expenses" style="display:none"></div>
+          </div>
+          <div class="kpi-sub" id="v-expenses-month">AVG/lună: —</div>
         </div>
+        
+        <div class="kpi-card" id="kpi-marketing" style="display:none; border-left: 4px solid var(--purple);">
+          <div class="kpi-label">MARKETING</div>
+          <div style="display:flex; align-items:center; flex-wrap:wrap; gap:8px;">
+            <div class="kpi-value" id="v-marketing" style="color:var(--purple);">—</div>
+            <div class="kpi-trend" id="t-marketing" style="display:none"></div>
+          </div>
+          <div style="display:flex; justify-content:space-between;">
+            <div class="kpi-sub" id="v-marketing-month">AVG/lună: —</div>
+            <div class="kpi-sub" id="v-bonus-pct">Bonus cost: —% din bet</div>
+          </div>
+        </div>
+        
     <div class="kpi-card" id="kpi-games">
       <div class="kpi-label">Total Games</div>
       <div class="kpi-value" id="v-games">—</div>
@@ -544,7 +579,7 @@
   <div style="padding:16px;">
           <section class="card" style="margin-top:0; border-top-left-radius:0; padding:0; overflow:hidden;">
             <div class="card-header" style="display:flex; align-items:center; border-bottom:1px solid var(--border); padding:16px 20px;">
-              <div style="display:flex; gap:10px; align-items:center; flex-wrap:nowrap; overflow-x:auto; width:100%;">
+              <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; width:100%;">
                 <!-- FILTRE -->
                 <!-- BARA CAUTARE -->
                 <div style="position:relative; display:flex; align-items:center;">
@@ -1893,7 +1928,7 @@
 </div>
 
 <script src="game_uuids.js?v=1"></script>
-<script src="app.js?v=999"></script>
+<script src="app.js?v=1009"></script>
 <!-- CUSTOM PROMPT MODAL -->
 <div class="settings-modal" id="modal-custom-prompt" onclick="if(event.target===this) { if(window.customPromptCancel) window.customPromptCancel(); }">
   <div class="settings-panel" style="width:400px; max-width:90%; background:var(--surface);">

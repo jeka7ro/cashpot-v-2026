@@ -175,7 +175,7 @@ window.reloadCurrentView = function() {
   else if (hash.startsWith('#rapoarte/marketing')) { loadAll(); loadMarketingReport(); }
   else if (hash.startsWith('#rapoarte/clienti')) { loadAll(); loadClientiReport(); }
   else if (hash.startsWith('#rapoarte/cashout')) { loadAll(); loadRapoarteCashout(); }
-  else if (hash.startsWith('#rapoarte/cheltuieli')) {
+  else if (hash.startsWith('#rapoarte/cheltuieli') || hash === '#cheltuieli' || hash.startsWith('#cheltuieli/')) {
     const {s: ks, e: ke} = getPeriod();
     if (ks && ke) loadKPI(ks, ke).catch(console.error);
     window.loadExpensesReport();
@@ -391,7 +391,11 @@ function applyPreset(p){
   else if(p==='yesterday'){s=new Date(today);s.setDate(today.getDate()-1);e=new Date(today);e.setDate(today.getDate()-1);}
   else if(p==='month'){s=new Date(today.getFullYear(),today.getMonth(),1);e=new Date(today);}
   else if(p==='prev_month'){s=new Date(today.getFullYear(),today.getMonth()-1,1);e=new Date(today.getFullYear(),today.getMonth(),0);}
-  else if(p==='7d'){e=new Date(today);s=new Date(today);s.setDate(today.getDate()-6);}
+  else if(p==='q'){
+    const q = Math.floor(today.getMonth() / 3);
+    s = new Date(today.getFullYear(), q * 3, 1);
+    e = new Date(today);
+  }
   else if(p==='30d'){e=new Date(today);s=new Date(today);s.setDate(today.getDate()-29);}
   else if(p==='ytd'){s=new Date(today.getFullYear(),0,1);e=new Date(today);}
   const yMd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -424,7 +428,7 @@ function autoSetTrend() {
 
 document.querySelectorAll('.preset-btn').forEach(btn=>{
   btn.addEventListener('click',()=>{
-    if (btn.tagName === 'SELECT') return;
+    if (btn.tagName === 'SELECT' || btn.id === 'btn-month-multi') return;
     document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
     const sel = document.getElementById('preset-month-select');
     if(sel) sel.value = '';
@@ -434,39 +438,139 @@ document.querySelectorAll('.preset-btn').forEach(btn=>{
   });
 });
 
-window.selectPresetMonth = function(val) {
-  if(!val) return;
+window.toggleMonthMulti = function(e) {
+  e.stopPropagation();
+  const dd = document.getElementById('dropdown-month-multi');
+  const btn = document.getElementById('btn-month-multi');
+  if (dd.style.display === 'none' || !dd.style.display) {
+    const rect = btn.getBoundingClientRect();
+    dd.style.position = 'fixed';
+    dd.style.top = (rect.bottom + 4) + 'px';
+    dd.style.left = rect.left + 'px';
+    dd.style.display = 'flex';
+  } else {
+    dd.style.display = 'none';
+  }
+};
+
+document.addEventListener('click', (e) => {
+  const container = document.getElementById('multi-month-container');
+  const dd = document.getElementById('dropdown-month-multi');
+  if (container && dd && !container.contains(e.target)) {
+    dd.style.display = 'none';
+  }
+});
+
+let selectedMultiMonths = [];
+
+window.updateMultiMonthSelection = function() {
   document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('preset-month-select').classList.add('active');
-  const [y, m] = val.split('-');
-  const s = new Date(y, m, 1);
-  const e = new Date(y, parseInt(m)+1, 0);
-  const today = new Date();
-  const end = e > today ? today : e;
+  const btn = document.getElementById('btn-month-multi');
+  if(btn) btn.classList.add('active');
   
-  const yMd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  document.getElementById('native-date-start').value=yMd(s);
-  document.getElementById('native-date-end').value=yMd(end);
-  document.getElementById('date-start').value=yMd(s);
-  document.getElementById('date-end').value=yMd(end);
-  document.getElementById('tl-range-display').textContent=`${yMd(s)} ➔ ${yMd(end)}`;
+  const checkboxes = document.querySelectorAll('.month-checkbox:checked');
+  selectedMultiMonths = Array.from(checkboxes).map(cb => cb.value);
+  
+  if (selectedMultiMonths.length === 0) return;
+  
+  // Find min start and max end dates from selected months
+  let minDate = new Date('2099-01-01');
+  let maxDate = new Date('2000-01-01');
+  const today = new Date();
+  
+  selectedMultiMonths.forEach(val => {
+    const [y, m] = val.split('-');
+    const s = new Date(y, m, 1);
+    let e = new Date(y, parseInt(m)+1, 0);
+    if (e > today) e = today;
+    
+    if (s < minDate) minDate = s;
+    if (e > maxDate) maxDate = e;
+  });
+  
+  const yMd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  
+  document.getElementById('native-date-start').value = yMd(minDate);
+  document.getElementById('native-date-end').value = yMd(maxDate);
+  document.getElementById('date-start').value = yMd(minDate);
+  document.getElementById('date-end').value = yMd(maxDate);
+  document.getElementById('tl-range-display').textContent = `${yMd(minDate)} ➔ ${yMd(maxDate)}`;
   
   autoSetTrend();
   reloadCurrentView();
 };
 
 function populateMonthDropdown() {
-  const sel = document.getElementById('preset-month-select');
-  if (!sel) return;
+  const dd = document.getElementById('dropdown-month-multi');
+  if (!dd) return;
+  dd.innerHTML = '';
+  
+  // Update parent dropdown to not clip the button
+  dd.style.overflowY = 'visible';
+  dd.style.maxHeight = 'none';
+  
+  const scrollArea = document.createElement('div');
+  scrollArea.style.maxHeight = '240px';
+  scrollArea.style.overflowY = 'auto';
+  scrollArea.style.display = 'flex';
+  scrollArea.style.flexDirection = 'column';
+  scrollArea.style.gap = '4px';
+  
   const today = new Date();
   const MO_RO=['Ianuarie','Februarie','Martie','Aprilie','Mai','Iunie','Iulie','August','Septembrie','Octombrie','Noiembrie','Decembrie'];
+  
   for (let i = 0; i < 12; i++) {
     const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
-    const opt = document.createElement('option');
-    opt.value = `${d.getFullYear()}-${d.getMonth()}`;
-    opt.textContent = `${MO_RO[d.getMonth()]} ${d.getFullYear()}`;
-    sel.appendChild(opt);
+    const val = `${d.getFullYear()}-${d.getMonth()}`;
+    const lbl = `${MO_RO[d.getMonth()]} ${d.getFullYear()}`;
+    
+    const wrapper = document.createElement('label');
+    wrapper.style.display = 'flex';
+    wrapper.style.alignItems = 'center';
+    wrapper.style.padding = '8px 12px';
+    wrapper.style.cursor = 'pointer';
+    wrapper.style.borderRadius = '6px';
+    wrapper.style.fontSize = '12px';
+    wrapper.onmouseover = () => wrapper.style.background = 'rgba(255,255,255,0.05)';
+    wrapper.onmouseout = () => wrapper.style.background = 'transparent';
+    
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.className = 'month-checkbox';
+    cb.value = val;
+    cb.style.marginRight = '10px';
+    // Removed immediate onchange to prevent constant reloading
+    
+    wrapper.appendChild(cb);
+    wrapper.appendChild(document.createTextNode(lbl));
+    scrollArea.appendChild(wrapper);
   }
+  
+  dd.appendChild(scrollArea);
+  
+  // Add Apply Button
+  const btnWrapper = document.createElement('div');
+  btnWrapper.style.marginTop = '8px';
+  btnWrapper.style.paddingTop = '8px';
+  btnWrapper.style.borderTop = '1px solid var(--border)';
+  btnWrapper.style.display = 'flex';
+  btnWrapper.style.justifyContent = 'flex-end';
+  
+  const applyBtn = document.createElement('button');
+  applyBtn.textContent = 'Aplică';
+  applyBtn.className = 'btn-primary';
+  applyBtn.style.padding = '6px 16px';
+  applyBtn.style.fontSize = '13px';
+  applyBtn.style.fontWeight = 'bold';
+  applyBtn.style.borderRadius = '6px';
+  applyBtn.onclick = (e) => {
+    e.stopPropagation();
+    updateMultiMonthSelection();
+    dd.style.display = 'none';
+  };
+  
+  btnWrapper.appendChild(applyBtn);
+  dd.appendChild(btnWrapper);
 }
 populateMonthDropdown();
 
@@ -538,8 +642,7 @@ function renderMonthCalendar(){
       let htmlTip = `
         <div class="tt-header">${k}</div>
         <div class="tt-row"><span class="tt-label">Total IN</span><span class="tt-val">${fmt(row.tin)}</span></div>
-        <div class="tt-row"><span class="tt-label">NGR (Net)</span><span class="tt-val ${ggr>=0?'pos':'neg'}">${fmt(ggr)}</span></div>
-        <div class="tt-row"><span class="tt-label">GGR Brut</span><span class="tt-val">${fmt(row.raw_ggr)}</span></div>
+        <div class="tt-row"><span class="tt-label">GGR</span><span class="tt-val ${ggr>=0?'pos':'neg'}">${fmt(ggr)}</span></div>
         <div class="tt-row"><span class="tt-label">Cheltuieli</span><span class="tt-val hl">${fmt(row.exp)}</span></div>
         <div class="tt-row"><span class="tt-label">Total BET</span><span class="tt-val">${fmt(row.bet)}</span></div>
       `;
@@ -665,7 +768,7 @@ async function updateMonthCalendarData(y, m) {
   let maxValidDate = '0000-00-00';
   dMonth.forEach(r => { 
     const exp = expByDate[r.date] || 0;
-    dailyMonthData[r.date] = {ggr: r.ggr - exp, raw_ggr: r.ggr, exp: exp, tin:r.total_in, hh:r.hh, bet:r.bet||0, locs:r.loc_details||[]}; 
+    dailyMonthData[r.date] = {ggr: r.ggr, raw_ggr: r.ggr, exp: exp, tin:r.total_in, hh:r.hh, bet:r.bet||0, locs:r.loc_details||[]}; 
     if (r.date > maxValidDate && r.total_in > 0) { maxValidDate = r.date; }
   });
   return maxValidDate;
@@ -731,10 +834,10 @@ window.goToMultigame = function(mix) {
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
 function openSettings(showExpenses){
-  // Show/hide expenses section based on context (only Super Admin, only from cheltuieli page)
+  // Always show expenses config for Super Admin (merged into one button)
   const expSection = document.getElementById('settings-exp-section');
   const expGrid = document.getElementById('settings-exp-grid');
-  const show = showExpenses && currentUser && currentUser.role === 'Super Admin';
+  const show = currentUser && currentUser.role === 'Super Admin';
   if (expSection) expSection.style.display = show ? '' : 'none';
   if (expGrid) expGrid.style.display = show ? 'grid' : 'none';
   if (show) setTimeout(() => loadExpensesConfig(), 50);
@@ -898,15 +1001,46 @@ async function loadKPI(s,e){
   document.getElementById('v-hold').textContent='Hold: '+fmt(d.hold_pct,2)+'%';
   const ggrDayEl = document.getElementById('v-ggr-day');
   if(ggrDayEl) ggrDayEl.textContent = 'AVG/zi: ' + fmt(d.avg_ggr_zi) + ' RON';
+
+  const marketingCost = (d.jackpot || 0) + (d.hh || 0) + (d.cashback || 0);
+  const ngrCalculated = (d.ggr || 0) + marketingCost;
+
+  const ngrEl = document.getElementById('v-ngr');
+  if (ngrEl) ngrEl.textContent = fmt(ngrCalculated) + ' RON';
+  const ngrDayEl = document.getElementById('v-ngr-day');
+  if (ngrDayEl) ngrDayEl.textContent = 'AVG/zi: ' + fmt(d.nr_zile ? ngrCalculated/d.nr_zile : 0) + ' RON';
+
   const profitEl = document.getElementById('v-profit');
   if (profitEl) {
     profitEl.textContent = fmt(d.net_profit) + ' RON';
     profitEl.style.color = d.net_profit >= 0 ? 'var(--green)' : 'var(--red)';
   }
   const expEl = document.getElementById('v-expenses');
-  if (expEl) expEl.textContent = 'Cheltuieli: ' + fmt(d.expenses) + ' RON';
-  document.getElementById('v-jp').textContent=fmt(d.jackpot)+' RON';
-  document.getElementById('v-hh').textContent='HH: '+fmt(d.hh)+' RON';
+  if (expEl) {
+    const isExpensesPage = window.location.hash === '#cheltuieli' || window.location.hash.startsWith('#cheltuieli/') || window.location.hash.startsWith('#rapoarte/cheltuieli');
+    expEl.textContent = isExpensesPage ? 'AVG/zi: ' + fmt(d.nr_zile ? d.net_profit/d.nr_zile : 0) + ' RON' : 'Cheltuieli: ' + fmt(d.expenses) + ' RON';
+  }
+  const vMkt = document.getElementById('v-marketing');
+  if (vMkt) {
+    vMkt.textContent = fmt(marketingCost) + ' RON';
+    vMkt.style.color = 'var(--purple)'; 
+  }
+  
+  const vMktMonth = document.getElementById('v-marketing-month');
+  if (vMktMonth && s && e) {
+    const diffDays = (new Date(e) - new Date(s)) / (1000 * 60 * 60 * 24);
+    const months = Math.max(1, diffDays / 30.44);
+    vMktMonth.textContent = 'AVG/lună: ' + fmt(marketingCost / months) + ' RON';
+  }
+
+  const vBonusPct = document.getElementById('v-bonus-pct');
+  if (vBonusPct) {
+    if (d.bet > 0) {
+      vBonusPct.textContent = 'Bonus cost: ' + fmt((Math.abs(marketingCost) / d.bet) * 100, 2) + '% din bet';
+    } else {
+      vBonusPct.textContent = 'Bonus cost: 0% din bet';
+    }
+  }
   
   const vOnlyExp = document.getElementById('v-only-expenses');
   if(vOnlyExp) vOnlyExp.textContent = fmt(d.expenses) + ' RON';
@@ -934,6 +1068,18 @@ async function loadKPI(s,e){
   const daysText = isCurrentMonth ? `luna ant. (1-${new Date().getDate()-1})` : 'luna ant.';
   renderTrend('t-in', currExcl?.total_in, comp?.total_in, daysText);
   renderTrend('t-ggr', currExcl?.ggr, comp?.ggr, daysText);
+
+  if (currExcl && comp) {
+    const currExclMkt = (currExcl.jackpot || 0) + (currExcl.hh || 0) + (currExcl.cashback || 0);
+    const compMkt = (comp.jackpot || 0) + (comp.hh || 0) + (comp.cashback || 0);
+    const currExclNgr = (currExcl.ggr || 0) + currExclMkt;
+    const compNgr = (comp.ggr || 0) + compMkt;
+
+    renderTrend('t-ngr', currExclNgr, compNgr, daysText);
+    renderTrend('t-marketing', currExclMkt, compMkt, daysText);
+    renderTrend('t-profit', currExcl.net_profit, comp.net_profit, daysText);
+    renderTrend('t-expenses', currExcl.expenses, comp.expenses, daysText);
+  }
 }
 
 let currentTrendGroup = 'day';
@@ -1675,10 +1821,42 @@ window.addEventListener('hashchange', () => {
   const tlSection = document.querySelector('.timeline-section');
   if(tlSection) tlSection.style.display = mainHash === 'live' ? 'none' : '';
 
-  if(mainHash === 'cheltuieli') {
+  if(mainHash === 'cheltuieli' || mainHash === 'pl') {
+    // Hide KPI cards that are irrelevant for expenses/PL page
+    ['kpi-in', 'kpi-jp', 'kpi-games', 'kpi-aparate'].forEach(id => {
+      const el = document.getElementById(id);
+      if(el) el.style.display = 'none';
+    });
+    // Show the requested ones explicitly
+    ['kpi-ggr', 'kpi-ngr', 'kpi-profit', 'kpi-total-expenses', 'kpi-marketing'].forEach(id => {
+      const el = document.getElementById(id);
+      if(el) el.style.display = 'block';
+    });
+    
+    // Arrange cards nicely across the row
+    const globalKpiGrid = document.querySelector('.kpi-grid');
+    if (globalKpiGrid) globalKpiGrid.style.gridTemplateColumns = '';
+    
     loadExpensesReport();
     const btnExpSettings = document.getElementById('btn-exp-settings');
     if (btnExpSettings) btnExpSettings.style.display = (currentUser && currentUser.role === 'Super Admin') ? 'inline-flex' : 'none';
+  } else {
+    // Show them back on other pages
+    ['kpi-in', 'kpi-ggr', 'kpi-profit', 'kpi-jp', 'kpi-games', 'kpi-aparate'].forEach(id => {
+      const el = document.getElementById(id);
+      if(el) el.style.display = 'block';
+    });
+    const expKpi = document.getElementById('kpi-total-expenses');
+    if(expKpi) expKpi.style.display = 'none';
+    const mktKpi = document.getElementById('kpi-marketing');
+    if(mktKpi) mktKpi.style.display = 'none';
+    
+    // Restore label
+    const inCard = document.getElementById('kpi-in');
+    if (inCard) {
+      const lbl = inCard.querySelector('.kpi-label');
+      if (lbl) lbl.textContent = 'Total IN';
+    }
   }
 
   if(mainHash === 'pl') {
@@ -1775,10 +1953,14 @@ window.addEventListener('hashchange', () => {
   // Show/Hide kpi-profit (Expenses & Net Profit) based on context
   const kpiProfit = document.getElementById('kpi-profit');
   const globalKpiGrid = document.querySelector('.kpi-grid');
-  if (mainHash === 'dashboard' || (mainHash === 'rapoarte' && subHash === 'cheltuieli')) {
-    if (kpiProfit) kpiProfit.style.display = '';
-    if (globalKpiGrid && mainHash === 'dashboard') {
-      globalKpiGrid.style.gridTemplateColumns = '';
+  if (mainHash === 'dashboard' || mainHash === 'cheltuieli' || mainHash === 'pl' || (mainHash === 'rapoarte' && subHash === 'cheltuieli')) {
+    if (kpiProfit) kpiProfit.style.display = 'block';
+    if (globalKpiGrid) {
+      if (window.innerWidth > 1200) {
+        globalKpiGrid.style.gridTemplateColumns = 'repeat(5, 1fr)';
+      } else {
+        globalKpiGrid.style.gridTemplateColumns = '';
+      }
     }
   } else {
     if (kpiProfit) kpiProfit.style.display = 'none';
@@ -4232,7 +4414,13 @@ window.doLogin = async function(e) {
         localStorage.removeItem('cp2_saved_email');
         localStorage.removeItem('cp2_saved_pwd');
       }
-      checkAuth();
+      await checkAuth();
+      if (currentUser) {
+        await loadBNR();
+        applyPreset('month');
+        window.dispatchEvent(new Event('hashchange'));
+        if (window.location.hash === '' || window.location.hash === '#dashboard') await loadAll();
+      }
     }
   } catch (err) {
     errEl.textContent = 'Eroare retea. Verifica daca serverul ruleaza.';
@@ -4921,6 +5109,21 @@ window.loadPLData = async function() {
     const expRes = await api(`/api/reports/expenses?${p}`);
     const expData = expRes || [];
 
+    // Update KPI cards for PL page
+    const totalExp = expData.reduce((sum, r) => sum + (r.amount || 0), 0);
+    const vOnlyExp = document.getElementById('v-only-expenses');
+    if (vOnlyExp) vOnlyExp.textContent = fmt(totalExp) + ' RON';
+    
+    let months = 1;
+    if (s && e) {
+      const diffDays = (new Date(e) - new Date(s)) / (1000 * 60 * 60 * 24);
+      months = Math.max(1, diffDays / 30.44);
+    }
+    const vExpMonth = document.getElementById('v-expenses-month');
+    if (vExpMonth) vExpMonth.textContent = 'AVG/lună: ' + fmt(totalExp / months) + ' RON';
+    
+    // Marketing is now handled in loadKPI
+
     const norm = n => n.toLowerCase().replace(/[\(\)]/g, '').replace(/\s+/g, ' ').trim();
 
     const locRevMap = {};
@@ -4942,8 +5145,9 @@ window.loadPLData = async function() {
     let tIn = 0, tOut = 0, tGgr = 0, tBonus = 0, tNgr = 0, tExp = 0, tNet = 0;
     let html = '';
     
+    // Only show locations returned by /api/locations (respects exclusion filter)
+    // Cheltuieli from excluded locations (e.g. Depozit) are summed separately
     const allLocNames = new Set(locRes.map(r => r.locatie));
-    Object.keys(expMap).forEach(k => allLocNames.add(k));
     
     const rows = Array.from(allLocNames).map(lName => {
        const rev = locRevMap[lName] || {};
@@ -5121,7 +5325,9 @@ window.loadPLData = async function() {
       thead += '<th style="text-align:center; font-size:11px;">Total 12M</th></tr>';
       
       let tbody = '';
-      const locNames = Object.keys(locData).sort();
+      // Only show locations that are in the active locRes (respects exclusion filter)
+      const activeLocNames = new Set(locRes.map(r => r.locatie));
+      const locNames = Object.keys(locData).filter(k => activeLocNames.has(k)).sort();
       const monthTotals = {};
       months.forEach(m => monthTotals[m] = 0);
       let grandTotal = 0;
@@ -5216,6 +5422,18 @@ window.loadExpensesReport = async function() {
     const vOnlyExp = document.getElementById('v-only-expenses');
     if (vOnlyExp) vOnlyExp.textContent = fmt(totalExp) + ' RON';
     
+    // Calculate months for average
+    let months = 1;
+    if (s && e) {
+      const diffDays = (new Date(e) - new Date(s)) / (1000 * 60 * 60 * 24);
+      months = Math.max(1, diffDays / 30.44);
+    }
+    const vExpMonth = document.getElementById('v-expenses-month');
+    if (vExpMonth) vExpMonth.textContent = 'AVG/lună: ' + fmt(totalExp / months) + ' RON';
+    
+    // Marketing is now handled in loadKPI
+    
+    
     // Trigger KPI load for dashboard KPIs if they still show "—"
     const vIn = document.getElementById('v-in');
     if (vIn && (vIn.textContent === '—' || vIn.textContent.trim() === '—')) {
@@ -5260,66 +5478,68 @@ window.renderExpSummary = function() {
   const q = (document.getElementById('exp-search')?.value || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const filtered = typeof getExpFiltered === 'function' ? getExpFiltered() : _expensesData.filter(r => !q || [r.explanation, r.location_name, r.department_name, r.vendor_name, r.expenditure_type_name].join(' ').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(q));
 
-  // Get unique departments and locations
-  const depsMap = {};
-  const locsMap = {};
-  
+  // Categorii ca rânduri, locații ca coloane
+  const depsMap = {};  // dep → total
+  const locsMap = {};  // dep → { loc → total }
+  const locTotals = {}; // loc → grand total
+
   for (const r of filtered) {
     const dName = r.department_name || 'Fără Dep.';
     const lName = r.location_name || 'Fără Locație';
-    
+
     if (!depsMap[dName]) depsMap[dName] = 0;
-    if (!locsMap[lName]) locsMap[lName] = {};
-    if (!locsMap[lName][dName]) locsMap[lName][dName] = 0;
-    
+    if (!locsMap[dName]) locsMap[dName] = {};
+    if (!locsMap[dName][lName]) locsMap[dName][lName] = 0;
+    if (!locTotals[lName]) locTotals[lName] = 0;
+
     depsMap[dName] += r.amount;
-    locsMap[lName][dName] += r.amount;
+    locsMap[dName][lName] += r.amount;
+    locTotals[lName] += r.amount;
   }
-  
+
   const deps = Object.keys(depsMap).sort();
-  const locs = Object.keys(locsMap).sort();
-  
+  const locs = Object.keys(locTotals).sort();
+
   const thead = document.getElementById('head-exp-summary');
   const tbody = document.getElementById('body-exp-summary');
   if (!thead || !tbody) return;
-  
-  let thHtml = '<tr><th>Locație</th>';
-  for (const d of deps) {
-    thHtml += `<th class="num">${d}</th>`;
-  }
-  thHtml += '<th class="num">Total</th></tr>';
+
+  // Header: Categorie | Loc1 | Loc2 | ... | Total
+  let thHtml = '<tr><th>Categorie</th>';
+  for (const l of locs) thHtml += `<th class="num">${l}</th>`;
+  thHtml += '<th class="num" style="color:var(--red);">Total</th></tr>';
   thead.innerHTML = thHtml;
-  
+
   let tbHtml = '';
   let grandTotal = 0;
-  
-  for (const l of locs) {
-    let locTotal = 0;
-    tbHtml += `<tr><td style="font-weight:600; color:var(--accent);">${l}</td>`;
-    
-    for (const d of deps) {
-      const amt = locsMap[l][d] || 0;
-      locTotal += amt;
+  const locGrandTotals = {};
+
+  for (const d of deps) {
+    let depTotal = 0;
+    tbHtml += `<tr><td style="font-weight:600; color:var(--accent); white-space:nowrap;">${d}</td>`;
+    for (const l of locs) {
+      const amt = locsMap[d][l] || 0;
+      depTotal += amt;
+      if (!locGrandTotals[l]) locGrandTotals[l] = 0;
+      locGrandTotals[l] += amt;
       tbHtml += `<td class="num">${amt > 0 ? fmt(amt) : '-'}</td>`;
     }
-    
-    grandTotal += locTotal;
-    tbHtml += `<td class="num" style="font-weight:700; color:var(--red);">${fmt(locTotal)}</td></tr>`;
+    grandTotal += depTotal;
+    tbHtml += `<td class="num" style="font-weight:700; color:var(--red);">${fmt(depTotal)}</td></tr>`;
   }
-  
+
   // Total row
-  if (locs.length > 0) {
+  if (deps.length > 0) {
     tbHtml += `<tr style="background:var(--surface2);"><td style="font-weight:700;">TOTAL GENERAL</td>`;
-    for (const d of deps) {
-      tbHtml += `<td class="num" style="font-weight:700;">${fmt(depsMap[d])}</td>`;
-    }
+    for (const l of locs) tbHtml += `<td class="num" style="font-weight:700;">${fmt(locGrandTotals[l] || 0)}</td>`;
     tbHtml += `<td class="num" style="font-weight:800; color:var(--red);">${fmt(grandTotal)}</td></tr>`;
   } else {
-    tbHtml += `<tr><td colspan="${deps.length + 2}" style="text-align:center; color:var(--muted); padding:20px;">Nu există date conform filtrelor selectate.</td></tr>`;
+    tbHtml += `<tr><td colspan="${locs.length + 2}" style="text-align:center; color:var(--muted); padding:20px;">Nu există date conform filtrelor selectate.</td></tr>`;
   }
-  
+
   tbody.innerHTML = tbHtml;
 }
+
 
 
 window.filterExpensesTable = function() { 
@@ -5537,10 +5757,18 @@ window.renderExpCharts = function() {
   if (c0) {
     if (window._expChartLoc) window._expChartLoc.destroy();
     window._expChartLoc = new Chart(c0, { type:'doughnut',
+      plugins: [ChartDataLabels],
       data:{ labels:loc8.map(([k])=>k.length>14?k.slice(0,12)+'…':k), datasets:[{data:loc8.map(([,v])=>v), backgroundColor:COLORS, borderWidth:0}] },
       options:{ 
         responsive:true, maintainAspectRatio:false, cutout:'65%', 
-        plugins:{legend:{position:'right', labels:{color:'#94a3b8', font:{size:9}, boxWidth:8}}},
+        plugins:{
+          legend:{position:'right', labels:{color:'#94a3b8', font:{size:9}, boxWidth:8}},
+          datalabels: {
+            color: '#fff',
+            font: {weight: 'bold', size: 10},
+            formatter: (val) => val >= 1000 ? (val/1000).toFixed(0)+'k' : val
+          }
+        },
         onHover: (e, elements) => { e.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
         onClick: (e, elements) => {
           if (elements.length > 0) {
@@ -5564,10 +5792,22 @@ window.renderExpCharts = function() {
   const c1 = document.getElementById('exp-chart-dep');
   if (c1) {
     if (window._expChartDep) window._expChartDep.destroy();
-    window._expChartDep = new Chart(c1, { type:'bar', indexAxis:'y',
+    window._expChartDep = new Chart(c1, { type:'bar',
+      plugins: [ChartDataLabels],
       data:{ labels:dep10.map(([k])=>k.length>18?k.slice(0,16)+'…':k), datasets:[{data:dep10.map(([,v])=>v), backgroundColor:COLORS, borderRadius:6, barPercentage: 0.7}] },
       options:{ 
-        responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+        indexAxis:'y',
+        responsive:true, maintainAspectRatio:false, 
+        plugins:{
+          legend:{display:false},
+          datalabels: {
+            color: '#fff',
+            font: {weight: 'bold', size: 9},
+            anchor: 'end',
+            align: 'start',
+            formatter: (val) => val >= 1000 ? (val/1000).toFixed(0)+'k' : val
+          }
+        },
         scales:{ x:{grid:{color:'rgba(255,255,255,0.05)'}, ticks:{font:{size:9},color:'#94a3b8', callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}}, y:{grid:{display:false}, ticks:{font:{size:9, weight:'600'},color:'#cbd5e1'}} },
         onHover: (e, elements) => { e.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
         onClick: (e, elements) => {
@@ -5586,12 +5826,18 @@ window.renderExpCharts = function() {
   }
 
   // Chart 2: evolution in time -> Beautiful line with gradient
-  const sDate = document.getElementById('date-start').value;
-  const eDate = document.getElementById('date-end').value;
   let useMonth = false;
-  if (sDate && eDate) {
-    const diff = (new Date(eDate) - new Date(sDate)) / (1000 * 60 * 60 * 24);
-    if (diff > 31) useMonth = true;
+  if (data && data.length > 0) {
+    let minD = data[0].date;
+    let maxD = data[0].date;
+    for (let r of data) {
+      if (r.date < minD) minD = r.date;
+      if (r.date > maxD) maxD = r.date;
+    }
+    if (minD && maxD) {
+      const diff = (new Date(maxD) - new Date(minD)) / (1000 * 60 * 60 * 24);
+      if (diff > 31) useMonth = true;
+    }
   }
   
   const timeMap = {};
@@ -5631,9 +5877,20 @@ window.renderExpCharts = function() {
   if (c3) {
     if (window._expChartTip) window._expChartTip.destroy();
     window._expChartTip = new Chart(c3, { type:'bar',
+      plugins: [ChartDataLabels],
       data:{ labels:tip8.map(([k])=>k.length>14?k.slice(0,12)+'…':k), datasets:[{data:tip8.map(([,v])=>v), backgroundColor:COLORS, borderRadius:6, barPercentage: 0.6}] },
       options:{ 
-        responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}},
+        responsive:true, maintainAspectRatio:false, 
+        plugins:{
+          legend:{display:false},
+          datalabels: {
+            color: '#fff',
+            font: {weight: 'bold', size: 9},
+            anchor: 'end',
+            align: 'start',
+            formatter: (val) => val >= 1000 ? (val/1000).toFixed(0)+'k' : val
+          }
+        },
         scales:{ x:{grid:{display:false}, ticks:{font:{size:9},color:'#94a3b8',maxRotation:40}}, y:{grid:{color:'rgba(255,255,255,0.05)'}, ticks:{font:{size:9},color:'#94a3b8', callback:v=>v>=1000?(v/1000).toFixed(0)+'k':v}} },
         onHover: (e, elements) => { e.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
         onClick: (e, elements) => {
@@ -5786,9 +6043,13 @@ window.saveExpensesConfig = async function() {
   });
   
   try {
+    const token = localStorage.getItem('cp2_token');
     const r = await fetch(API + '/api/admin/expenses_config', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
       body: JSON.stringify({ 
         excluded_departments: [], 
         excluded_types: exclTypes,
@@ -5798,6 +6059,7 @@ window.saveExpensesConfig = async function() {
     });
     const res = await r.json();
     if(!res.success) console.error('Eroare la salvare configuratie cheltuieli');
+    else console.log('Configuratie cheltuieli salvata:', exclTypes.length, 'tipuri excluse');
   } catch(e) { console.error(e); }
 }
 
