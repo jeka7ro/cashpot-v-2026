@@ -1657,7 +1657,7 @@ async function loadAll(){
   // Cardurile live se încarcă ÎNTOTDEAUNA, independent de erorile din Promise.all
   loadDashboardLiveCard();
   loadTop10Games();
-  if (!window._dashLiveInt) window._dashLiveInt = setInterval(() => { loadDashboardLiveCard(); loadTop10Games(); }, 30000);
+  // if (!window._dashLiveInt) window._dashLiveInt = setInterval(() => { loadDashboardLiveCard(); loadTop10Games(); }, 30000);
 }
 
 async function loadDashboardLiveCard() {
@@ -3273,7 +3273,7 @@ async function loadLive() {
     if(el) el.textContent = `Ultima actualizare: ${ts} — se reimprospatează la 10s`;
 
     if (!_liveTimer) {
-      _liveTimer = setInterval(loadLive, 10000);
+      // _liveTimer = setInterval(loadLive, 10000); // Dezactivat pentru a preveni refresh-ul continuu
     }
 
     const tl = d.totals_live || {};
@@ -3391,9 +3391,9 @@ async function loadLive() {
 // Auto-refresh every 30s
 function startLiveTimer() {
   if(_liveTimer) clearInterval(_liveTimer);
-  _liveTimer = setInterval(() => {
-    if(document.getElementById('view-live')?.classList.contains('active')) loadLive();
-  }, 30000);
+  // _liveTimer = setInterval(() => {
+  //   if(document.getElementById('view-live')?.classList.contains('active')) loadLive();
+  // }, 30000); // Dezactivat pentru a preveni refresh-ul continuu
 }
 startLiveTimer();
 
