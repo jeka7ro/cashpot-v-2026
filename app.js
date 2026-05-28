@@ -2026,7 +2026,7 @@ window.addEventListener('hashchange', () => {
     if (btnExpSettings) btnExpSettings.style.display = (currentUser && currentUser.role === 'Super Admin') ? 'inline-flex' : 'none';
   } else {
     // Show them back on other pages
-    ['kpi-in', 'kpi-ggr', 'kpi-profit', 'kpi-jp', 'kpi-games', 'kpi-aparate'].forEach(id => {
+    ['kpi-in', 'kpi-ggr', 'kpi-profit', 'kpi-games', 'kpi-aparate'].forEach(id => {
       const el = document.getElementById(id);
       if(el) el.style.display = 'block';
     });
@@ -2075,7 +2075,7 @@ window.addEventListener('hashchange', () => {
         if(kpiExp)   kpiExp.style.display   = 'block';
         if(kpiGrid)  kpiGrid.style.gridTemplateColumns = 'repeat(4,1fr)';
       } else {
-        if(kpiJp)    kpiJp.style.display    = 'block';
+        if(kpiJp)    kpiJp.style.display    = 'none';
         if(kpiGames) kpiGames.style.display = 'block';
         if(kpiAp)    kpiAp.style.display    = 'block';
         if(kpiExp)   kpiExp.style.display   = 'none';
