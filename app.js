@@ -876,18 +876,23 @@ async function loadLocationDetails(locId, locName) {
     const diffMkt = pMkt ? ((mkt - pMkt)/pMkt)*100 : 0;
     
     const dCls = v => v > 0 ? 'var(--green)' : v < 0 ? 'var(--red)' : 'var(--muted)';
-    const renderDiff = v => `<span style="color:${dCls(v)}; font-size:10px; font-weight:700;">${v > 0 ? '+' : ''}${v.toFixed(1)}%</span>`;
+    const renderDiff = (v, prevAmt) => {
+      if (!prevAmt && v === 0) return '';
+      return `<span style="color:${dCls(v)}; font-size:11px; font-weight:700;">
+        ${v > 0 ? '+' : ''}${v.toFixed(1)}% <span style="color:var(--muted); font-weight:400;">(${fmt(prevAmt)})</span>
+      </span>`;
+    };
 
     document.getElementById('ld-buc').textContent = machData.length;
     document.getElementById('ld-kpi-row').innerHTML = `
       <div class="kpi-card" style="padding:16px;">
         <div class="kpi-label">Total IN</div>
-        <div class="kpi-value" style="font-size:20px; display:flex; align-items:baseline; gap:8px;">${fmt(tIn)} ${renderDiff(diffIn)}</div>
+        <div class="kpi-value" style="font-size:20px; display:flex; align-items:baseline; gap:8px;">${fmt(tIn)} ${renderDiff(diffIn, pIn)}</div>
         <div class="kpi-sub">AVG/zi: <strong>${fmt(d.avg_in_zi||0)} RON</strong></div>
       </div>
       <div class="kpi-card" style="padding:16px;">
         <div class="kpi-label">GGR</div>
-        <div class="kpi-value" style="font-size:20px; display:flex; align-items:baseline; gap:8px;">${fmt(tGgr)} ${renderDiff(diffGgr)}</div>
+        <div class="kpi-value" style="font-size:20px; display:flex; align-items:baseline; gap:8px;">${fmt(tGgr)} ${renderDiff(diffGgr, pGgr)}</div>
         <div style="display:flex; justify-content:space-between; gap:12px;">
           <div class="kpi-sub">Hold: <strong style="color:${holdCls}">${hold.toFixed(2)}%</strong></div>
           <div class="kpi-sub">AVG/zi: <strong>${fmt(d.avg_ggr_zi||0)} RON</strong></div>
@@ -895,12 +900,12 @@ async function loadLocationDetails(locId, locName) {
       </div>
       <div class="kpi-card" style="padding:16px; border-left:4px solid var(--red);">
         <div class="kpi-label">Cheltuieli (JP+HH+CB)</div>
-        <div class="kpi-value" style="font-size:20px; color:var(--red); display:flex; align-items:baseline; gap:8px;">${fmt(expenses)} ${renderDiff(diffExp)}</div>
+        <div class="kpi-value" style="font-size:20px; color:var(--red); display:flex; align-items:baseline; gap:8px;">${fmt(expenses)} ${renderDiff(diffExp, pExp)}</div>
         <div class="kpi-sub">AVG/zi: <strong>${fmt(expenses / Math.max(1, d.nr_zile||1))} RON</strong></div>
       </div>
       <div class="kpi-card" style="padding:16px; border-left:4px solid var(--purple);">
         <div class="kpi-label">Marketing</div>
-        <div class="kpi-value" style="font-size:20px; color:var(--purple); display:flex; align-items:baseline; gap:8px;">${fmt(mkt)} ${renderDiff(diffMkt)}</div>
+        <div class="kpi-value" style="font-size:20px; color:var(--purple); display:flex; align-items:baseline; gap:8px;">${fmt(mkt)} ${renderDiff(diffMkt, pMkt)}</div>
         <div style="display:flex; justify-content:space-between; gap:12px;">
           <div class="kpi-sub">Bonus Cost: <strong>${bonusCostPct.toFixed(2)}%</strong></div>
           <div class="kpi-sub">AVG/zi: <strong>${fmt(mkt / Math.max(1, d.nr_zile||1))} RON</strong></div>
@@ -913,8 +918,9 @@ async function loadLocationDetails(locId, locName) {
       </div>
     `;
 
-    // 2. Trend Chart
+    // 2. Trend Chart & Calendar
     renderLocDetailChart(dailyData);
+    renderLocDetailCalendar(locId, e);
 
     // 3. Machines Table
     renderLocDetailMachines(machData);
@@ -1064,6 +1070,27 @@ window.filterLocMach = function() {
 function renderLocDetailMachines(data) {
   _locMachData = data ? [...data].sort((a,b) => (b.ggr||0) - (a.ggr||0)) : [];
   _locMachFiltered = [..._locMachData];
+  
+  // Populate Top 10 / Bottom 10
+  const top10 = _locMachData.slice(0, 10);
+  const bottom10 = [..._locMachData].reverse().slice(0, 10);
+  
+  const renderMiniRow = (r) => `
+    <tr>
+      <td style="padding-left:16px;">
+        <div style="font-weight:600; color:var(--text);">${r.cabinet||'—'}</div>
+        <div style="font-size:10px; color:var(--muted);">${r.serial_nr||''}</div>
+      </td>
+      <td>${r.provider||'—'}</td>
+      <td class="num" style="font-weight:600; color:${(r.ggr||0)>=0 ? 'var(--green)' : 'var(--red)'};">${fmt(r.ggr)}</td>
+    </tr>
+  `;
+  
+  const topBody = document.getElementById('ld-top-machines-body');
+  const bottomBody = document.getElementById('ld-bottom-machines-body');
+  if (topBody) topBody.innerHTML = top10.length ? top10.map(renderMiniRow).join('') : '<tr><td colspan="3" style="text-align:center;padding:10px;">Fără date</td></tr>';
+  if (bottomBody) bottomBody.innerHTML = bottom10.length ? bottom10.map(renderMiniRow).join('') : '<tr><td colspan="3" style="text-align:center;padding:10px;">Fără date</td></tr>';
+
   _locMachPage = 1;
   renderLocDetailMachinesPaginated();
 }
@@ -7203,3 +7230,143 @@ window.changeDispPerPage = function(val) {
   _dispPage = 1;
   renderDispozitive();
 }
+
+// ─── Location Details Calendar ─────────────────────────────────────────────────────────────
+let ldDailyMonthData = {};
+let ldHourlyDayData = {};
+let ldCalViewDate = new Date();
+let ldCurrentLocId = null;
+
+async function renderLocDetailCalendar(locId, dateStr) {
+  ldCurrentLocId = locId;
+  ldCalViewDate = new Date(dateStr);
+  await updateLdMonthCalendar(ldCalViewDate.getFullYear(), ldCalViewDate.getMonth());
+}
+
+async function updateLdMonthCalendar(y, m) {
+  const mStart = `${y}-${String(m+1).padStart(2,'0')}-01`;
+  const lastDay = new Date(y, m+1, 0).getDate();
+  const mEnd = `${y}-${String(m+1).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
+  
+  const dMonth = await api(`/api/daily?res=day&start=${mStart}&end=${mEnd}&loc_ids=${ldCurrentLocId}`);
+  ldDailyMonthData = {};
+  let maxValidDate = '0000-00-00';
+  if (dMonth) {
+    dMonth.forEach(r => { 
+      ldDailyMonthData[r.date] = {ggr: r.ggr, tin:r.total_in, hh:r.hh, bet:r.bet||0}; 
+      if (r.date > maxValidDate && r.total_in > 0) { maxValidDate = r.date; }
+    });
+  }
+
+  let lastDataDate = mEnd;
+  if (maxValidDate !== '0000-00-00' && maxValidDate <= mEnd) {
+    lastDataDate = maxValidDate;
+  }
+  
+  const dHour = await api(`/api/daily?res=hour&start=${lastDataDate}&end=${lastDataDate}&loc_ids=${ldCurrentLocId}`);
+  ldHourlyDayData = {};
+  if (dHour) {
+    dHour.forEach(r => { ldHourlyDayData[r.date] = {ggr:r.ggr, tin:r.total_in, hh:r.hh, bet:r.bet||0}; });
+  }
+
+  drawLdMonthGrid(y, m);
+  drawLdHourGrid(lastDataDate);
+}
+
+function drawLdMonthGrid(y, m) {
+  document.getElementById('ld-cal-title').textContent = `${MO_RO[m]} ${y}`;
+  const grid = document.getElementById('ld-calendar-grid'); grid.innerHTML = '';
+  grid.style.gridTemplateColumns = 'repeat(7, 1fr)';
+  DA_RO.forEach(d => { const h=document.createElement('div'); h.className='cal-day-header'; h.textContent=d; grid.appendChild(h); });
+  
+  const first=new Date(y,m,1), last=new Date(y,m+1,0), today=new Date();
+  let off=first.getDay()-1; if(off<0)off=6;
+  
+  let sumIn = 0, countIn = 0;
+  const vals = [];
+  for(let d=1; d<=last.getDate(); d++) {
+    const k=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    if(ldDailyMonthData[k]!==undefined){
+      vals.push(ldDailyMonthData[k].ggr); 
+      if(ldDailyMonthData[k].tin > 0) { sumIn += ldDailyMonthData[k].tin; countIn++; }
+    }
+  }
+  const maxV=Math.max(...vals.filter(v=>v>0),1), minV=Math.min(...vals.filter(v=>v<0),-1);
+  const avgIn = countIn > 0 ? sumIn / countIn : 1;
+  
+  for(let i=0;i<off;i++){ const e=document.createElement('div'); e.className='cal-day empty'; grid.appendChild(e); }
+  for(let d=1;d<=last.getDate();d++){
+    const k=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const row=ldDailyMonthData[k];
+    const ggr=row?.ggr;
+    const cell=document.createElement('div');
+    const isT=today.getFullYear()===y&&today.getMonth()===m&&today.getDate()===d;
+    cell.className='cal-day'+(isT?' today':'')+(row===undefined?' cal-no-data':'');
+    
+    if(row!==undefined){
+      const inten=ggr>=0?Math.min(1,ggr/maxV):Math.min(1,Math.abs(ggr)/Math.abs(minV));
+      const alpha=(0.15+inten*0.5).toFixed(2);
+      cell.style.background=ggr>=0?`rgba(16,185,129,${alpha})`:`rgba(239,68,68,${alpha})`;
+      let inPct = countIn > 0 && row.tin > 0 ? ((row.tin / avgIn) - 1) * 100 : 0;
+      let inArr = inPct >= 0 ? '↑' : '↓';
+      let inColor = inPct >= 0 ? 'var(--success)' : 'var(--danger)';
+      cell.innerHTML=`<div class="cal-day-num">${d}</div><div class="cal-day-val">${fmtK(ggr)}</div>`+
+        `<div class="cal-day-metrics">IN: ${fmtK(row.tin)} <span style="color:${inColor}; font-size:9px;">${inArr}${Math.abs(inPct).toFixed(1)}%</span><br>BET:${fmtK(row.bet)} &bull; HH:${fmtK(row.hh)}</div>`;
+    } else { 
+      cell.innerHTML=`<div class="cal-day-num">${d}</div>`; 
+    }
+    grid.appendChild(cell);
+  }
+}
+
+function drawLdHourGrid(selectedDate) {
+  document.getElementById('ld-cal-hour-title').textContent = `Evoluție Orară - ${selectedDate}`;
+  const grid=document.getElementById('ld-calendar-hour-grid'); grid.innerHTML='';
+  grid.style.gridTemplateColumns = 'repeat(6, 1fr)';
+  
+  let sumIn = 0, countIn = 0;
+  const vals = [];
+  for(let i=0;i<24;i++){
+    const h = (i+8)%24;
+    const k = `${String(h).padStart(2,'0')}:00`;
+    if(ldHourlyDayData[k]!==undefined){
+      vals.push(ldHourlyDayData[k].ggr); 
+      if(ldHourlyDayData[k].tin > 0) { sumIn += ldHourlyDayData[k].tin; countIn++; }
+    }
+  }
+  const maxV=Math.max(...vals.filter(v=>v>0),1), minV=Math.min(...vals.filter(v=>v<0),-1);
+  const avgIn = countIn > 0 ? sumIn / countIn : 1;
+  
+  for(let i=0;i<24;i++){
+    const h = (i+8)%24;
+    const k = `${String(h).padStart(2,'0')}:00`;
+    const row=ldHourlyDayData[k]; const ggr=row?.ggr; const cell=document.createElement('div');
+    cell.className='cal-day'+(row===undefined?' cal-no-data':'');
+    if(row!==undefined){
+      const inten=ggr>=0?Math.min(1,ggr/maxV):Math.min(1,Math.abs(ggr)/Math.abs(minV));
+      const alpha=(0.15+inten*0.5).toFixed(2);
+      cell.style.background=ggr>=0?`rgba(16,185,129,${alpha})`:`rgba(239,68,68,${alpha})`;
+      let inPct = countIn > 0 && row.tin > 0 ? ((row.tin / avgIn) - 1) * 100 : 0;
+      let inArr = inPct >= 0 ? '↑' : '↓';
+      let inColor = inPct >= 0 ? 'var(--success)' : 'var(--danger)';
+      cell.innerHTML=`<div class="cal-day-num">${k}</div><div class="cal-day-val">${fmtK(ggr)}</div>`+
+        `<div class="cal-day-metrics">IN: ${fmtK(row.tin)} <span style="color:${inColor}; font-size:9px;">${inArr}${Math.abs(inPct).toFixed(1)}%</span><br>BET:${fmtK(row.bet)} &bull; HH:${fmtK(row.hh)}</div>`;
+    } else { 
+      cell.innerHTML=`<div class="cal-day-num">${k}</div>`; 
+    }
+    grid.appendChild(cell);
+  }
+}
+
+document.getElementById('ld-cal-prev').addEventListener('click', async ()=>{
+  if(!ldCurrentLocId) return;
+  const m = ldCalViewDate.getMonth();
+  ldCalViewDate.setMonth(m - 1);
+  await updateLdMonthCalendar(ldCalViewDate.getFullYear(), ldCalViewDate.getMonth());
+});
+document.getElementById('ld-cal-next').addEventListener('click', async ()=>{
+  if(!ldCurrentLocId) return;
+  const m = ldCalViewDate.getMonth();
+  ldCalViewDate.setMonth(m + 1);
+  await updateLdMonthCalendar(ldCalViewDate.getFullYear(), ldCalViewDate.getMonth());
+});

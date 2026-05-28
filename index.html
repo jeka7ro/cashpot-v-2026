@@ -1379,10 +1379,64 @@
         <!-- Filled by JS -->
       </div>
 
+      <!-- CALENDAR GGR WIDGET (Local) -->
+      <div style="display: flex; gap: 24px; margin-bottom: 24px;">
+        <section class="calendar-section" style="flex: 1; margin: 0;">
+          <div class="calendar-header">
+            <button class="cal-nav" id="ld-cal-prev">‹</button>
+            <div class="calendar-title" id="ld-cal-title">—</div>
+            <button class="cal-nav" id="ld-cal-next">›</button>
+          </div>
+          <div class="calendar-grid" id="ld-calendar-grid"></div>
+        </section>
+
+        <section class="calendar-section" style="flex: 1; margin: 0;">
+          <div class="calendar-header" style="justify-content: space-between;">
+            <div class="calendar-title" id="ld-cal-hour-title" style="margin-left: 10px;">Evoluție Orară</div>
+            <div class="cal-legend">
+              <span class="cal-leg-dot" style="background:rgba(16,185,129,.7)"></span>GGR pozitiv
+              <span class="cal-leg-dot" style="background:rgba(239,68,68,.7);margin-left:10px"></span>GGR negativ
+            </div>
+          </div>
+          <div class="calendar-grid" id="ld-calendar-hour-grid"></div>
+        </section>
+      </div>
+
       <!-- Charts -->
       <div style="background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:24px;">
         <div style="font-size:11px; font-weight:700; color:var(--text); text-transform:uppercase; letter-spacing:.05em; margin-bottom:16px;">Evoluție Zilnică</div>
         <div style="position:relative; height:260px;"><canvas id="ld-daily-chart"></canvas></div>
+      </div>
+
+      <!-- Top/Bottom Performers -->
+      <div style="display: flex; gap: 24px; margin-bottom: 24px;">
+        <div style="flex: 1; background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.05);">
+          <div style="padding:14px 20px; border-bottom:1px solid var(--border); background:rgba(16,185,129,0.05);">
+            <span style="font-size:11px; font-weight:700; color:var(--green); text-transform:uppercase; letter-spacing:.05em;">Top 10 Cele mai performante (GGR)</span>
+          </div>
+          <div class="table-scroll">
+            <table class="data-table" style="width:100%; border-collapse:collapse;">
+              <thead>
+                <tr><th style="padding-left:16px;">Cabinet</th><th>Provider</th><th class="num">GGR</th></tr>
+              </thead>
+              <tbody id="ld-top-machines-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div style="flex: 1; background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.05);">
+          <div style="padding:14px 20px; border-bottom:1px solid var(--border); background:rgba(239,68,68,0.05);">
+            <span style="font-size:11px; font-weight:700; color:var(--red); text-transform:uppercase; letter-spacing:.05em;">Top 10 Cele mai slabe (GGR)</span>
+          </div>
+          <div class="table-scroll">
+            <table class="data-table" style="width:100%; border-collapse:collapse;">
+              <thead>
+                <tr><th style="padding-left:16px;">Cabinet</th><th>Provider</th><th class="num">GGR</th></tr>
+              </thead>
+              <tbody id="ld-bottom-machines-body"></tbody>
+            </table>
+          </div>
+        </div>
       </div>
 
       <!-- Machines Table -->
