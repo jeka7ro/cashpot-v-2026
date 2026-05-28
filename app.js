@@ -1073,7 +1073,11 @@ function renderLocDetailMachines(data) {
   _locMachFiltered = [..._locMachData];
   
   // Populate Top/Bottom
-  const topLimit = parseInt(document.getElementById('ld-top-limit')?.value || '10');
+  const storedLimit = localStorage.getItem('locDetailTopLimit') || '10';
+  const selectEl = document.getElementById('ld-top-limit');
+  if (selectEl) selectEl.value = storedLimit;
+  const topLimit = parseInt(storedLimit);
+
   const top10 = _locMachData.slice(0, topLimit);
   const bottom10 = [..._locMachData].reverse().slice(0, topLimit);
   
@@ -1085,8 +1089,8 @@ function renderLocDetailMachines(data) {
       </td>
       <td>${r.provider||'—'}</td>
       <td class="num">${pill(r.hold_pct)}</td>
-      <td class="num" style="color:var(--muted)">${r.handpays||0}</td>
       <td class="num" style="font-weight:600; color:${(r.ggr||0)>=0 ? 'var(--green)' : 'var(--red)'};">${fmt(r.ggr)}</td>
+      <td class="num" style="color:var(--muted)">${r.handpays||0}</td>
     </tr>
   `;
   
@@ -2132,22 +2136,28 @@ async function loadDashboardLiveCard() {
     if (cashoutsContainer) {
       window._latestCashoutsData = data.latest_cashouts || [];
       window._maxCashoutsData = [...(data.latest_cashouts || [])].sort((a,b) => Math.max(b.cashout_ron||0, b.jackpot_ron||0, b.hh_ron||0) - Math.max(a.cashout_ron||0, a.jackpot_ron||0, a.hh_ron||0));
+      window._handpayCashoutsData = [...(data.latest_cashouts || [])].filter(c => (c.hh_ron || 0) > 0);
       window._currentCashoutTab = window._currentCashoutTab || 'ultimele';
       renderCashoutsList();
     }
   } catch(e) { if(container) container.innerHTML = `<div style="color:red;padding:10px">ERROR: ${e.toString()}</div>`; console.error('loadDashboardLiveCard error:', e); }
 }
 
+window.changeLocDetailLimit = function() {
+  const limit = document.getElementById('ld-top-limit').value;
+  localStorage.setItem('locDetailTopLimit', limit);
+  renderLocDetailMachines();
+}
+
 window.switchCashoutTab = function(tab) {
   window._currentCashoutTab = tab;
-  document.getElementById('btn-cashout-ultimele').style.background = tab === 'ultimele' ? 'var(--surface)' : 'transparent';
-  document.getElementById('btn-cashout-ultimele').style.color = tab === 'ultimele' ? 'var(--text)' : 'var(--muted)';
-  document.getElementById('btn-cashout-ultimele').style.boxShadow = tab === 'ultimele' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none';
-  
-  document.getElementById('btn-cashout-mari').style.background = tab === 'mari' ? 'var(--surface)' : 'transparent';
-  document.getElementById('btn-cashout-mari').style.color = tab === 'mari' ? 'var(--text)' : 'var(--muted)';
-  document.getElementById('btn-cashout-mari').style.boxShadow = tab === 'mari' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none';
-  
+  ['ultimele', 'mari', 'handpay'].forEach(t => {
+    const el = document.getElementById('btn-cashout-' + t);
+    if (!el) return;
+    el.style.background = tab === t ? 'var(--surface)' : 'transparent';
+    el.style.color = tab === t ? 'var(--text)' : 'var(--muted)';
+    el.style.boxShadow = tab === t ? '0 1px 3px rgba(0,0,0,0.1)' : 'none';
+  });
   renderCashoutsList();
 }
 
@@ -2155,7 +2165,10 @@ window.renderCashoutsList = function() {
   const container = document.getElementById('v-latest-cashouts');
   if (!container) return;
   const tab = window._currentCashoutTab || 'ultimele';
-  const cashouts = tab === 'ultimele' ? (window._latestCashoutsData || []) : (window._maxCashoutsData || []);
+  let cashouts = [];
+  if (tab === 'ultimele') cashouts = window._latestCashoutsData || [];
+  else if (tab === 'mari') cashouts = window._maxCashoutsData || [];
+  else if (tab === 'handpay') cashouts = window._handpayCashoutsData || [];
   
   if (cashouts.length === 0) {
     container.innerHTML = '<div style="color:var(--muted); text-align:center; padding-top:20px;">Nu există date recente.</div>';

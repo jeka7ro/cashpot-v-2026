@@ -1412,10 +1412,11 @@
       <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
         <div style="display:flex; align-items:center; gap:8px;">
           <span style="font-size:11px; color:var(--muted); font-weight:600; text-transform:uppercase;">Rânduri:</span>
-          <select id="ld-top-limit" class="glass-select" style="padding:4px 8px; font-size:11px;" onchange="renderLocDetailMachines()">
+          <select id="ld-top-limit" class="glass-select" style="padding:4px 8px; font-size:11px;" onchange="changeLocDetailLimit()">
             <option value="5">5</option>
-            <option value="10" selected>10</option>
+            <option value="10">10</option>
             <option value="20">20</option>
+            <option value="50">50</option>
           </select>
         </div>
       </div>
@@ -1427,7 +1428,7 @@
           <div class="table-scroll">
             <table class="data-table" style="width:100%; border-collapse:collapse;">
               <thead>
-                <tr><th style="padding-left:16px;">Cabinet</th><th>Provider</th><th class="num">Hold%</th><th class="num">GGR</th></tr>
+                <tr><th style="padding-left:16px;">Cabinet</th><th>Provider</th><th class="num">Hold%</th><th class="num">GGR</th><th class="num">Nr. Handpays</th></tr>
               </thead>
               <tbody id="ld-top-machines-body"></tbody>
             </table>
@@ -1441,7 +1442,7 @@
           <div class="table-scroll">
             <table class="data-table" style="width:100%; border-collapse:collapse;">
               <thead>
-                <tr><th style="padding-left:16px;">Cabinet</th><th>Provider</th><th class="num">Hold%</th><th class="num">GGR</th></tr>
+                <tr><th style="padding-left:16px;">Cabinet</th><th>Provider</th><th class="num">Hold%</th><th class="num">GGR</th><th class="num">Nr. Handpays</th></tr>
               </thead>
               <tbody id="ld-bottom-machines-body"></tbody>
             </table>
@@ -1589,6 +1590,7 @@
             <div style="display:flex; gap:4px; font-size:10px; background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:2px;">
               <button id="btn-cashout-ultimele" onclick="switchCashoutTab('ultimele')" style="background:var(--surface); border:none; border-radius:10px; padding:4px 10px; font-weight:600; cursor:pointer; color:var(--text); box-shadow:0 1px 3px rgba(0,0,0,0.1)">Ultimele</button>
               <button id="btn-cashout-mari" onclick="switchCashoutTab('mari')" style="background:transparent; border:none; border-radius:10px; padding:4px 10px; font-weight:600; cursor:pointer; color:var(--muted)">Cele mai mari</button>
+              <button id="btn-cashout-handpay" onclick="switchCashoutTab('handpay')" style="background:transparent; border:none; border-radius:10px; padding:4px 10px; font-weight:600; cursor:pointer; color:var(--muted)">Handpay-uri</button>
             </div>
           </div>
           <div id="v-latest-cashouts" style="height:260px; overflow-y:auto; padding-right:8px; font-size:11px; display:flex; flex-direction:column; gap:8px; color:var(--text);">
