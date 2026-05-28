@@ -1003,6 +1003,10 @@ def serve_img():
 def serve_logo():
     return send_from_directory(BASE_DIR, 'logo_cashpot.png')
 
+@app.route('/favicon.ico')
+def serve_favicon():
+    return send_from_directory(BASE_DIR, 'favicon.ico')
+
 # ─── Raport pe Ore ────────────────────────────────────────────────────────────
 @app.route('/api/reports/hourly')
 def reports_hourly():
