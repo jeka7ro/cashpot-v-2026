@@ -861,7 +861,8 @@ async function loadLocationDetails(locId, locName) {
     const tIn = d.total_in||0, tGgr = d.ggr||0, jp = d.jackpot||0, hh = d.hh||0, cb = d.cashback||0;
     const hold = tIn>0 ? (tGgr/tIn)*100 : 0;
     const expenses = jp + hh + cb;
-    const mkt = d.marketing||0, bet = d.bet||0;
+    const mkt = d.marketing || expenses;
+    const bet = d.bet||0;
     const bonusCostPct = bet>0 ? (mkt/bet)*100 : 0;
     const holdCls = hold < 15 ? 'var(--red)' : hold > 25 ? 'var(--green)' : 'var(--text)';
 
