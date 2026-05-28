@@ -2130,38 +2130,63 @@ async function loadDashboardLiveCard() {
 
     // --- Ultimele Cashout-uri ---
     if (cashoutsContainer) {
-      const cashouts = data.latest_cashouts || [];
-      if (cashouts.length === 0) {
-        cashoutsContainer.innerHTML = '<div style="color:var(--muted); text-align:center; padding-top:20px;">Nu există date recente.</div>';
-      } else {
-        let chHtm = '<div style="display:flex; flex-direction:column; gap:8px;">';
-        for (let i = 0; i < cashouts.length; i++) {
-          const c = cashouts[i];
-          const d = (c.cashout_time||'').substring(5,16).replace('-', '.');
-          const t = (c.cashout_time||'').substring(11,16);
-          const hh = c.hh_ron||0, jp = c.jackpot_ron||0, out = c.cashout_ron||0;
-          let tip = 'Cashout'; if (jp>0) tip='Jackpot'; if (hh>0) tip='Handpay';
-          const tipColor = jp>0 ? '#eab308' : hh>0 ? '#ec4899' : '#94a3b8';
-          const mixInfo = [c.mix, c.cabinet, c.joc].filter(Boolean).join(' · ');
-          chHtm += `
-            <div style="border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:8px;">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
-                <strong style="font-size:12px; color:var(--accent); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${c.locatie || '—'}</strong>
-                <strong style="color:var(--red); font-size:12px; white-space:nowrap;">${fmt(Math.max(out, jp, hh))} <span style="font-size:9px">RON</span></strong>
-              </div>
-              ${mixInfo ? `<div style="font-size:10px;color:var(--text);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600">${mixInfo}</div>` : ''}
-              <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; color:var(--muted);">
-                <span>#${c.machine_id || c.serial_nr} • ${d}</span>
-                <span style="color:${tipColor};font-weight:700">${tip} ${t}</span>
-              </div>
-            </div>
-          `;
-        }
-        chHtm += '</div>';
-        cashoutsContainer.innerHTML = chHtm;
-      }
+      window._latestCashoutsData = data.latest_cashouts || [];
+      window._maxCashoutsData = [...(data.latest_cashouts || [])].sort((a,b) => Math.max(b.cashout_ron||0, b.jackpot_ron||0, b.hh_ron||0) - Math.max(a.cashout_ron||0, a.jackpot_ron||0, a.hh_ron||0));
+      window._currentCashoutTab = window._currentCashoutTab || 'ultimele';
+      renderCashoutsList();
     }
   } catch(e) { if(container) container.innerHTML = `<div style="color:red;padding:10px">ERROR: ${e.toString()}</div>`; console.error('loadDashboardLiveCard error:', e); }
+}
+
+window.switchCashoutTab = function(tab) {
+  window._currentCashoutTab = tab;
+  document.getElementById('btn-cashout-ultimele').style.background = tab === 'ultimele' ? 'var(--surface)' : 'transparent';
+  document.getElementById('btn-cashout-ultimele').style.color = tab === 'ultimele' ? 'var(--text)' : 'var(--muted)';
+  document.getElementById('btn-cashout-ultimele').style.boxShadow = tab === 'ultimele' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none';
+  
+  document.getElementById('btn-cashout-mari').style.background = tab === 'mari' ? 'var(--surface)' : 'transparent';
+  document.getElementById('btn-cashout-mari').style.color = tab === 'mari' ? 'var(--text)' : 'var(--muted)';
+  document.getElementById('btn-cashout-mari').style.boxShadow = tab === 'mari' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none';
+  
+  renderCashoutsList();
+}
+
+window.renderCashoutsList = function() {
+  const container = document.getElementById('v-latest-cashouts');
+  if (!container) return;
+  const tab = window._currentCashoutTab || 'ultimele';
+  const cashouts = tab === 'ultimele' ? (window._latestCashoutsData || []) : (window._maxCashoutsData || []);
+  
+  if (cashouts.length === 0) {
+    container.innerHTML = '<div style="color:var(--muted); text-align:center; padding-top:20px;">Nu există date recente.</div>';
+    return;
+  }
+  
+  let chHtm = '<div style="display:flex; flex-direction:column; gap:8px;">';
+  for (let i = 0; i < cashouts.length; i++) {
+    const c = cashouts[i];
+    const d = (c.cashout_time||'').substring(5,16).replace('-', '.');
+    const t = (c.cashout_time||'').substring(11,16);
+    const hh = c.hh_ron||0, jp = c.jackpot_ron||0, out = c.cashout_ron||0;
+    let tip = 'Cashout'; if (jp>0) tip='Jackpot'; if (hh>0) tip='Handpay';
+    const tipColor = jp>0 ? '#eab308' : hh>0 ? '#ec4899' : '#94a3b8';
+    const mixInfo = [c.mix, c.cabinet, c.joc].filter(Boolean).join(' · ');
+    chHtm += `
+      <div style="border-bottom:1px solid var(--border); padding-bottom:8px; margin-bottom:8px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+          <strong style="font-size:12px; color:var(--accent); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${c.locatie || '—'}</strong>
+          <strong style="color:var(--red); font-size:12px; white-space:nowrap;">${fmt(Math.max(out, jp, hh))} <span style="font-size:9px">RON</span></strong>
+        </div>
+        ${mixInfo ? `<div style="font-size:10px;color:var(--text);margin-bottom:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600">${mixInfo}</div>` : ''}
+        <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; color:var(--muted);">
+          <span>#${c.machine_id || c.serial_nr} • ${d}</span>
+          <span style="color:${tipColor};font-weight:700">${tip} ${t}</span>
+        </div>
+      </div>
+    `;
+  }
+  chHtm += '</div>';
+  container.innerHTML = chHtm;
 }
 
 

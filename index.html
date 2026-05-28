@@ -1427,7 +1427,7 @@
           <div class="table-scroll">
             <table class="data-table" style="width:100%; border-collapse:collapse;">
               <thead>
-                <tr><th style="padding-left:16px;">Cabinet</th><th>Provider</th><th class="num">Hold%</th><th class="num">Zile Handpay</th><th class="num">GGR</th></tr>
+                <tr><th style="padding-left:16px;">Cabinet</th><th>Provider</th><th class="num">Hold%</th><th class="num">GGR</th></tr>
               </thead>
               <tbody id="ld-top-machines-body"></tbody>
             </table>
@@ -1441,7 +1441,7 @@
           <div class="table-scroll">
             <table class="data-table" style="width:100%; border-collapse:collapse;">
               <thead>
-                <tr><th style="padding-left:16px;">Cabinet</th><th>Provider</th><th class="num">Hold%</th><th class="num">Zile Handpay</th><th class="num">GGR</th></tr>
+                <tr><th style="padding-left:16px;">Cabinet</th><th>Provider</th><th class="num">Hold%</th><th class="num">GGR</th></tr>
               </thead>
               <tbody id="ld-bottom-machines-body"></tbody>
             </table>
@@ -1581,9 +1581,15 @@
             Încărcare...
           </div>
         </div>
-        <div class="chart-card" onclick="window.location.hash='#rapoarte/cashout'" style="background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; cursor:pointer; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='none'">
-          <div class="chart-title" id="dash-cashout-title" style="color:#ef4444; display:flex; align-items:center; gap:6px; margin-bottom:16px;">
-            <span style="width:8px; height:8px; border-radius:50%; background:#ef4444; animation:pulse 2s infinite;"></span> Ultimele Cashout-uri
+        <div class="chart-card" style="background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; transition:transform 0.2s;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='none'">
+          <div class="chart-title" id="dash-cashout-title" style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+            <div style="color:#ef4444; display:flex; align-items:center; gap:6px; cursor:pointer;" onclick="window.location.hash='#rapoarte/cashout'">
+              <span style="width:8px; height:8px; border-radius:50%; background:#ef4444; animation:pulse 2s infinite;"></span> Cashout-uri Azi
+            </div>
+            <div style="display:flex; gap:4px; font-size:10px; background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:2px;">
+              <button id="btn-cashout-ultimele" onclick="switchCashoutTab('ultimele')" style="background:var(--surface); border:none; border-radius:10px; padding:4px 10px; font-weight:600; cursor:pointer; color:var(--text); box-shadow:0 1px 3px rgba(0,0,0,0.1)">Ultimele</button>
+              <button id="btn-cashout-mari" onclick="switchCashoutTab('mari')" style="background:transparent; border:none; border-radius:10px; padding:4px 10px; font-weight:600; cursor:pointer; color:var(--muted)">Cele mai mari</button>
+            </div>
           </div>
           <div id="v-latest-cashouts" style="height:260px; overflow-y:auto; padding-right:8px; font-size:11px; display:flex; flex-direction:column; gap:8px; color:var(--text);">
             Așteptare date...
