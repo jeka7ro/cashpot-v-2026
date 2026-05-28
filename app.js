@@ -7467,3 +7467,49 @@ async function loadRetentionReport() {
     if (tbody) tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:var(--red);">${err.message}</td></tr>`;
   }
 }
+
+window.showGlobalHpTooltip = function(el) {
+  const hpStr = el.getAttribute('data-hp');
+  if (!hpStr) return;
+  
+  let tt = document.getElementById('global-hp-tooltip');
+  if (!tt) {
+    tt = document.createElement('div');
+    tt.id = 'global-hp-tooltip';
+    tt.style.position = 'fixed';
+    tt.style.background = 'var(--surface)';
+    tt.style.border = '1px solid var(--border)';
+    tt.style.boxShadow = '0 8px 24px rgba(0,0,0,0.5)';
+    tt.style.padding = '12px';
+    tt.style.borderRadius = '8px';
+    tt.style.zIndex = '999999';
+    tt.style.minWidth = '140px';
+    tt.style.pointerEvents = 'none';
+    tt.style.backdropFilter = 'blur(10px)';
+    document.body.appendChild(tt);
+  }
+  
+  const parts = hpStr.split(';');
+  const maxHps = parts.map(p => {
+    const [d, sum] = p.split('|');
+    return { d, sum: parseFloat(sum) || 0 };
+  }).sort((a,b) => b.sum - a.sum).slice(0, 5);
+  
+  const detailsStr = maxHps.map(x => `<div style="display:flex;justify-content:space-between;width:130px;margin-bottom:4px;font-size:11px;"><span>${(x.d||'').replace('202','2').substring(2)}</span><strong style="color:var(--green)">${fmt(x.sum)}</strong></div>`).join('');
+  
+  tt.innerHTML = `
+    <div style="font-size:10px; font-weight:800; color:var(--text); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.05em; border-bottom:1px solid var(--border); padding-bottom:4px;">Top Plăți Zilnice</div>
+    ${detailsStr}
+  `;
+  tt.style.display = 'block';
+  
+  const rect = el.getBoundingClientRect();
+  const ttRect = tt.getBoundingClientRect();
+  tt.style.top = Math.max(10, rect.top + rect.height/2 - ttRect.height/2) + 'px';
+  tt.style.left = (rect.left - ttRect.width - 15) + 'px';
+};
+
+window.hideGlobalHpTooltip = function() {
+  const tt = document.getElementById('global-hp-tooltip');
+  if (tt) tt.style.display = 'none';
+};
