@@ -300,7 +300,7 @@ def kpi():
             SUM(`in`-`out`-COALESCE(jackpot,0)-COALESCE(hh,0)-COALESCE(cashback,0)) as ngr,
             SUM(games) as games,
             SUM(bet) as bet,
-            SUM(COALESCE(jackpot,0)+COALESCE(cb_real,0)+COALESCE(hh,0)+COALESCE(cb_birthday,0)+COALESCE(cb_fortune_wheel,0)+COALESCE(cb_raffle,0)) as marketing
+            SUM(COALESCE(jackpot,0)+COALESCE(cashback,0)+COALESCE(hh,0)+COALESCE(cb_birthday,0)+COALESCE(cb_fortune_wheel,0)+COALESCE(cb_raffle,0)) as marketing
         FROM machine_audit_summaries mas
         WHERE mas.date >= %s AND mas.date <= %s
           AND mas.`in` > 0
@@ -442,7 +442,7 @@ def trend():
             SUM(games) as games,
             COUNT(DISTINCT machine_id) as aparate,
             COUNT(DISTINCT date) as zile,
-            SUM(COALESCE(jackpot,0)+COALESCE(cb_real,0)+COALESCE(hh,0)+COALESCE(cb_birthday,0)+COALESCE(cb_fortune_wheel,0)+COALESCE(cb_raffle,0)) as marketing
+            SUM(COALESCE(jackpot,0)+COALESCE(cashback,0)+COALESCE(hh,0)+COALESCE(cb_birthday,0)+COALESCE(cb_fortune_wheel,0)+COALESCE(cb_raffle,0)) as marketing
         FROM {table} mas
         WHERE {where_date}
     """ + lf + f"""
@@ -494,7 +494,7 @@ def locations():
             SUM(mas.`in`-mas.`out`-COALESCE(mas.jackpot,0)-COALESCE(mas.hh,0)-COALESCE(mas.cashback,0)) AS ngr,
             SUM(mas.games) AS games,
             SUM(mas.bet) AS bet,
-            SUM(COALESCE(mas.jackpot,0)+COALESCE(mas.cb_real,0)+COALESCE(mas.hh,0)+COALESCE(mas.cb_birthday,0)+COALESCE(mas.cb_fortune_wheel,0)+COALESCE(mas.cb_raffle,0)) AS marketing
+            SUM(COALESCE(mas.jackpot,0)+COALESCE(mas.cashback,0)+COALESCE(mas.hh,0)+COALESCE(mas.cb_birthday,0)+COALESCE(mas.cb_fortune_wheel,0)+COALESCE(mas.cb_raffle,0)) AS marketing
         FROM machine_audit_summaries mas
         JOIN locations l ON l.id = mas.location_id
         WHERE mas.date >= %s AND mas.date <= %s
@@ -564,7 +564,7 @@ def providers():
             SUM(mas.jackpot) AS jackpot, SUM(mas.hh) AS hh,
             SUM(mas.cashback) AS cashback, SUM(mas.cb_fortune_wheel) AS roata, SUM(mas.cb_raffle) AS raffles,
             SUM(mas.games) AS games, SUM(mas.bet) AS bet,
-            SUM(COALESCE(mas.jackpot,0)+COALESCE(mas.cb_real,0)+COALESCE(mas.hh,0)+COALESCE(mas.cb_birthday,0)+COALESCE(mas.cb_fortune_wheel,0)+COALESCE(mas.cb_raffle,0)) AS marketing
+            SUM(COALESCE(mas.jackpot,0)+COALESCE(mas.cashback,0)+COALESCE(mas.hh,0)+COALESCE(mas.cb_birthday,0)+COALESCE(mas.cb_fortune_wheel,0)+COALESCE(mas.cb_raffle,0)) AS marketing
         FROM machine_audit_summaries mas
         LEFT JOIN machine_types mt ON mt.id = mas.machine_type_id
         LEFT JOIN machine_manufacturers mm ON mm.id = mt.manufacturer_id
@@ -608,7 +608,7 @@ def types():
             SUM(mas.jackpot) AS jackpot, SUM(mas.hh) AS hh,
             SUM(mas.cashback) AS cashback,
             SUM(mas.games) AS games, SUM(mas.bet) AS bet,
-            SUM(COALESCE(mas.jackpot,0)+COALESCE(mas.cb_real,0)+COALESCE(mas.hh,0)+COALESCE(mas.cb_birthday,0)) AS marketing
+            SUM(COALESCE(mas.jackpot,0)+COALESCE(mas.cashback,0)+COALESCE(mas.hh,0)+COALESCE(mas.cb_birthday,0)) AS marketing
         FROM machine_audit_summaries mas
         JOIN machines m ON m.id = mas.machine_id
         LEFT JOIN machine_cabinet_types mct ON mct.id = m.cabinet_type_id
@@ -652,7 +652,7 @@ def cabinets():
             SUM(mas.jackpot) AS jackpot, SUM(mas.hh) AS hh,
             SUM(mas.cashback) AS cashback,
             SUM(mas.games) AS games, SUM(mas.bet) AS bet,
-            SUM(COALESCE(mas.jackpot,0)+COALESCE(mas.cb_real,0)+COALESCE(mas.hh,0)+COALESCE(mas.cb_birthday,0)) AS marketing
+            SUM(COALESCE(mas.jackpot,0)+COALESCE(mas.cashback,0)+COALESCE(mas.hh,0)+COALESCE(mas.cb_birthday,0)) AS marketing
         FROM machine_audit_summaries mas
         JOIN machines m ON m.id = mas.machine_id
         LEFT JOIN machine_cabinet_types mct ON mct.id = m.cabinet_type_id
@@ -737,7 +737,7 @@ def machines():
             SUM(COALESCE(mas.cb_real,0))   AS cb_real,
             SUM(COALESCE(mas.cb_birthday,0)) AS cb_birthday,
             SUM(COALESCE(mas.cashback,0))  AS cashback,
-            SUM(COALESCE(mas.jackpot,0)+COALESCE(mas.cb_real,0)+COALESCE(mas.hh,0)+COALESCE(mas.cb_birthday,0)) AS marketing,
+            SUM(COALESCE(mas.jackpot,0)+COALESCE(mas.cashback,0)+COALESCE(mas.hh,0)+COALESCE(mas.cb_birthday,0)) AS marketing,
             SUM(mas.games)                 AS games,
             SUM(mas.bet)                   AS bet
         FROM machine_audit_summaries mas
@@ -868,7 +868,7 @@ def daily():
                 SUM(COALESCE(mas.cb_fortune_wheel, 0)) as roata,
                 SUM(COALESCE(mas.cb_raffle, 0)) as raffles,
                 SUM(mas.bet) as bet,
-                SUM(COALESCE(mas.jackpot,0)+COALESCE(mas.cb_real,0)+COALESCE(mas.hh,0)+COALESCE(mas.cb_birthday,0)+COALESCE(mas.cb_fortune_wheel,0)+COALESCE(mas.cb_raffle,0)) as marketing,
+                SUM(COALESCE(mas.jackpot,0)+COALESCE(mas.cashback,0)+COALESCE(mas.hh,0)+COALESCE(mas.cb_birthday,0)+COALESCE(mas.cb_fortune_wheel,0)+COALESCE(mas.cb_raffle,0)) as marketing,
                 COUNT(DISTINCT mas.machine_id) as aparate
             FROM machine_audit_summaries mas
             LEFT JOIN locations l ON mas.location_id = l.id
