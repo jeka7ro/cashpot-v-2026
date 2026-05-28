@@ -1083,23 +1083,7 @@ function renderLocDetailMachines(data) {
   const bottom10 = [..._locMachData].reverse().slice(0, topLimit);
   
   const renderMiniRow = (r) => {
-    let tooltipHtml = '';
-    if (r.hp_details) {
-      const parts = r.hp_details.split(';');
-      const maxHps = parts.map(p => {
-        const [d, sum] = p.split('|');
-        return { d, sum: parseFloat(sum) || 0 };
-      }).sort((a,b) => b.sum - a.sum).slice(0, 5); // top 5
-      
-      const detailsStr = maxHps.map(x => `<div style="display:flex;justify-content:space-between;width:120px;margin-bottom:2px;font-size:10px;"><span>${x.d.replace('202','2').substring(2)}</span><strong style="color:var(--text)">${fmt(x.sum)}</strong></div>`).join('');
-      tooltipHtml = `
-        <div class="hp-tooltip" style="display:none; position:absolute; right:100%; top:50%; transform:translateY(-50%); background:var(--surface); border:1px solid var(--border); box-shadow:0 8px 24px rgba(0,0,0,0.2); padding:10px; border-radius:8px; z-index:100; min-width:140px; pointer-events:none;">
-          <div style="font-size:9px; font-weight:800; color:var(--accent); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.05em; border-bottom:1px solid var(--border); padding-bottom:4px;">Top Plăți Zilnice</div>
-          ${detailsStr}
-        </div>
-      `;
-    }
-
+    let rawDetails = r.hp_details || '';
     return `
     <tr>
       <td style="padding-left:16px;">
@@ -1109,9 +1093,8 @@ function renderLocDetailMachines(data) {
       <td>${r.provider||'—'}</td>
       <td class="num">${pill(r.hold_pct)}</td>
       <td class="num" style="font-weight:600; color:${(r.ggr||0)>=0 ? 'var(--green)' : 'var(--red)'};">${fmt(r.ggr)}</td>
-      <td class="num" style="color:var(--muted); position:relative; cursor:${r.hp_details ? 'pointer' : 'default'};" onmouseenter="this.querySelector('.hp-tooltip') && (this.querySelector('.hp-tooltip').style.display='block')" onmouseleave="this.querySelector('.hp-tooltip') && (this.querySelector('.hp-tooltip').style.display='none')">
+      <td class="num" style="color:var(--text); font-weight:bold; cursor:${r.hp_details ? 'pointer' : 'default'};" data-hp="${rawDetails}" onmouseenter="window.showGlobalHpTooltip(this)" onmouseleave="window.hideGlobalHpTooltip()">
         ${r.handpays||0}
-        ${tooltipHtml}
       </td>
     </tr>
     `;
