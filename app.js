@@ -1622,9 +1622,12 @@ window.sortDashClienti = function(field) {
   window.renderDashClientiTable();
 };
 
+let _loadAllRunning = false;
 async function loadAll(){
+  if (_loadAllRunning) return;
+  _loadAllRunning = true;
   const{s,e}=getPeriod();
-  if(!s||!e)return;
+  if(!s||!e){ _loadAllRunning = false; return; }
   showLoader(true);
   try{
     await Promise.all([loadKPI(s,e),loadTrend(s,e),loadLocations(s,e),loadProviders(s,e),loadTypes(s,e),loadCabinets(s,e),loadCalendars(s,e),loadMachines(),loadTop10Games(),loadDashClienti(s,e)]);
@@ -1649,11 +1652,13 @@ async function loadAll(){
     }
   }
   catch(err){console.error('loadAll error:', err);}
-  finally{showLoader(false);}
+  finally{ showLoader(false); }
   // Cardurile live se încarcă ÎNTOTDEAUNA, independent de erorile din Promise.all
   loadDashboardLiveCard();
   loadTop10Games();
   // if (!window._dashLiveInt) window._dashLiveInt = setInterval(() => { loadDashboardLiveCard(); loadTop10Games(); }, 30000);
+  // Eliberăm lock-ul după 1s pentru a preveni apeluri duble rapide
+  setTimeout(() => { _loadAllRunning = false; }, 1000);
 }
 
 async function loadDashboardLiveCard() {
