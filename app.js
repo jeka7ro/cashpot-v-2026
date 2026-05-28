@@ -812,7 +812,14 @@ function drillTo(field,val,label){
   // Set filter
   if(field==='provider'){const s=document.getElementById('f-prov');for(let o of s.options){if(o.textContent===label){s.value=o.value;break;}}}
   if(field==='cabinet'){const s=document.getElementById('f-cab');for(let o of s.options){if(o.textContent===label){s.value=o.value;break;}}}
-  if(field==='location'){const s=document.getElementById('global-loc-select');if(s)for(let o of s.options){if(o.value==val){s.value=o.value;break;}}}
+  if(field==='location'){
+    // Deselecteaza toate locatiile si selecteaza doar cea apasata
+    const sel = document.getElementById('global-loc-select');
+    if (sel) {
+      Array.from(sel.options).forEach(o => { o.selected = (o.value == val); });
+      sel.dispatchEvent(new Event('change'));
+    }
+  }
   loadMachines();
 }
 
@@ -1246,6 +1253,7 @@ async function loadLocations(s,e){
     }
 
     return`<tr>
+      <td style="text-align:center; color:var(--muted); font-size:11px">${i+1}</td>
       <td><span class="drill-link" onclick="drillTo('location',${r.id},'${(r.locatie||'').replace(/'/g,"\\'")}')">${r.locatie||'—'}</span></td>
       <td style="text-align:center">${r.buc}</td><td style="text-align:center">${r.zile}</td><td class="num">${clientiVal}</td>
       <td class="num">${fmt(r.total_in)}${inB}</td>
@@ -1257,8 +1265,8 @@ async function loadLocations(s,e){
   });
   renderTablePaginated('locatii');
 
-  // Actualizeaza header Clienti dinamic
-  const clientiHeader = document.querySelector('#tab-locatii thead th:nth-child(4)');
+  // Actualizează header Clienți/zi dinamic (coloana 5)
+  const clientiHeader = document.querySelector('#tab-locatii thead th:nth-child(5)');
   if (clientiHeader) {
     const anyOneDayH = data.every(r => +r.zile === 1);
     clientiHeader.textContent = anyOneDayH ? 'Clienți' : 'Clienți/zi';
