@@ -860,24 +860,33 @@ async function loadLocationDetails(locId, locName) {
       <div class="kpi-card" style="padding:16px;">
         <div class="kpi-label">Total IN</div>
         <div class="kpi-value" style="font-size:20px;">${fmt(tIn)}</div>
+        <div class="kpi-sub">AVG/zi: <strong>${fmt(d.avg_in_zi||0)} RON</strong></div>
       </div>
       <div class="kpi-card" style="padding:16px;">
         <div class="kpi-label">GGR</div>
         <div class="kpi-value" style="font-size:20px;">${fmt(tGgr)}</div>
-        <div class="kpi-sub">Hold: <strong style="color:${holdCls}">${hold.toFixed(2)}%</strong></div>
+        <div style="display:flex; justify-content:space-between; gap:12px;">
+          <div class="kpi-sub">Hold: <strong style="color:${holdCls}">${hold.toFixed(2)}%</strong></div>
+          <div class="kpi-sub">AVG/zi: <strong>${fmt(d.avg_ggr_zi||0)} RON</strong></div>
+        </div>
       </div>
       <div class="kpi-card" style="padding:16px; border-left:4px solid var(--red);">
         <div class="kpi-label">Cheltuieli (JP+HH+CB)</div>
         <div class="kpi-value" style="font-size:20px; color:var(--red);">${fmt(expenses)}</div>
+        <div class="kpi-sub">AVG/zi: <strong>${fmt(expenses / Math.max(1, d.nr_zile||1))} RON</strong></div>
       </div>
       <div class="kpi-card" style="padding:16px; border-left:4px solid var(--purple);">
         <div class="kpi-label">Marketing</div>
         <div class="kpi-value" style="font-size:20px; color:var(--purple);">${fmt(mkt)}</div>
-        <div class="kpi-sub">Bonus Cost: <strong>${bonusCostPct.toFixed(2)}%</strong></div>
+        <div style="display:flex; justify-content:space-between; gap:12px;">
+          <div class="kpi-sub">Bonus Cost: <strong>${bonusCostPct.toFixed(2)}%</strong></div>
+          <div class="kpi-sub">AVG/zi: <strong>${fmt(mkt / Math.max(1, d.nr_zile||1))} RON</strong></div>
+        </div>
       </div>
       <div class="kpi-card" style="padding:16px;">
         <div class="kpi-label">Games</div>
         <div class="kpi-value" style="font-size:20px;">${fmt(d.games)}</div>
+        <div class="kpi-sub">Bet Mediu: <strong>${((bet / Math.max(1, d.games||1)) / Math.max(1, machData.length)).toFixed(4)} RON</strong></div>
       </div>
     `;
 
@@ -967,25 +976,46 @@ function renderLocDetailChart(data) {
   });
 }
 
+let _locMachData = [];
+let _locMachPage = 1;
+const _locMachPerPage = 15;
+
 function renderLocDetailMachines(data) {
+  _locMachData = data ? [...data].sort((a,b) => (b.ggr||0) - (a.ggr||0)) : [];
+  _locMachPage = 1;
+  renderLocDetailMachinesPaginated();
+}
+
+function renderLocDetailMachinesPaginated() {
   const tbody = document.getElementById('ld-machines-body');
   const tfoot = document.getElementById('ld-machines-foot');
   tbody.innerHTML = '';
   
-  if (!data || data.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:20px; color:var(--muted);">Fără date</td></tr>';
-    tfoot.innerHTML = '';
+  document.getElementById('ld-table-title').textContent = `Aparate în locație (${_locMachData.length})`;
+
+  if (!_locMachData.length) {
+    tfoot.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:20px;color:var(--muted)">Niciun aparat înregistrat</td></tr>`;
+    document.getElementById('ld-machines-info').textContent = 'Arată 0 din 0 rânduri';
+    document.getElementById('ld-machines-pages').innerHTML = '';
     return;
   }
-
-  let tIn=0, tGgr=0, tJp=0, tGames=0, tMkt=0, tBet=0;
   
-  data.sort((a,b) => (b.ggr||0) - (a.ggr||0)).forEach((r, i) => {
+  let tIn=0, tGgr=0, tJp=0, tGames=0, tMkt=0, tBet=0;
+  _locMachData.forEach(r => {
     tIn += +r.total_in||0; tGgr += +r.ggr||0; tJp += +r.jackpot||0; 
     tGames += +r.games||0; tMkt += +r.marketing||0; tBet += +r.bet||0;
+  });
 
+  const start = (_locMachPage - 1) * _locMachPerPage;
+  const end = start + _locMachPerPage;
+  const pageData = _locMachData.slice(start, end);
+
+  const maxAbsGgr = Math.max(1, ..._locMachData.map(x=>Math.abs(x.ggr||0)));
+
+  pageData.forEach((r, idx) => {
+    const i = start + idx;
     const bPct = +r.bet>0 ? (+r.marketing/(+r.bet))*100 : 0;
-    const cc = cellCls(+r.ggr||0, Math.max(1, ...data.map(x=>Math.abs(x.ggr||0))));
+    const cc = cellCls(+r.ggr||0, maxAbsGgr);
 
     tbody.innerHTML += `<tr>
       <td style="text-align:center; color:var(--muted); font-size:11px">${i+1}</td>
@@ -993,9 +1023,9 @@ function renderLocDetailMachines(data) {
       <td>${r.provider||'—'}</td>
       <td>${r.tip_slot||'—'}</td>
       <td class="num">${fmt(r.total_in)}</td>
+      <td class="num">${fmt(r.bet)}</td>
       <td class="num ${cc}">${fmt(r.ggr)}</td>
       <td class="num">${pill(r.hold_pct)}</td>
-      <td class="num">${fmt(r.bet)}</td>
       <td class="num">${fmt(r.jackpot)}</td>
       <td class="num">${fmt(r.games)}</td>
       <td class="num">${bonusCost(bPct)}</td>
@@ -1008,13 +1038,81 @@ function renderLocDetailMachines(data) {
   tfoot.innerHTML = `<tr style="font-weight:800; background:var(--surface2);">
     <td colspan="4">TOTAL</td>
     <td class="num">${fmt(tIn)}</td>
+    <td class="num">${fmt(tBet)}</td>
     <td class="num">${fmt(tGgr)}</td>
     <td class="num">${pill(avgHold)}</td>
-    <td class="num">${fmt(tBet)}</td>
     <td class="num">${fmt(tJp)}</td>
     <td class="num">${fmt(tGames)}</td>
     <td class="num">${bonusCost(avgBonus)}</td>
   </tr>`;
+
+  const totalPages = Math.ceil(_locMachData.length / _locMachPerPage);
+  document.getElementById('ld-machines-info').textContent = `Arată ${start + 1} - ${Math.min(end, _locMachData.length)} din ${_locMachData.length} rânduri`;
+  
+  let pagesHtml = '';
+  for (let p = 1; p <= totalPages; p++) {
+    if (totalPages > 7) {
+      if (p !== 1 && p !== totalPages && Math.abs(p - _locMachPage) > 2) {
+        if (p === 2 || p === totalPages - 1) pagesHtml += `<span style="padding:4px">...</span>`;
+        continue;
+      }
+    }
+    const act = p === _locMachPage ? 'background:var(--accent);color:#fff;border-color:var(--accent)' : 'background:transparent;color:var(--text)';
+    pagesHtml += `<button class="cal-nav" style="${act};font-size:12px;padding:4px 10px;border-radius:4px" onclick="_locMachPage=${p};renderLocDetailMachinesPaginated()">${p}</button>`;
+  }
+  document.getElementById('ld-machines-pages').innerHTML = pagesHtml;
+}
+
+let _locMachSortCol = 'ggr';
+let _locMachSortAsc = false;
+window.sortLocMach = function(col) {
+  if (_locMachSortCol === col) {
+    _locMachSortAsc = !_locMachSortAsc;
+  } else {
+    _locMachSortCol = col;
+    _locMachSortAsc = false;
+  }
+  _locMachData.sort((a,b) => {
+    let va = a[col], vb = b[col];
+    if (col === 'hold_pct') {
+      va = a.total_in > 0 ? (a.ggr/a.total_in) : 0;
+      vb = b.total_in > 0 ? (b.ggr/b.total_in) : 0;
+    }
+    if (typeof va === 'string') return _locMachSortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+    return _locMachSortAsc ? (va||0) - (vb||0) : (vb||0) - (va||0);
+  });
+  _locMachPage = 1;
+  renderLocDetailMachinesPaginated();
+}
+
+window.exportLocMachExcel = function() {
+  if (!_locMachData.length) return;
+  const csv = [
+    ['Nr.', 'Cabinet', 'Provider', 'Tip Joc', 'Total IN', 'Bet', 'GGR', 'Hold%', 'Jackpot', 'Games', 'Bonus Cost Pct'].join(',')
+  ];
+  _locMachData.forEach((r, i) => {
+    const hold = r.total_in > 0 ? ((r.ggr/r.total_in)*100).toFixed(2) : 0;
+    const bp = r.bet > 0 ? ((r.marketing/r.bet)*100).toFixed(2) : 0;
+    csv.push([
+      i+1, 
+      `"${r.cabinet||''}"`, 
+      `"${r.provider||''}"`, 
+      `"${r.tip_slot||''}"`, 
+      r.total_in||0, 
+      r.bet||0, 
+      r.ggr||0, 
+      hold, 
+      r.jackpot||0, 
+      r.games||0, 
+      bp
+    ].join(','));
+  });
+  const blob = new Blob([csv.join('\\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Aparate_Locatie_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
 }
 
 window.goToMultigame = function(mix) {

@@ -299,7 +299,8 @@ def kpi():
             SUM(cashback) as cashback,
             SUM(`in`-`out`-COALESCE(jackpot,0)-COALESCE(hh,0)-COALESCE(cashback,0)) as ngr,
             SUM(games) as games,
-            SUM(bet) as bet
+            SUM(bet) as bet,
+            SUM(COALESCE(jackpot,0)+COALESCE(cb_real,0)+COALESCE(hh,0)+COALESCE(cb_birthday,0)+COALESCE(cb_fortune_wheel,0)+COALESCE(cb_raffle,0)) as marketing
         FROM machine_audit_summaries mas
         WHERE mas.date >= %s AND mas.date <= %s
           AND mas.`in` > 0
@@ -392,7 +393,8 @@ def kpi():
         "avg_in_ap_zi": round(tin/(days*ap),2),
         "avg_bet_game": round(bet/games,4) if games else 0,
         "avg_games_zi": round(games/days,2),
-        "exp_total": expenses
+        "exp_total": expenses,
+        "marketing": safe(row.get('marketing'))
     }
     
     set_cached_response(c_key, resp_data)
