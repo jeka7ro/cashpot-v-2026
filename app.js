@@ -919,9 +919,10 @@ function renderLocDetailChart(data) {
         {
           label: 'Total IN',
           data: totalIn,
-          backgroundColor: 'rgba(16, 185, 129, 0.2)', // Emerald light
+          backgroundColor: 'rgba(16, 185, 129, 0.2)',
           borderColor: 'rgba(16, 185, 129, 1)',
           borderWidth: 1,
+          yAxisID: 'y',
           order: 2
         },
         {
@@ -934,6 +935,7 @@ function renderLocDetailChart(data) {
           pointRadius: 3,
           fill: false,
           tension: 0.1,
+          yAxisID: 'y1',
           order: 1
         }
       ]
@@ -950,7 +952,16 @@ function renderLocDetailChart(data) {
       },
       scales: {
         x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-        y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 10 }, callback: v => fmtK(v) } }
+        y: { 
+          type: 'linear', display: true, position: 'left',
+          grid: { color: 'rgba(0,0,0,0.05)' }, 
+          ticks: { font: { size: 10 }, callback: v => fmtK(v) } 
+        },
+        y1: { 
+          type: 'linear', display: true, position: 'right',
+          grid: { drawOnChartArea: false },
+          ticks: { font: { size: 10 }, callback: v => fmtK(v) }
+        }
       }
     }
   });
@@ -1998,6 +2009,9 @@ window.addEventListener('hashchange', () => {
   }
   
   if (mainHash === 'locatie') {
+    const kpiSection = document.getElementById('kpi-section');
+    if (kpiSection) kpiSection.style.display = 'none';
+    
     document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
     document.getElementById('view-loc-detail').classList.add('active');
     
@@ -2011,6 +2025,9 @@ window.addEventListener('hashchange', () => {
   document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.sidebar .nav-item').forEach(i => i.classList.remove('active'));
   
+  const kpiSection = document.getElementById('kpi-section');
+  if (kpiSection) kpiSection.style.display = mainHash === 'live' ? 'none' : 'grid';
+
   const targetView = document.getElementById('view-' + mainHash);
   if(targetView) targetView.classList.add('active');
   

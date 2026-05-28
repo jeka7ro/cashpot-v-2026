@@ -1388,7 +1388,7 @@
       <!-- Machines Table -->
       <section class="card" style="padding:0; overflow:hidden;">
         <div style="padding:14px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
-          <span style="font-size:11px; font-weight:700; color:var(--text); text-transform:uppercase; letter-spacing:.05em;">Aparate în locație</span>
+          <span id="ld-table-title" style="font-size:11px; font-weight:700; color:var(--text); text-transform:uppercase; letter-spacing:.05em;">Aparate în locație</span>
         </div>
         <div class="table-scroll">
           <table class="data-table" style="min-width:1000px;">
@@ -1410,6 +1410,10 @@
             <tbody id="ld-machines-body"></tbody>
             <tfoot id="ld-machines-foot"></tfoot>
           </table>
+        </div>
+        <div class="table-pagination" id="ld-machines-pagination" style="padding: 12px 20px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted);">
+          <div id="ld-machines-info">Arată 0 din 0 rânduri</div>
+          <div style="display: flex; gap: 4px;" id="ld-machines-pages"></div>
         </div>
       </section>
     </div>
