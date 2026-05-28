@@ -1093,7 +1093,7 @@ function renderLocDetailMachines(data) {
       const detailsStr = maxHps.map(x => `<div style="display:flex;justify-content:space-between;width:120px;margin-bottom:2px;font-size:10px;"><span>${x.d.replace('202','2').substring(2)}</span><strong style="color:var(--text)">${fmt(x.sum)}</strong></div>`).join('');
       tooltipHtml = `
         <div class="hp-tooltip" style="display:none; position:absolute; right:100%; top:50%; transform:translateY(-50%); background:var(--surface); border:1px solid var(--border); box-shadow:0 8px 24px rgba(0,0,0,0.2); padding:10px; border-radius:8px; z-index:100; min-width:140px; pointer-events:none;">
-          <div style="font-size:9px; font-weight:800; color:var(--accent); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.05em; border-bottom:1px solid var(--border); padding-bottom:4px;">Top Plăți</div>
+          <div style="font-size:9px; font-weight:800; color:var(--accent); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.05em; border-bottom:1px solid var(--border); padding-bottom:4px;">Top Zile (Cashout)</div>
           ${detailsStr}
         </div>
       `;
