@@ -813,14 +813,192 @@ function drillTo(field,val,label){
   if(field==='provider'){const s=document.getElementById('f-prov');for(let o of s.options){if(o.textContent===label){s.value=o.value;break;}}}
   if(field==='cabinet'){const s=document.getElementById('f-cab');for(let o of s.options){if(o.textContent===label){s.value=o.value;break;}}}
   if(field==='location'){
-    // Deselecteaza toate locatiile si selecteaza doar cea apasata
-    const sel = document.getElementById('global-loc-select');
-    if (sel) {
-      Array.from(sel.options).forEach(o => { o.selected = (o.value == val); });
-      sel.dispatchEvent(new Event('change'));
-    }
+    loadLocationDetails(val, label);
+    return;
   }
   loadMachines();
+}
+
+// ─── LOCATION DETAILS PAGE ──────────────────────────────────────────────────
+let _locDetailChart = null;
+
+let _prevActiveView = 'view-dashboard';
+
+async function loadLocationDetails(locId, locName) {
+  // Save current view and show loc detail
+  const activeView = document.querySelector('.view-panel.active');
+  if (activeView && activeView.id !== 'view-loc-detail') {
+    _prevActiveView = activeView.id;
+  }
+  document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('view-loc-detail').classList.add('active');
+
+  document.getElementById('ld-title').textContent = locName;
+  const{s,e}=getPeriod();
+  if(!s||!e) return;
+  showLoader(true);
+
+  try {
+    // Fetch KPI + daily trend + machines specifically for this location
+    const [kpiData, dailyData, machData] = await Promise.all([
+      api(`/api/kpi?start=${s}&end=${e}&loc_ids=${locId}`),
+      api(`/api/daily?res=day&start=${s}&end=${e}&loc_ids=${locId}`),
+      api(`/api/machines?start=${s}&end=${e}&loc_ids=${locId}`)
+    ]);
+
+    // 1. KPI
+    const d = kpiData;
+    const tIn = d.total_in||0, tGgr = d.ggr||0, jp = d.jackpot||0, hh = d.hh||0, cb = d.cashback||0;
+    const hold = tIn>0 ? (tGgr/tIn)*100 : 0;
+    const expenses = jp + hh + cb;
+    const mkt = d.marketing||0, bet = d.bet||0;
+    const bonusCostPct = bet>0 ? (mkt/bet)*100 : 0;
+    const holdCls = hold < 15 ? 'var(--red)' : hold > 25 ? 'var(--green)' : 'var(--text)';
+
+    document.getElementById('ld-buc').textContent = machData.length;
+    document.getElementById('ld-kpi-row').innerHTML = `
+      <div class="kpi-card" style="padding:16px;">
+        <div class="kpi-label">Total IN</div>
+        <div class="kpi-value" style="font-size:20px;">${fmt(tIn)}</div>
+      </div>
+      <div class="kpi-card" style="padding:16px;">
+        <div class="kpi-label">GGR</div>
+        <div class="kpi-value" style="font-size:20px;">${fmt(tGgr)}</div>
+        <div class="kpi-sub">Hold: <strong style="color:${holdCls}">${hold.toFixed(2)}%</strong></div>
+      </div>
+      <div class="kpi-card" style="padding:16px; border-left:4px solid var(--red);">
+        <div class="kpi-label">Cheltuieli (JP+HH+CB)</div>
+        <div class="kpi-value" style="font-size:20px; color:var(--red);">${fmt(expenses)}</div>
+      </div>
+      <div class="kpi-card" style="padding:16px; border-left:4px solid var(--purple);">
+        <div class="kpi-label">Marketing</div>
+        <div class="kpi-value" style="font-size:20px; color:var(--purple);">${fmt(mkt)}</div>
+        <div class="kpi-sub">Bonus Cost: <strong>${bonusCostPct.toFixed(2)}%</strong></div>
+      </div>
+      <div class="kpi-card" style="padding:16px;">
+        <div class="kpi-label">Games</div>
+        <div class="kpi-value" style="font-size:20px;">${fmt(d.games)}</div>
+      </div>
+    `;
+
+    // 2. Trend Chart
+    renderLocDetailChart(dailyData);
+
+    // 3. Machines Table
+    renderLocDetailMachines(machData);
+
+  } catch (err) {
+    console.error('Error loading location details', err);
+  } finally {
+    showLoader(false);
+  }
+}
+
+function closeLocDetail() {
+  document.getElementById('view-loc-detail').classList.remove('active');
+  document.getElementById(_prevActiveView).classList.add('active');
+}
+
+function renderLocDetailChart(data) {
+  const ctx = document.getElementById('ld-daily-chart').getContext('2d');
+  if (_locDetailChart) _locDetailChart.destroy();
+  if (!data || data.length === 0) return;
+
+  const labels = data.map(r => r.date);
+  const totalIn = data.map(r => r.total_in || 0);
+  const ggr = data.map(r => r.ggr || 0);
+
+  _locDetailChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Total IN',
+          data: totalIn,
+          backgroundColor: 'rgba(16, 185, 129, 0.2)', // Emerald light
+          borderColor: 'rgba(16, 185, 129, 1)',
+          borderWidth: 1,
+          order: 2
+        },
+        {
+          label: 'GGR',
+          data: ggr,
+          type: 'line',
+          borderColor: '#1e293b',
+          backgroundColor: '#1e293b',
+          borderWidth: 2,
+          pointRadius: 3,
+          fill: false,
+          tension: 0.1,
+          order: 1
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } },
+        tooltip: {
+          callbacks: { label: c => c.dataset.label + ': ' + fmt(c.raw) }
+        }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+        y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 10 }, callback: v => fmtK(v) } }
+      }
+    }
+  });
+}
+
+function renderLocDetailMachines(data) {
+  const tbody = document.getElementById('ld-machines-body');
+  const tfoot = document.getElementById('ld-machines-foot');
+  tbody.innerHTML = '';
+  
+  if (!data || data.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:20px; color:var(--muted);">Fără date</td></tr>';
+    tfoot.innerHTML = '';
+    return;
+  }
+
+  let tIn=0, tGgr=0, tJp=0, tGames=0, tMkt=0, tBet=0;
+  
+  data.sort((a,b) => (b.ggr||0) - (a.ggr||0)).forEach((r, i) => {
+    tIn += +r.total_in||0; tGgr += +r.ggr||0; tJp += +r.jackpot||0; 
+    tGames += +r.games||0; tMkt += +r.marketing||0; tBet += +r.bet||0;
+
+    const bPct = +r.bet>0 ? (+r.marketing/(+r.bet))*100 : 0;
+    const cc = cellCls(+r.ggr||0, Math.max(1, ...data.map(x=>Math.abs(x.ggr||0))));
+
+    tbody.innerHTML += `<tr>
+      <td style="text-align:center; color:var(--muted); font-size:11px">${i+1}</td>
+      <td><strong>${r.cabinet||'—'}</strong><div style="font-size:10px;color:var(--muted)">SN: ${r.serial_nr||'—'}</div></td>
+      <td>${r.provider||'—'}</td>
+      <td>${r.tip_joc||'—'}</td>
+      <td class="num">${fmt(r.total_in)}</td>
+      <td class="num ${cc}">${fmt(r.ggr)}</td>
+      <td class="num">${pill(r.hold_pct)}</td>
+      <td class="num">${fmt(r.jackpot)}</td>
+      <td class="num">${fmt(r.games)}</td>
+      <td class="num">${bonusCost(bPct)}</td>
+    </tr>`;
+  });
+
+  const avgHold = tIn>0 ? (tGgr/tIn)*100 : 0;
+  const avgBonus = tBet>0 ? (tMkt/tBet)*100 : 0;
+
+  tfoot.innerHTML = `<tr style="font-weight:800; background:var(--surface2);">
+    <td colspan="4">TOTAL</td>
+    <td class="num">${fmt(tIn)}</td>
+    <td class="num">${fmt(tGgr)}</td>
+    <td class="num">${pill(avgHold)}</td>
+    <td class="num">${fmt(tJp)}</td>
+    <td class="num">${fmt(tGames)}</td>
+    <td class="num">${bonusCost(avgBonus)}</td>
+  </tr>`;
 }
 
 window.goToMultigame = function(mix) {

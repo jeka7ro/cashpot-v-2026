@@ -1341,6 +1341,64 @@
     </div>
   </div>
 
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- VIEW: LOCATION DETAIL                                                 -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <div id="view-loc-detail" class="view-panel" style="overflow-y:auto; display:none;">
+    <div style="padding:24px; max-width:1400px; margin:0 auto;">
+      <!-- Header -->
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
+        <div style="display:flex; align-items:center; gap:16px;">
+          <button class="settings-btn" onclick="closeLocDetail()" style="display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:20px; font-size:12px; font-weight:600;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg> Înapoi
+          </button>
+          <div>
+            <h1 id="ld-title" style="font-size:24px; font-weight:800; color:var(--text); margin:0;">Locație</h1>
+            <div style="font-size:12px; color:var(--muted); margin-top:2px;">Aparate: <strong id="ld-buc">0</strong> &bull; Status: <strong style="color:var(--green)">Activ</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI Grid -->
+      <div id="ld-kpi-row" style="display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-bottom:24px;">
+        <!-- Filled by JS -->
+      </div>
+
+      <!-- Charts -->
+      <div style="background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:24px;">
+        <div style="font-size:11px; font-weight:700; color:var(--text); text-transform:uppercase; letter-spacing:.05em; margin-bottom:16px;">Evoluție Zilnică</div>
+        <div style="position:relative; height:260px;"><canvas id="ld-daily-chart"></canvas></div>
+      </div>
+
+      <!-- Machines Table -->
+      <section class="card" style="padding:0; overflow:hidden;">
+        <div style="padding:14px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:11px; font-weight:700; color:var(--text); text-transform:uppercase; letter-spacing:.05em;">Aparate în locație</span>
+        </div>
+        <div class="table-scroll">
+          <table class="data-table" style="min-width:1000px;">
+            <thead>
+              <tr>
+                <th style="padding-left:16px;width:30px">Nr.</th>
+                <th>Cabinet</th>
+                <th>Provider</th>
+                <th>Tip Joc</th>
+                <th class="num">Total IN</th>
+                <th class="num">GGR</th>
+                <th class="num">Hold%</th>
+                <th class="num">Jackpot</th>
+                <th class="num">Games</th>
+                <th class="num" style="padding-right:16px">Bonus Cost</th>
+              </tr>
+            </thead>
+            <tbody id="ld-machines-body"></tbody>
+            <tfoot id="ld-machines-foot"></tfoot>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+
 
   
   <!-- VIEW: LIVE MONITOR                                                   -->
