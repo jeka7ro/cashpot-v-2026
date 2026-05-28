@@ -441,7 +441,8 @@ def trend():
             SUM(COALESCE(bet,0)) as bet,
             SUM(games) as games,
             COUNT(DISTINCT machine_id) as aparate,
-            COUNT(DISTINCT date) as zile
+            COUNT(DISTINCT date) as zile,
+            SUM(COALESCE(jackpot,0)+COALESCE(cb_real,0)+COALESCE(hh,0)+COALESCE(cb_birthday,0)+COALESCE(cb_fortune_wheel,0)+COALESCE(cb_raffle,0)) as marketing
         FROM {table} mas
         WHERE {where_date}
     """ + lf + f"""
@@ -867,6 +868,7 @@ def daily():
                 SUM(COALESCE(mas.cb_fortune_wheel, 0)) as roata,
                 SUM(COALESCE(mas.cb_raffle, 0)) as raffles,
                 SUM(mas.bet) as bet,
+                SUM(COALESCE(mas.jackpot,0)+COALESCE(mas.cb_real,0)+COALESCE(mas.hh,0)+COALESCE(mas.cb_birthday,0)+COALESCE(mas.cb_fortune_wheel,0)+COALESCE(mas.cb_raffle,0)) as marketing,
                 COUNT(DISTINCT mas.machine_id) as aparate
             FROM machine_audit_summaries mas
             LEFT JOIN locations l ON mas.location_id = l.id
@@ -885,6 +887,7 @@ def daily():
                 daily_data[day] = {
                     'date': day, 'ggr': 0, 'total_in': 0, 'jp': 0,
                     'hh': 0, 'cb': 0, 'roata': 0, 'raffles': 0, 'bet': 0, 'aparate': 0,
+                    'marketing': 0,
                     'loc_details': []
                 }
             dd = daily_data[day]
@@ -896,6 +899,7 @@ def daily():
             dd['roata']    += safe(r['roata'])
             dd['raffles']  += safe(r['raffles'])
             dd['bet']      += safe(r['bet'])
+            dd['marketing'] += safe(r['marketing'])
             dd['aparate']  += int(r['aparate'] or 0)
             dd['loc_details'].append({
                 'locatie': loc,

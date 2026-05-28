@@ -839,15 +839,25 @@ async function loadLocationDetails(locId, locName) {
   showLoader(true);
 
   try {
+    const sDate = new Date(s);
+    const eDate = new Date(e);
+    const days = Math.round((eDate - sDate) / 86400000) + 1;
+    const ps = new Date(sDate.getFullYear(), sDate.getMonth() - 1, sDate.getDate());
+    const pe = new Date(ps.getTime() + (days - 1) * 86400000);
+    const prevS = ps.toISOString().split('T')[0];
+    const prevE = pe.toISOString().split('T')[0];
+
     // Fetch KPI + daily trend + machines specifically for this location
-    const [kpiData, dailyData, machData] = await Promise.all([
+    const [kpiData, dailyData, machData, prevKpiData] = await Promise.all([
       api(`/api/kpi?start=${s}&end=${e}&loc_ids=${locId}`),
       api(`/api/daily?res=day&start=${s}&end=${e}&loc_ids=${locId}`),
-      api(`/api/machines?start=${s}&end=${e}&loc_ids=${locId}`)
+      api(`/api/machines?start=${s}&end=${e}&loc_ids=${locId}`),
+      api(`/api/kpi?start=${prevS}&end=${prevE}&loc_ids=${locId}`).catch(()=>({}))
     ]);
 
     // 1. KPI
     const d = kpiData;
+    const pd = prevKpiData || {};
     const tIn = d.total_in||0, tGgr = d.ggr||0, jp = d.jackpot||0, hh = d.hh||0, cb = d.cashback||0;
     const hold = tIn>0 ? (tGgr/tIn)*100 : 0;
     const expenses = jp + hh + cb;
@@ -855,16 +865,29 @@ async function loadLocationDetails(locId, locName) {
     const bonusCostPct = bet>0 ? (mkt/bet)*100 : 0;
     const holdCls = hold < 15 ? 'var(--red)' : hold > 25 ? 'var(--green)' : 'var(--text)';
 
+    const pIn = pd.total_in||0;
+    const pGgr = pd.ggr||0;
+    const pExp = (pd.jackpot||0) + (pd.hh||0) + (pd.cashback||0);
+    const pMkt = pd.marketing||0;
+    
+    const diffIn = pIn ? ((tIn - pIn)/pIn)*100 : 0;
+    const diffGgr = pGgr ? ((tGgr - pGgr)/Math.abs(pGgr))*100 : 0;
+    const diffExp = pExp ? ((expenses - pExp)/pExp)*100 : 0;
+    const diffMkt = pMkt ? ((mkt - pMkt)/pMkt)*100 : 0;
+    
+    const dCls = v => v > 0 ? 'var(--green)' : v < 0 ? 'var(--red)' : 'var(--muted)';
+    const renderDiff = v => `<span style="color:${dCls(v)}; font-size:10px; font-weight:700;">${v > 0 ? '+' : ''}${v.toFixed(1)}%</span>`;
+
     document.getElementById('ld-buc').textContent = machData.length;
     document.getElementById('ld-kpi-row').innerHTML = `
       <div class="kpi-card" style="padding:16px;">
         <div class="kpi-label">Total IN</div>
-        <div class="kpi-value" style="font-size:20px;">${fmt(tIn)}</div>
+        <div class="kpi-value" style="font-size:20px; display:flex; align-items:baseline; gap:8px;">${fmt(tIn)} ${renderDiff(diffIn)}</div>
         <div class="kpi-sub">AVG/zi: <strong>${fmt(d.avg_in_zi||0)} RON</strong></div>
       </div>
       <div class="kpi-card" style="padding:16px;">
         <div class="kpi-label">GGR</div>
-        <div class="kpi-value" style="font-size:20px;">${fmt(tGgr)}</div>
+        <div class="kpi-value" style="font-size:20px; display:flex; align-items:baseline; gap:8px;">${fmt(tGgr)} ${renderDiff(diffGgr)}</div>
         <div style="display:flex; justify-content:space-between; gap:12px;">
           <div class="kpi-sub">Hold: <strong style="color:${holdCls}">${hold.toFixed(2)}%</strong></div>
           <div class="kpi-sub">AVG/zi: <strong>${fmt(d.avg_ggr_zi||0)} RON</strong></div>
@@ -872,12 +895,12 @@ async function loadLocationDetails(locId, locName) {
       </div>
       <div class="kpi-card" style="padding:16px; border-left:4px solid var(--red);">
         <div class="kpi-label">Cheltuieli (JP+HH+CB)</div>
-        <div class="kpi-value" style="font-size:20px; color:var(--red);">${fmt(expenses)}</div>
+        <div class="kpi-value" style="font-size:20px; color:var(--red); display:flex; align-items:baseline; gap:8px;">${fmt(expenses)} ${renderDiff(diffExp)}</div>
         <div class="kpi-sub">AVG/zi: <strong>${fmt(expenses / Math.max(1, d.nr_zile||1))} RON</strong></div>
       </div>
       <div class="kpi-card" style="padding:16px; border-left:4px solid var(--purple);">
         <div class="kpi-label">Marketing</div>
-        <div class="kpi-value" style="font-size:20px; color:var(--purple);">${fmt(mkt)}</div>
+        <div class="kpi-value" style="font-size:20px; color:var(--purple); display:flex; align-items:baseline; gap:8px;">${fmt(mkt)} ${renderDiff(diffMkt)}</div>
         <div style="display:flex; justify-content:space-between; gap:12px;">
           <div class="kpi-sub">Bonus Cost: <strong>${bonusCostPct.toFixed(2)}%</strong></div>
           <div class="kpi-sub">AVG/zi: <strong>${fmt(mkt / Math.max(1, d.nr_zile||1))} RON</strong></div>
@@ -1012,6 +1035,7 @@ function renderLocDetailChart(data) {
 }
 
 let _locMachData = [];
+let _locMachFiltered = [];
 let _locMachPage = 1;
 let _locMachPerPage = 15;
 
@@ -1021,8 +1045,25 @@ window.changeLocMachPerPage = function(val) {
   renderLocDetailMachinesPaginated();
 }
 
+window.filterLocMach = function() {
+  const term = (document.getElementById('ld-mach-search')?.value || '').toLowerCase();
+  if (!term) {
+    _locMachFiltered = [..._locMachData];
+  } else {
+    _locMachFiltered = _locMachData.filter(d => 
+      (d.cabinet||'').toLowerCase().includes(term) ||
+      (d.provider||'').toLowerCase().includes(term) ||
+      (d.tip_slot||'').toLowerCase().includes(term) ||
+      (d.serial_nr||'').toLowerCase().includes(term)
+    );
+  }
+  _locMachPage = 1;
+  renderLocDetailMachinesPaginated();
+}
+
 function renderLocDetailMachines(data) {
   _locMachData = data ? [...data].sort((a,b) => (b.ggr||0) - (a.ggr||0)) : [];
+  _locMachFiltered = [..._locMachData];
   _locMachPage = 1;
   renderLocDetailMachinesPaginated();
 }
@@ -1032,26 +1073,26 @@ function renderLocDetailMachinesPaginated() {
   const tfoot = document.getElementById('ld-machines-foot');
   tbody.innerHTML = '';
   
-  document.getElementById('ld-table-title').textContent = `Aparate în locație (${_locMachData.length})`;
+  document.getElementById('ld-table-title').textContent = `Aparate în locație (${_locMachFiltered.length})`;
 
-  if (!_locMachData.length) {
-    tfoot.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:20px;color:var(--muted)">Niciun aparat înregistrat</td></tr>`;
+  if (!_locMachFiltered.length) {
+    tfoot.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:20px;color:var(--muted)">Niciun aparat găsit</td></tr>`;
     document.getElementById('ld-machines-info').textContent = 'Arată 0 din 0 rânduri';
     document.getElementById('ld-machines-pages').innerHTML = '';
     return;
   }
   
   let tIn=0, tGgr=0, tJp=0, tGames=0, tMkt=0, tBet=0;
-  _locMachData.forEach(r => {
+  _locMachFiltered.forEach(r => {
     tIn += +r.total_in||0; tGgr += +r.ggr||0; tJp += +r.jackpot||0; 
     tGames += +r.games||0; tMkt += +r.marketing||0; tBet += +r.bet||0;
   });
 
   const start = (_locMachPage - 1) * _locMachPerPage;
   const end = start + _locMachPerPage;
-  const pageData = _locMachData.slice(start, end);
+  const pageData = _locMachFiltered.slice(start, end);
 
-  const maxAbsGgr = Math.max(1, ..._locMachData.map(x=>Math.abs(x.ggr||0)));
+  const maxAbsGgr = Math.max(1, ..._locMachFiltered.map(x=>Math.abs(x.ggr||0)));
 
   pageData.forEach((r, idx) => {
     const i = start + idx;
