@@ -165,29 +165,25 @@ function locParam() {
 window.reloadCurrentView = function() {
   const hash = window.location.hash || '#dashboard';
   const { s, e } = getPeriod();
-  
-  if (s && e && !hash.startsWith('#dashboard') && !hash.startsWith('#live') && !hash.startsWith('#admin')) {
-    loadKPI(s, e);
-  }
 
-  if (hash.startsWith('#rapoarte/ore')) { loadAll(); loadHourlyReport(); }
-  else if (hash.startsWith('#rapoarte/hh')) { loadAll(); loadHhReport(); }
-  else if (hash.startsWith('#rapoarte/marketing')) { loadAll(); loadMarketingReport(); }
-  else if (hash.startsWith('#rapoarte/clienti')) { loadAll(); loadClientiReport(); }
-  else if (hash.startsWith('#rapoarte/cashout')) { loadAll(); loadRapoarteCashout(); }
+  if (hash.startsWith('#rapoarte/ore')) { loadKPI(s,e); loadHourlyReport(); }
+  else if (hash.startsWith('#rapoarte/hh')) { loadKPI(s,e); loadHhReport(); }
+  else if (hash.startsWith('#rapoarte/marketing')) { loadKPI(s,e); loadMarketingReport(); }
+  else if (hash.startsWith('#rapoarte/clienti')) { loadKPI(s,e); loadClientiReport(); }
+  else if (hash.startsWith('#rapoarte/cashout')) { loadKPI(s,e); loadRapoarteCashout(); }
   else if (hash.startsWith('#rapoarte/cheltuieli') || hash === '#cheltuieli' || hash.startsWith('#cheltuieli/')) {
-    const {s: ks, e: ke} = getPeriod();
-    if (ks && ke) loadKPI(ks, ke).catch(console.error);
+    if (s && e) loadKPI(s, e).catch(console.error);
     window.loadExpensesReport();
   }
   else if (hash === '#pl' || hash.startsWith('#pl/')) {
     loadPLData();
   }
   else if (hash.startsWith('#rapoarte/multigame')) {
-    loadAll();
+    loadKPI(s,e);
     window.loadMultigameReport ? loadMultigameReport() : loadMultigame();
   }
   else if (hash.startsWith('#admin/sloturi')) loadAdminSloturi();
+  else if (hash.startsWith('#live')) { /* live se gestioneaza prin hashchange */ }
   else loadAll();
 };
 async function api(path) {
