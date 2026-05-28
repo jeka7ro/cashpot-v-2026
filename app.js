@@ -886,7 +886,7 @@ async function loadLocationDetails(locId, locName) {
       <div class="kpi-card" style="padding:16px;">
         <div class="kpi-label">Games</div>
         <div class="kpi-value" style="font-size:20px;">${fmt(d.games)}</div>
-        <div class="kpi-sub">Bet Mediu: <strong>${((bet / Math.max(1, d.games||1)) / Math.max(1, machData.length)).toFixed(4)} RON</strong></div>
+        <div class="kpi-sub">Bet Mediu: <strong>${(bet / Math.max(1, d.games||1)).toFixed(4)} RON</strong></div>
       </div>
     `;
 
@@ -963,6 +963,23 @@ function renderLocDetailChart(data) {
               return fmtK(val);
             }
           }
+        },
+        {
+          label: 'Marketing',
+          data: data.map(r => r.marketing || 0),
+          type: 'line',
+          borderColor: '#a855f7', // Purple
+          backgroundColor: '#a855f7',
+          borderWidth: 2,
+          pointBackgroundColor: '#fff',
+          pointBorderColor: '#a855f7',
+          pointBorderWidth: 2,
+          pointRadius: 3,
+          fill: false,
+          tension: 0.3,
+          yAxisID: 'y1',
+          order: 0,
+          datalabels: { display: false }
         }
       ]
     },
@@ -996,7 +1013,13 @@ function renderLocDetailChart(data) {
 
 let _locMachData = [];
 let _locMachPage = 1;
-const _locMachPerPage = 15;
+let _locMachPerPage = 15;
+
+window.changeLocMachPerPage = function(val) {
+  _locMachPerPage = parseInt(val);
+  _locMachPage = 1;
+  renderLocDetailMachinesPaginated();
+}
 
 function renderLocDetailMachines(data) {
   _locMachData = data ? [...data].sort((a,b) => (b.ggr||0) - (a.ggr||0)) : [];
@@ -7048,4 +7071,94 @@ window.appAlert = function(msg) {
   }
   document.getElementById('app-alert-msg').innerText = msg;
   modal.classList.add('show');
+}
+
+// ─── DISPOZITIVE ─────────────────────────────────────────────────────────────
+let _dispData = [];
+let _dispPage = 1;
+let _dispPerPage = 50;
+
+async function loadDispozitive() {
+  try {
+    const res = await fetch('/api/slots/inventory');
+    if (!res.ok) throw new Error('API Error');
+    _dispData = await res.json();
+    _dispPage = 1;
+    renderDispozitive();
+  } catch (err) {
+    console.error('Eroare loadDispozitive:', err);
+    document.getElementById('disp-body').innerHTML = `<tr><td colspan="10" style="text-align:center;color:var(--red);">Eroare la încărcarea dispozitivelor</td></tr>`;
+  }
+}
+
+window.renderDispozitive = function(forcePage) {
+  if (forcePage) _dispPage = forcePage;
+  const tbody = document.getElementById('disp-body');
+  const term = (document.getElementById('disp-search')?.value || '').toLowerCase();
+  
+  let filtered = _dispData;
+  if (term) {
+    filtered = filtered.filter(d => 
+      (d.cabinet||'').toLowerCase().includes(term) ||
+      (d.provider||'').toLowerCase().includes(term) ||
+      (d.tip_slot||'').toLowerCase().includes(term) ||
+      (d.serial_nr||'').toLowerCase().includes(term) ||
+      (d.locatie||'').toLowerCase().includes(term)
+    );
+  }
+  
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--muted)">Nu s-au găsit dispozitive</td></tr>`;
+    document.getElementById('disp-info').textContent = 'Arată 0 din 0 rânduri';
+    document.getElementById('disp-pages').innerHTML = '';
+    return;
+  }
+  
+  const start = (_dispPage - 1) * _dispPerPage;
+  const end = start + _dispPerPage;
+  const pageData = filtered.slice(start, end);
+  
+  const maxAbsGgr = Math.max(1, ...filtered.map(x=>Math.abs(x.tot_ggr||0)));
+  
+  tbody.innerHTML = pageData.map((r, idx) => {
+    const cc = cellCls(+r.tot_ggr||0, maxAbsGgr);
+    const badge = r.status === 'Activ' 
+      ? `<span style="padding:2px 8px; border-radius:12px; background:rgba(34,197,94,0.1); color:#22c55e; font-size:10px; font-weight:700;">ACTIV</span>`
+      : `<span style="padding:2px 8px; border-radius:12px; background:rgba(239,68,68,0.1); color:#ef4444; font-size:10px; font-weight:700;">${(r.status||'INACTIV').toUpperCase()}</span>`;
+      
+    return `<tr>
+      <td style="text-align:center; color:var(--muted); font-size:11px">${start + idx + 1}</td>
+      <td>${badge}</td>
+      <td><strong>${r.cabinet||'—'}</strong></td>
+      <td>${r.serial_nr||'—'}</td>
+      <td><span style="font-weight:600;color:var(--text)">${r.locatie||'Depozit'}</span></td>
+      <td>${r.mix||'—'} / ${r.provider||'—'}</td>
+      <td class="num">${r.tva_exp||'—'}</td>
+      <td class="num">${fmt(r.tot_in)}</td>
+      <td class="num ${cc}">${fmt(r.tot_ggr)}</td>
+      <td class="num" style="padding-right:16px">${pill(r.rto_pct)}</td>
+    </tr>`;
+  }).join('');
+  
+  const totalPages = Math.ceil(filtered.length / _dispPerPage);
+  document.getElementById('disp-info').textContent = `Arată ${start + 1} - ${Math.min(end, filtered.length)} din ${filtered.length} rânduri`;
+  
+  let pagesHtml = '';
+  for (let p = 1; p <= totalPages; p++) {
+    if (totalPages > 7) {
+      if (p !== 1 && p !== totalPages && Math.abs(p - _dispPage) > 2) {
+        if (p === 2 || p === totalPages - 1) pagesHtml += `<span style="padding:4px">...</span>`;
+        continue;
+      }
+    }
+    const act = p === _dispPage ? 'background:var(--accent);color:#fff;border-color:var(--accent)' : 'background:transparent;color:var(--text)';
+    pagesHtml += `<button class="cal-nav" style="${act};font-size:12px;padding:4px 10px;border-radius:4px" onclick="_dispPage=${p};renderDispozitive()">${p}</button>`;
+  }
+  document.getElementById('disp-pages').innerHTML = pagesHtml;
+}
+
+window.changeDispPerPage = function(val) {
+  _dispPerPage = parseInt(val);
+  _dispPage = 1;
+  renderDispozitive();
 }
