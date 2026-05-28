@@ -1661,10 +1661,7 @@ async function loadAll(){
   }
   catch(err){console.error('loadAll error:', err);}
   finally{ showLoader(false); }
-  // Cardurile live se încarcă ÎNTOTDEAUNA, independent de erorile din Promise.all
-  loadDashboardLiveCard();
   loadTop10Games();
-  // if (!window._dashLiveInt) window._dashLiveInt = setInterval(() => { loadDashboardLiveCard(); loadTop10Games(); }, 30000);
   // Eliberăm lock-ul după 1s pentru a preveni apeluri duble rapide
   setTimeout(() => { _loadAllRunning = false; }, 1000);
 }
