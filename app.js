@@ -3280,6 +3280,9 @@ async function loadLive() {
     const ts = d.ts || '';
     const el = document.getElementById('live-ts');
     if(el) el.textContent = `Ultima actualizare: ${ts} — se reimprospatează la 10s`;
+    
+    // Update live cards (moved to Live page)
+    loadDashboardLiveCard();
 
     if (!_liveTimer) {
       // _liveTimer = setInterval(loadLive, 10000); // Dezactivat pentru a preveni refresh-ul continuu
