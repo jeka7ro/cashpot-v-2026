@@ -1777,7 +1777,7 @@ window.renderDashClientiTable = function() {
     return asc ? va - vb : vb - va;
   });
 
-  tableStates['clienti'].rows = data.map(r => {
+  tableStates['clienti'].rows = data.map((r, i) => {
     const ggrColor = r.ggr >= 0 ? 'var(--green)' : 'var(--red)';
     const cabs = r.cabinets.size > 0 ? Array.from(r.cabinets).join(', ') : '-';
     const gams = r.games.size > 0 ? Array.from(r.games).join(', ') : '-';
