@@ -813,7 +813,7 @@ function drillTo(field,val,label){
   if(field==='provider'){const s=document.getElementById('f-prov');for(let o of s.options){if(o.textContent===label){s.value=o.value;break;}}}
   if(field==='cabinet'){const s=document.getElementById('f-cab');for(let o of s.options){if(o.textContent===label){s.value=o.value;break;}}}
   if(field==='location'){
-    loadLocationDetails(val, label);
+    window.location.hash = `#locatie/${val}?name=${encodeURIComponent(label)}`;
     return;
   }
   loadMachines();
@@ -895,8 +895,11 @@ async function loadLocationDetails(locId, locName) {
 }
 
 function closeLocDetail() {
-  document.getElementById('view-loc-detail').classList.remove('active');
-  document.getElementById(_prevActiveView).classList.add('active');
+  if (window.history.length > 1) {
+    window.history.back();
+  } else {
+    window.location.hash = '#dashboard';
+  }
 }
 
 function renderLocDetailChart(data) {
@@ -977,10 +980,11 @@ function renderLocDetailMachines(data) {
       <td style="text-align:center; color:var(--muted); font-size:11px">${i+1}</td>
       <td><strong>${r.cabinet||'—'}</strong><div style="font-size:10px;color:var(--muted)">SN: ${r.serial_nr||'—'}</div></td>
       <td>${r.provider||'—'}</td>
-      <td>${r.tip_joc||'—'}</td>
+      <td>${r.tip_slot||'—'}</td>
       <td class="num">${fmt(r.total_in)}</td>
       <td class="num ${cc}">${fmt(r.ggr)}</td>
       <td class="num">${pill(r.hold_pct)}</td>
+      <td class="num">${fmt(r.bet)}</td>
       <td class="num">${fmt(r.jackpot)}</td>
       <td class="num">${fmt(r.games)}</td>
       <td class="num">${bonusCost(bPct)}</td>
@@ -995,6 +999,7 @@ function renderLocDetailMachines(data) {
     <td class="num">${fmt(tIn)}</td>
     <td class="num">${fmt(tGgr)}</td>
     <td class="num">${pill(avgHold)}</td>
+    <td class="num">${fmt(tBet)}</td>
     <td class="num">${fmt(tJp)}</td>
     <td class="num">${fmt(tGames)}</td>
     <td class="num">${bonusCost(avgBonus)}</td>
@@ -1989,6 +1994,17 @@ window.addEventListener('hashchange', () => {
   
   if (mainHash === 'invite') {
     handleInviteHash(subHash);
+    return;
+  }
+  
+  if (mainHash === 'locatie') {
+    document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('view-loc-detail').classList.add('active');
+    
+    // Extract name from query params if possible
+    const searchParams = new URLSearchParams(window.location.hash.split('?')[1] || '');
+    const locName = searchParams.get('name') || 'Locație';
+    loadLocationDetails(subHash, locName);
     return;
   }
   
