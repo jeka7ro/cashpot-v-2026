@@ -734,10 +734,12 @@ def machines():
             SUM(mas.`in`-mas.`out`)        AS ggr,
             SUM(COALESCE(mas.jackpot,0))   AS jackpot,
             SUM(COALESCE(mas.hh,0))        AS hh,
-            SUM(COALESCE(mas.cb_real,0))   AS cb_real,
             SUM(COALESCE(mas.cb_birthday,0)) AS cb_birthday,
             SUM(COALESCE(mas.cashback,0))  AS cashback,
-            SUM(COALESCE(mas.jackpot,0)+COALESCE(mas.cashback,0)+COALESCE(mas.hh,0)+COALESCE(mas.cb_birthday,0)) AS marketing,
+            SUM(COALESCE(mas.cb_fortune_wheel,0)) AS cb_fortune_wheel,
+            SUM(COALESCE(mas.cb_raffle,0)) AS cb_raffle,
+            SUM(COALESCE(mas.jackpot,0)+COALESCE(mas.cashback,0)+COALESCE(mas.hh,0)+COALESCE(mas.cb_birthday,0)+COALESCE(mas.cb_fortune_wheel,0)+COALESCE(mas.cb_raffle,0)) AS marketing,
+            SUM(CASE WHEN mas.`out` > 0 OR mas.jackpot > 0 OR mas.hh > 0 THEN 1 ELSE 0 END) AS handpays,
             SUM(mas.games)                 AS games,
             SUM(mas.bet)                   AS bet
         FROM machine_audit_summaries mas

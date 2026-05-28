@@ -1,13 +1,13 @@
 import sys
-import mysql.connector
+import os
+sys.path.append('.')
+from server import get_conn
 
 try:
-    conn = mysql.connector.connect(
-        host="localhost", user="root", password="1", database="cashpot2"
-    )
+    conn = get_conn()
     cursor = conn.cursor()
-    cursor.execute("DESCRIBE machine_audit_summaries")
+    cursor.execute("SHOW TABLES")
     for row in cursor.fetchall():
-        print(row[0], row[1])
+        print(row.values())
 except Exception as e:
     print(e)

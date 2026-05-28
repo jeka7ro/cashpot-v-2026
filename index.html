@@ -1409,15 +1409,25 @@
       </div>
 
       <!-- Top/Bottom Performers -->
+      <div style="display:flex; justify-content:flex-end; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:11px; color:var(--muted); font-weight:600; text-transform:uppercase;">Rânduri:</span>
+          <select id="ld-top-limit" class="glass-select" style="padding:4px 8px; font-size:11px;" onchange="renderLocDetailMachines()">
+            <option value="5">5</option>
+            <option value="10" selected>10</option>
+            <option value="20">20</option>
+          </select>
+        </div>
+      </div>
       <div style="display: flex; gap: 24px; margin-bottom: 24px;">
         <div style="flex: 1; background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.05);">
           <div style="padding:14px 20px; border-bottom:1px solid var(--border); background:rgba(16,185,129,0.05);">
-            <span style="font-size:11px; font-weight:700; color:var(--green); text-transform:uppercase; letter-spacing:.05em;">Top 10 Cele mai performante (GGR)</span>
+            <span style="font-size:11px; font-weight:700; color:var(--green); text-transform:uppercase; letter-spacing:.05em;">Top Performante (GGR)</span>
           </div>
           <div class="table-scroll">
             <table class="data-table" style="width:100%; border-collapse:collapse;">
               <thead>
-                <tr><th style="padding-left:16px;">Cabinet</th><th>Provider</th><th class="num">GGR</th></tr>
+                <tr><th style="padding-left:16px;">Cabinet</th><th>Provider</th><th class="num">Hold%</th><th class="num">Zile Handpay</th><th class="num">GGR</th></tr>
               </thead>
               <tbody id="ld-top-machines-body"></tbody>
             </table>
@@ -1426,12 +1436,12 @@
 
         <div style="flex: 1; background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.05);">
           <div style="padding:14px 20px; border-bottom:1px solid var(--border); background:rgba(239,68,68,0.05);">
-            <span style="font-size:11px; font-weight:700; color:var(--red); text-transform:uppercase; letter-spacing:.05em;">Top 10 Cele mai slabe (GGR)</span>
+            <span style="font-size:11px; font-weight:700; color:var(--red); text-transform:uppercase; letter-spacing:.05em;">Top Slabe (GGR)</span>
           </div>
           <div class="table-scroll">
             <table class="data-table" style="width:100%; border-collapse:collapse;">
               <thead>
-                <tr><th style="padding-left:16px;">Cabinet</th><th>Provider</th><th class="num">GGR</th></tr>
+                <tr><th style="padding-left:16px;">Cabinet</th><th>Provider</th><th class="num">Hold%</th><th class="num">Zile Handpay</th><th class="num">GGR</th></tr>
               </thead>
               <tbody id="ld-bottom-machines-body"></tbody>
             </table>

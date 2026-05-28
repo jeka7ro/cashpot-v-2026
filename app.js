@@ -1069,12 +1069,13 @@ window.filterLocMach = function() {
 }
 
 function renderLocDetailMachines(data) {
-  _locMachData = data ? [...data].sort((a,b) => (b.ggr||0) - (a.ggr||0)) : [];
+  if (data) _locMachData = [...data].sort((a,b) => (b.ggr||0) - (a.ggr||0));
   _locMachFiltered = [..._locMachData];
   
-  // Populate Top 10 / Bottom 10
-  const top10 = _locMachData.slice(0, 10);
-  const bottom10 = [..._locMachData].reverse().slice(0, 10);
+  // Populate Top/Bottom
+  const topLimit = parseInt(document.getElementById('ld-top-limit')?.value || '10');
+  const top10 = _locMachData.slice(0, topLimit);
+  const bottom10 = [..._locMachData].reverse().slice(0, topLimit);
   
   const renderMiniRow = (r) => `
     <tr>
@@ -1083,14 +1084,16 @@ function renderLocDetailMachines(data) {
         <div style="font-size:10px; color:var(--muted);">${r.serial_nr||''}</div>
       </td>
       <td>${r.provider||'—'}</td>
+      <td class="num">${pill(r.hold_pct)}</td>
+      <td class="num" style="color:var(--muted)">${r.handpays||0}</td>
       <td class="num" style="font-weight:600; color:${(r.ggr||0)>=0 ? 'var(--green)' : 'var(--red)'};">${fmt(r.ggr)}</td>
     </tr>
   `;
   
   const topBody = document.getElementById('ld-top-machines-body');
   const bottomBody = document.getElementById('ld-bottom-machines-body');
-  if (topBody) topBody.innerHTML = top10.length ? top10.map(renderMiniRow).join('') : '<tr><td colspan="3" style="text-align:center;padding:10px;">Fără date</td></tr>';
-  if (bottomBody) bottomBody.innerHTML = bottom10.length ? bottom10.map(renderMiniRow).join('') : '<tr><td colspan="3" style="text-align:center;padding:10px;">Fără date</td></tr>';
+  if (topBody) topBody.innerHTML = top10.length ? top10.map(renderMiniRow).join('') : '<tr><td colspan="5" style="text-align:center;padding:10px;">Fără date</td></tr>';
+  if (bottomBody) bottomBody.innerHTML = bottom10.length ? bottom10.map(renderMiniRow).join('') : '<tr><td colspan="5" style="text-align:center;padding:10px;">Fără date</td></tr>';
 
   _locMachPage = 1;
   renderLocDetailMachinesPaginated();
