@@ -13,6 +13,21 @@
   if (window.location.hash.startsWith('#invite')) {
     document.write('<style>#app-container, #view-login { display: none !important; } #view-register { display: flex !important; }</style>');
   }
+  
+  // Hack to suppress the annoying Chrome Extension error that the user is seeing
+  const _origError = console.error;
+  console.error = function(...args) {
+    if (args.length > 0 && typeof args[0] === 'string' && args[0].includes('tabs:outgoing.message.ready')) return;
+    if (args[0] && args[0].message && args[0].message.includes('tabs:outgoing.message.ready')) return;
+    _origError.apply(console, args);
+  };
+  window.addEventListener('error', function(e) {
+    if (e.message && e.message.includes('tabs:outgoing.message.ready')) { e.preventDefault(); e.stopImmediatePropagation(); }
+  });
+  window.addEventListener('unhandledrejection', function(e) {
+    if (e.reason && e.reason.message && e.reason.message.includes('tabs:outgoing.message.ready')) { e.preventDefault(); e.stopImmediatePropagation(); }
+    if (e.reason && typeof e.reason === 'string' && e.reason.includes('tabs:outgoing.message.ready')) { e.preventDefault(); e.stopImmediatePropagation(); }
+  });
 </script>
 <style>
   .tahoe-icon-btn {
