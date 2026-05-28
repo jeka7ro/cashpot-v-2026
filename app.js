@@ -921,6 +921,7 @@ function renderLocDetailChart(data) {
   const ggr = data.map(r => r.ggr || 0);
 
   _locDetailChart = new Chart(ctx, {
+    plugins: [window.ChartDataLabels],
     type: 'bar',
     data: {
       labels: labels,
@@ -932,20 +933,36 @@ function renderLocDetailChart(data) {
           borderColor: 'rgba(16, 185, 129, 1)',
           borderWidth: 1,
           yAxisID: 'y',
-          order: 2
+          order: 2,
+          datalabels: { display: false }
         },
         {
           label: 'GGR',
           data: ggr,
           type: 'line',
-          borderColor: '#1e293b',
-          backgroundColor: '#1e293b',
-          borderWidth: 2,
-          pointRadius: 3,
+          borderColor: '#2563eb', // Strong blue
+          backgroundColor: '#2563eb',
+          borderWidth: 3,
+          pointBackgroundColor: '#fff',
+          pointBorderColor: '#2563eb',
+          pointBorderWidth: 2,
+          pointRadius: 4,
+          pointHoverRadius: 6,
           fill: false,
-          tension: 0.1,
+          tension: 0.3, // smooth curve
           yAxisID: 'y1',
-          order: 1
+          order: 1,
+          datalabels: {
+            display: true,
+            align: 'top',
+            anchor: 'end',
+            offset: 4,
+            color: '#1e293b',
+            font: { weight: 'bold', size: 10, family: 'Inter' },
+            formatter: function(val) {
+              return fmtK(val);
+            }
+          }
         }
       ]
     },
@@ -957,7 +974,8 @@ function renderLocDetailChart(data) {
         legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } },
         tooltip: {
           callbacks: { label: c => c.dataset.label + ': ' + fmt(c.raw) }
-        }
+        },
+        datalabels: {} // handled per dataset
       },
       scales: {
         x: { grid: { display: false }, ticks: { font: { size: 10 } } },
