@@ -739,8 +739,8 @@ def machines():
             SUM(COALESCE(mas.cb_fortune_wheel,0)) AS cb_fortune_wheel,
             SUM(COALESCE(mas.cb_raffle,0)) AS cb_raffle,
             SUM(COALESCE(mas.jackpot,0)+COALESCE(mas.cashback,0)+COALESCE(mas.hh,0)+COALESCE(mas.cb_birthday,0)+COALESCE(mas.cb_fortune_wheel,0)+COALESCE(mas.cb_raffle,0)) AS marketing,
-            SUM(CASE WHEN mas.`out` > 0 OR mas.jackpot > 0 OR mas.hh > 0 THEN 1 ELSE 0 END) AS handpays,
-            GROUP_CONCAT(CASE WHEN mas.`out` > 0 OR mas.jackpot > 0 OR mas.hh > 0 THEN CONCAT(mas.date, '|', GREATEST(mas.`out`, mas.jackpot, mas.hh)) ELSE NULL END SEPARATOR ';') AS hp_details,
+            SUM(CASE WHEN mas.jackpot > 0 OR mas.hh > 0 THEN 1 ELSE 0 END) AS handpays,
+            GROUP_CONCAT(CASE WHEN mas.jackpot > 0 OR mas.hh > 0 THEN CONCAT(mas.date, '|', GREATEST(mas.jackpot, mas.hh)) ELSE NULL END SEPARATOR ';') AS hp_details,
             SUM(mas.games)                 AS games,
             SUM(mas.bet)                   AS bet
         FROM machine_audit_summaries mas
