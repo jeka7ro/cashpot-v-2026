@@ -1,3 +1,13 @@
-import re
-with open('/Users/eugeniucazmal/.gemini/antigravity/brain/7ae4d87d-b163-4122-bf44-9649c034d563/.system_generated/logs/overview.txt') as f:
-    pass
+import sys
+sys.path.append('.')
+from server import qry
+
+try:
+    print("SESSIONS:")
+    print([r['Field'] for r in qry("DESCRIBE sessions")])
+    print("TRACKING_LOGS:")
+    print([r['Field'] for r in qry("DESCRIBE tracking_logs")])
+    print("TRACKING_EVENTS:")
+    print([r['Field'] for r in qry("DESCRIBE tracking_events")])
+except Exception as e:
+    print("ERROR:", e)

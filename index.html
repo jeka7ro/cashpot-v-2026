@@ -235,6 +235,10 @@
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
             Marketing
           </a>
+          <a href="#rapoarte/retentie" class="nav-item sub-item">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l5-5 4 4 5-5"/></svg>
+            Eficiență Promoții
+          </a>
           <a href="#rapoarte/clienti" class="nav-item sub-item" id="rep-nav-clienti">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             Clienti
@@ -994,6 +998,42 @@
           </section>
         </div><!-- /rep-page-marketing -->
             
+        <div id="rep-page-retentie" class="rep-page" style="display:none;">
+          <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:16px; margin-bottom: 24px;">
+            <div class="kpi-card">
+              <div class="kpi-label" style="color:var(--pink)">Total Investiție Promoții</div>
+              <div class="kpi-value" id="ret-kpi-promo">0</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label" style="color:var(--green)">Total Reciclat (Băgat înapoi)</div>
+              <div class="kpi-value" id="ret-kpi-recycled">0</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-label" style="color:var(--accent)">Rată de Reciclare (Reinvestment)</div>
+              <div class="kpi-value" id="ret-kpi-rate">0%</div>
+            </div>
+          </div>
+          <section class="card" style="margin-top:0; border-top-left-radius:0; padding:0; overflow:hidden;">
+            <div style="padding:14px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:11px; font-weight:700; color:var(--text); text-transform:uppercase; letter-spacing:.05em;">Clasament Retenție Jucători</span>
+            </div>
+            <div class="table-scroll">
+              <table class="data-table">
+                <thead><tr>
+                  <th style="padding-left:16px; width:40px;">#</th>
+                  <th>Nume Jucător</th>
+                  <th style="text-align:right;">Investiție Promo</th>
+                  <th style="text-align:right;">Reciclat (Rulaj)</th>
+                  <th style="text-align:right; padding-right:16px;">Hit & Run?</th>
+                </tr></thead>
+                <tbody id="ret-table-body">
+                  <tr><td colspan="5" style="text-align:center; padding:30px; color:var(--muted); font-size:12px;">Se încarcă datele...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+
         <div id="rep-page-clienti" class="rep-page" style="display:none;">
           <div id="clienti-main-view">
             <!-- Floating Search Bar -->

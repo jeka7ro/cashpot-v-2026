@@ -1445,6 +1445,46 @@ def live_monitor():
         'totals_live': tl,
         'active_slots': active_count
     })
+@app.route('/api/reports/retention')
+def report_retention():
+    start, end = period_params(request)
+    if not start: return jsonify([])
+    
+    end_dt = end + ' 23:59:59'
+    
+    # We query players who received a raffle or jackpot or cashback in this period
+    # Since we don't have the exact promo assignment table, we will use player_points_bets
+    # to show a list of players and their bets. In a real scenario we'd join with player_jackpots etc.
+    # For now, let's fetch top players by bet to simulate the UI, and return 0 for promos if empty.
+    
+    try:
+        rows = qry("""
+            SELECT 
+                p.id as player_id,
+                COALESCE(p.first_name, 'Anonim') as fname,
+                COALESCE(p.last_name, '') as lname,
+                (SELECT SUM(total_bet) FROM player_points_bets pb WHERE pb.player_id = p.id AND pb.bet_at >= %s AND pb.bet_at <= %s) as total_recycled,
+                (SELECT SUM(amount) FROM player_transactions pt WHERE pt.player_id = p.id AND pt.created_at >= %s AND pt.created_at <= %s AND pt.reason LIKE '%%Campanie%%') as promo_amount
+            FROM players p
+            HAVING promo_amount > 0 OR total_recycled > 0
+            ORDER BY total_recycled DESC
+            LIMIT 50
+        """, [start, end_dt, start, end_dt])
+        
+        # Calculate totals
+        total_promo = sum(r['promo_amount'] or 0 for r in rows)
+        total_recycled = sum(min(r['total_recycled'] or 0, r['promo_amount'] or 0) for r in rows) # Recycled cannot exceed promo for the rate calc
+        
+        return jsonify({
+            'total_promo': total_promo,
+            'total_recycled': total_recycled,
+            'rate': round((total_recycled / total_promo * 100) if total_promo > 0 else 0, 2),
+            'players': rows
+        })
+    except Exception as e:
+        print("RETENTION ERROR:", e)
+        return jsonify({'total_promo': 0, 'total_recycled': 0, 'rate': 0, 'players': []})
+
 
 @app.route('/api/reports/clients')
 def report_clients():
