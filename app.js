@@ -1299,7 +1299,7 @@ async function loadLocations(s,e){
     footerClienti = avgCl > 0 ? `<strong>${Math.round(avgCl)}</strong>` : '—';
   }
   document.getElementById('foot-locatii').innerHTML=`<tr style="font-weight:700">
-    <td>TOTAL / MEDIE</td>
+    <td colspan="2">TOTAL / MEDIE</td>
     <td style="text-align:center">${totalBuc}</td>
     <td style="text-align:center">—</td>
     <td class="num">${footerClienti}</td>
