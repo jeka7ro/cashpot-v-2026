@@ -1444,8 +1444,8 @@
         <div style="padding:14px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
           <span id="ld-table-title" style="font-size:11px; font-weight:700; color:var(--text); text-transform:uppercase; letter-spacing:.05em;">Aparate în locație</span>
           <div style="display:flex; gap:12px; align-items:center;">
-            <input type="text" id="ld-mach-search" oninput="filterLocMach()" placeholder="Caută cabinet, provider..." style="padding:6px 12px; border-radius:6px; border:1px solid var(--border); background:var(--surface2); color:var(--text); font-size:12px; width:200px; outline:none;">
-            <button class="preset-btn" onclick="exportLocMachExcel()" style="flex:none; display:flex; align-items:center; gap:6px;">
+            <input type="text" id="ld-mach-search" class="glass-select" oninput="filterLocMach()" placeholder="Caută cabinet, provider..." style="padding:6px 12px; width:200px;">
+            <button class="btn-primary" onclick="exportLocMachExcel()" style="display:flex; align-items:center; gap:6px; padding:0 16px; height:32px; font-size:11px;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
               Export Excel
             </button>

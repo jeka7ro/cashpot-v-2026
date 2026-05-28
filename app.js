@@ -1406,7 +1406,7 @@ async function loadKPI(s,e){
   const ggrDayEl = document.getElementById('v-ggr-day');
   if(ggrDayEl) ggrDayEl.textContent = 'AVG/zi: ' + fmt(d.avg_ggr_zi) + ' RON';
 
-  const marketingCost = (d.jackpot || 0) + (d.hh || 0) + (d.cashback || 0);
+  const marketingCost = d.marketing || ((d.jackpot || 0) + (d.hh || 0) + (d.cashback || 0));
   const ngrCalculated = (d.ggr || 0) + marketingCost;
 
   const ngrEl = document.getElementById('v-ngr');
