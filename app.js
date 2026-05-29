@@ -1701,7 +1701,7 @@ async function loadLocations(s,e){
   let tIn=0,tGgr=0,tJp=0,tHh=0,tCb=0,tGm=0,tMkt=0,tBet=0,tClientiCard=0,tClientiTotal=0;
   data.forEach(r => tGgr += +r.ggr||0);
   const maxG=Math.max(1,...data.map(r=>Math.abs(parseFloat(r.ggr||0))));
-  tableStates.locatii.rows=data.map((r, i)=>{
+  tableStates.locatii.filteredRows=null; tableStates.locatii.rows=data.map((r, i)=>{
     tIn+=+r.total_in||0;tJp+=+r.jackpot||0;tHh+=+r.hh||0;
     tCb+=+r.cashback||0;tGm+=+r.games||0;tMkt+=+r.marketing||0;tBet+=+r.bet||0;
     tClientiCard+=+(r.clienti_card||0); tClientiTotal+=+(r.clienti_total||0);
@@ -1829,7 +1829,7 @@ async function loadProviders(s,e){
   const data = res[0], prevData = c ? res[1] : [], currExclData = c ? res[2] : data;
 
   const maxG=Math.max(1,...data.map(r=>+r.ggr||0));
-  tableStates.provideri.rows=data.map((r, i)=>{
+  tableStates.provideri.filteredRows=null; tableStates.provideri.rows=data.map((r, i)=>{
     const cc=cellCls(+r.ggr||0,maxG);
     const prev = prevData.find(x => x.id === r.id);
     const currE = currExclData.find(x => x.id === r.id);
@@ -1889,7 +1889,7 @@ async function loadTypes(s,e){
   const data = res[0], prevData = c ? res[1] : [], currExclData = c ? res[2] : data;
 
   const maxG=Math.max(1,...data.map(r=>+r.ggr||0));
-  tableStates.tipuri.rows=data.map((r, i)=>{
+  tableStates.tipuri.filteredRows=null; tableStates.tipuri.rows=data.map((r, i)=>{
     const cc=cellCls(+r.ggr||0,maxG);
     const prev = prevData.find(x => x.tip_slot === r.tip_slot && x.cabinet === r.cabinet);
     const currE = currExclData.find(x => x.tip_slot === r.tip_slot && x.cabinet === r.cabinet);
@@ -1916,7 +1916,7 @@ async function loadCabinets(s,e){
   const data = res[0], prevData = c ? res[1] : [], currExclData = c ? res[2] : data;
 
   const maxG=Math.max(1,...data.map(r=>+r.ggr||0));
-  tableStates.cabinete.rows=data.map((r, i)=>{
+  tableStates.cabinete.filteredRows=null; tableStates.cabinete.rows=data.map((r, i)=>{
     const cc=cellCls(+r.ggr||0,maxG);
     const prev = prevData.find(x => x.cabinet === r.cabinet);
     const currE = currExclData.find(x => x.cabinet === r.cabinet);
@@ -1953,7 +1953,7 @@ async function loadMachines(){
 
     document.getElementById('machines-count').textContent=data.length+' aparate';
     const maxG=Math.max(1,...data.map(r=>+r.ggr||0));
-    tableStates.aparate.rows=data.map((r, i)=>{
+    tableStates.aparate.filteredRows=null; tableStates.aparate.rows=data.map((r, i)=>{
       const cc=cellCls(+r.ggr||0,maxG);
       const prev = prevData.find(x => x.serial_nr === r.serial_nr);
       const currE = currExclData.find(x => x.serial_nr === r.serial_nr);
@@ -2139,7 +2139,9 @@ window.sortDashClienti = function(field) {
 
 let _loadAllRunning = false;
 let _loadAllPending = false;
-async function loadAll(){
+let _dashAutoRefreshTimer = null;
+
+async function loadAll(silent = false){
   if (_loadAllRunning) {
     _loadAllPending = true;
     return;
@@ -2148,17 +2150,19 @@ async function loadAll(){
   _loadAllPending = false;
   const{s,e}=getPeriod();
   if(!s||!e){ _loadAllRunning = false; return; }
-  showLoader(true);
+  
+  if (!silent) showLoader(true);
   try{
     await Promise.all([loadKPI(s,e),loadTrend(s,e),loadLocations(s,e),loadProviders(s,e),loadTypes(s,e),loadCabinets(s,e),loadCalendars(s,e),loadMachines(),loadDashClienti(s,e)]);
+    if (typeof filterDashTables === 'function') filterDashTables();
     if (document.getElementById('view-rapoarte') && document.getElementById('view-rapoarte').classList.contains('active')) {
       const hh  = document.getElementById('rep-page-hh');
       const mg  = document.getElementById('rep-page-multigame');
       const cl  = document.getElementById('rep-page-clienti');
       const mkt = document.getElementById('rep-page-marketing');
       const co  = document.getElementById('rep-page-cashout');
-      if (hh  && hh.style.display !== 'none' && hh.style.display !== '')  loadHhReport();
-      else if (mg  && mg.style.display  !== 'none' && mg.style.display  !== '') loadMultigame();
+      if (hh  && hh.style.display  !== 'none' && hh.style.display  !== '') loadHourlyReport();
+      else if (mg  && mg.style.display  !== 'none' && mg.style.display  !== '') loadMultigameReport();
       else if (cl  && cl.style.display  !== 'none' && cl.style.display  !== '') loadClientiReport();
       else if (mkt && mkt.style.display !== 'none' && mkt.style.display !== '') loadMarketingReport();
       else if (co  && co.style.display  !== 'none' && co.style.display  !== '') loadCashoutReport();
