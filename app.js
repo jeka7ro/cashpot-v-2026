@@ -222,6 +222,8 @@ function renderTablePaginated(key) {
   const tbody = document.getElementById('body-' + key);
   const pgWrap = document.getElementById('pg-' + key);
   
+  const dataRows = st.filteredRows || st.rows;
+  
   // Attach sort listeners to TH elements if not already done
   let thead = null;
   if (tbody && tbody.closest('table')) {
@@ -235,8 +237,35 @@ function renderTablePaginated(key) {
     });
     thead.dataset.sortAttached = 'true';
   }
+
+  // Attach Excel button to card header if not already done
+  if (thead && !thead.dataset.excelAttached) {
+    let card = tbody.closest('.card') || tbody.closest('.table-card');
+    if (card) {
+      let headerDiv = card.querySelector('div'); // The first div is the header
+      if (headerDiv && headerDiv.querySelector('span')) {
+        let btnWrap = headerDiv.querySelector('.excel-btn-wrap');
+        if (!btnWrap) {
+          headerDiv.style.display = 'flex';
+          headerDiv.style.justifyContent = 'space-between';
+          headerDiv.style.alignItems = 'center';
+          btnWrap = document.createElement('div');
+          btnWrap.className = 'excel-btn-wrap';
+          headerDiv.appendChild(btnWrap);
+        }
+        let btn = document.createElement('button');
+        btn.style.cssText = 'padding:4px 12px; font-size:11px; height:24px; border:1px solid rgba(30, 215, 96, 0.3); border-radius:12px; background:rgba(30, 215, 96, 0.1); color:var(--green); display:flex; align-items:center; cursor:pointer; font-weight:600; transition:all 0.2s; margin-left: auto;';
+        btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Export Excel`;
+        btn.onmouseover = () => btn.style.background = 'rgba(30, 215, 96, 0.2)';
+        btn.onmouseout = () => btn.style.background = 'rgba(30, 215, 96, 0.1)';
+        btn.onclick = () => exportToExcel(key);
+        btnWrap.appendChild(btn);
+      }
+    }
+    thead.dataset.excelAttached = 'true';
+  }
   
-  let rowsToRender = st.rows;
+  let rowsToRender = st.filteredRows || st.rows;
   if (st.sortCol !== undefined) {
     if (!st.parsedRows) {
       st.parsedRows = st.rows.map(html => {
@@ -294,13 +323,11 @@ function renderTablePaginated(key) {
         <select onchange="changeLimit('${key}', this.value)" class="glass-select" style="padding:4px 30px 4px 12px; font-size:12px; background-color: transparent;">
           <option value="10" ${st.limit==10?'selected':''}>10</option>
           <option value="15" ${st.limit==15?'selected':''}>15</option>
+          <option value="20" ${st.limit==20?'selected':''}>20</option>
           <option value="25" ${st.limit==25?'selected':''}>25</option>
           <option value="50" ${st.limit==50?'selected':''}>50</option>
           <option value="all" ${st.limit==='all'?'selected':''}>Toți</option>
         </select>
-        <button class="settings-btn" onclick="exportToExcel('${key}')" style="padding:4px 12px; font-size:11px; margin-left:8px; border:1px solid var(--border);">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px; vertical-align:-2px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Excel
-        </button>
       </div>
       <div class="pg-controls" style="gap:8px;">
         <span class="pg-info" style="margin-right:8px; font-size:12px;">Pagina ${st.page} din ${totalPages}</span>
@@ -597,7 +624,7 @@ function renderMonthCalendar(){
   const y=calViewDate.getFullYear(),m=calViewDate.getMonth();
   document.getElementById('cal-title').textContent=`${MO_RO[m]} ${y}`;
   const grid=document.getElementById('calendar-grid');grid.innerHTML='';
-  grid.style.gridTemplateColumns = 'repeat(7, 1fr)';
+  grid.style.gridTemplateColumns = 'repeat(7, minmax(0, 1fr))';
   DA_RO.forEach(d=>{const h=document.createElement('div');h.className='cal-day-header';h.textContent=d;grid.appendChild(h);});
   const first=new Date(y,m,1),last=new Date(y,m+1,0),today=new Date();
   let off=first.getDay()-1;if(off<0)off=6;
@@ -668,9 +695,9 @@ function renderMonthCalendar(){
         tt.style.left = left + 'px'; tt.style.top = top + 'px';
         // Allow hovering over the tooltip itself without it disappearing
         tt.onmouseenter = () => clearTimeout(window.globalTooltipTimer);
-        tt.onmouseleave = () => { window.globalTooltipTimer = setTimeout(() => { tt.style.display = 'none'; }, 100); };
+        tt.onmouseleave = () => { window.globalTooltipTimer = setTimeout(() => { tt.style.display = 'none'; }, 400); };
       };
-      const _hideTooltip = () => { window.globalTooltipTimer = setTimeout(() => { const tt = document.getElementById('global-tooltip'); if (tt) tt.style.display = 'none'; }, 150); };
+      const _hideTooltip = () => { window.globalTooltipTimer = setTimeout(() => { const tt = document.getElementById('global-tooltip'); if (tt) tt.style.display = 'none'; }, 400); };
       cell.addEventListener('mouseenter', _showTooltip);
       cell.addEventListener('mouseleave', _hideTooltip);
     } else {
@@ -689,7 +716,10 @@ function renderMonthCalendar(){
 function renderHourCalendar(selectedDate) {
   document.getElementById('cal-hour-title').textContent = `Evoluție Orară - ${selectedDate}`;
   const grid=document.getElementById('calendar-hour-grid');grid.innerHTML='';
-  grid.style.gridTemplateColumns = 'repeat(6, 1fr)';
+  grid.style.gridTemplateColumns = 'repeat(7, minmax(0, 1fr))';
+  let emptyHeaders = '';
+  for(let i=0; i<7; i++) emptyHeaders += '<div class="cal-day-header" style="visibility:hidden;">&nbsp;</div>';
+  grid.innerHTML = emptyHeaders;
   const opHours = [];
   for(let i=8; i<24; i++) opHours.push(`${String(i).padStart(2,'0')}:00`);
   for(let i=0; i<8; i++) opHours.push(`${String(i).padStart(2,'0')}:00`);
@@ -729,9 +759,9 @@ function renderHourCalendar(selectedDate) {
         tt.style.left = left + 'px'; 
         tt.style.top = top + 'px';
         tt.onmouseenter = () => clearTimeout(window.globalTooltipTimer);
-        tt.onmouseleave = () => { window.globalTooltipTimer = setTimeout(() => { tt.style.display = 'none'; }, 100); };
+        tt.onmouseleave = () => { window.globalTooltipTimer = setTimeout(() => { tt.style.display = 'none'; }, 400); };
       };
-      const _hideHourTooltip = () => { window.globalTooltipTimer = setTimeout(() => { const tt = document.getElementById('global-tooltip'); if (tt) tt.style.display = 'none'; }, 150); };
+      const _hideHourTooltip = () => { window.globalTooltipTimer = setTimeout(() => { const tt = document.getElementById('global-tooltip'); if (tt) tt.style.display = 'none'; }, 400); };
       
       cell.addEventListener('mouseenter', _showHourTooltip);
       cell.addEventListener('mouseleave', _hideHourTooltip);
@@ -742,6 +772,19 @@ function renderHourCalendar(selectedDate) {
     } else { cell.innerHTML=`<div class="cal-day-num">${k}</div>`; }
     grid.appendChild(cell);
   });
+  
+  // Pad with empty cells to match the exact number of rows as the Month Calendar
+  const y = calViewDate.getFullYear(), m = calViewDate.getMonth();
+  const first = new Date(y, m, 1), last = new Date(y, m + 1, 0);
+  let off = first.getDay() - 1; if(off < 0) off = 6;
+  const totalMonthCells = off + last.getDate();
+  const numRows = Math.ceil(totalMonthCells / 7);
+  const targetHourCells = numRows * 7;
+  for(let i=24; i<targetHourCells; i++) {
+    const e = document.createElement('div');
+    e.className = 'cal-day empty';
+    grid.appendChild(e);
+  }
 }
 
 async function updateMonthCalendarData(y, m) {
@@ -773,6 +816,12 @@ async function updateMonthCalendarData(y, m) {
 
 async function loadCalendars(s,e){
   const d = new Date(e);
+  calViewDate = new Date(d.getFullYear(), d.getMonth(), 1);
+  dailyMonthData = {};
+  hourlyDayData = {};
+  renderMonthCalendar();
+  renderHourCalendar(e);
+
   const maxValidDate = await updateMonthCalendarData(d.getFullYear(), d.getMonth());
   
   let lastDataDate = e;
@@ -1804,8 +1853,8 @@ async function loadProviders(s,e){
     const val = +r.ggr || 0;
     const isNeg = val < 0;
     const wRaw = absMax > 0 ? (Math.abs(val) / absMax) : 0;
-    const w = Math.sqrt(wRaw) * 100; // Smoother visual proportions
-    const finalW = Math.max(3, w); // minimum 3% width so it's not just a dot
+    const w = Math.pow(wRaw, 0.35) * 100; // Stronger flattening so differences aren't as jarring
+    const finalW = Math.max(8, w); // minimum 8% width
     const color = isNeg ? 'var(--red)' : CHART_COLORS[i % CHART_COLORS.length];
     
     html += `
@@ -1816,9 +1865,9 @@ async function loadProviders(s,e){
         </div>
         <div style="flex:1; display:flex; align-items:center; gap:8px;">
           <div style="flex:1; background:var(--surface); height:8px; border-radius:4px; overflow:hidden; display:flex; justify-content:${isNeg ? 'flex-end' : 'flex-start'};">
-            <div style="width:${w}%; background:${color}; height:100%; border-radius:4px;"></div>
+            <div style="width:${finalW}%; background:${color}; height:100%; border-radius:4px;"></div>
           </div>
-          <span style="font-size:11px; font-weight:700; color:${color}; width:45px; text-align:${isNeg ? 'left' : 'right'};">${fmtK(val)}</span>
+          <span style="font-size:11px; font-weight:700; color:${color}; min-width:60px; white-space:nowrap; text-align:${isNeg ? 'left' : 'right'};">${fmtK(val)}</span>
         </div>
       </div>
     `;
@@ -1934,7 +1983,46 @@ function switchTab(name,btn){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('tab-'+name).classList.add('active');
   if(btn)btn.classList.add('active');
+  // Clear search when switching tabs
+  const searchEl = document.getElementById('dash-table-search');
+  const countEl  = document.getElementById('dash-search-count');
+  if (searchEl) searchEl.value = '';
+  if (countEl)  { countEl.style.display = 'none'; countEl.textContent = ''; }
+  // Reset any hidden rows
+  document.querySelectorAll('.tab-panel tbody tr').forEach(r => r.style.display = '');
 }
+
+window.filterDashTables = function() {
+  const q = (document.getElementById('dash-table-search')?.value || '').toLowerCase().trim();
+  const countEl = document.getElementById('dash-search-count');
+  const activePanel = document.querySelector('.tab-panel.active');
+  if (!activePanel) return;
+  
+  const key = activePanel.id.replace('tab-', '');
+  const st = tableStates[key];
+  if (!st) return;
+
+  if (!q) {
+    st.filteredRows = null;
+    if (countEl) { countEl.style.display = 'none'; countEl.textContent = ''; }
+  } else {
+    // Filter the RAW string rows! Need to strip HTML to search properly.
+    const temp = document.createElement('div');
+    st.filteredRows = st.rows.filter(rStr => {
+      temp.innerHTML = rStr;
+      return temp.textContent.toLowerCase().includes(q);
+    });
+    let visible = st.filteredRows.length;
+    if (countEl) {
+      countEl.textContent = visible;
+      countEl.style.display = visible > 0 ? 'block' : 'none';
+      countEl.style.color = visible === 0 ? 'var(--red)' : 'var(--muted)';
+    }
+  }
+  st.page = 1; // reset to page 1
+  renderTablePaginated(key);
+};
+
 
 function getLocName(id) {
   if (!filtersData || !filtersData.locations) return id;
@@ -2046,14 +2134,19 @@ window.sortDashClienti = function(field) {
 };
 
 let _loadAllRunning = false;
+let _loadAllPending = false;
 async function loadAll(){
-  if (_loadAllRunning) return;
+  if (_loadAllRunning) {
+    _loadAllPending = true;
+    return;
+  }
   _loadAllRunning = true;
+  _loadAllPending = false;
   const{s,e}=getPeriod();
   if(!s||!e){ _loadAllRunning = false; return; }
   showLoader(true);
   try{
-    await Promise.all([loadKPI(s,e),loadTrend(s,e),loadLocations(s,e),loadProviders(s,e),loadTypes(s,e),loadCabinets(s,e),loadCalendars(s,e),loadMachines(),loadTop10Games(),loadDashClienti(s,e)]);
+    await Promise.all([loadKPI(s,e),loadTrend(s,e),loadLocations(s,e),loadProviders(s,e),loadTypes(s,e),loadCabinets(s,e),loadCalendars(s,e),loadMachines(),loadDashClienti(s,e)]);
     if (document.getElementById('view-rapoarte') && document.getElementById('view-rapoarte').classList.contains('active')) {
       const hh  = document.getElementById('rep-page-hh');
       const mg  = document.getElementById('rep-page-multigame');
@@ -2076,9 +2169,11 @@ async function loadAll(){
   }
   catch(err){console.error('loadAll error:', err);}
   finally{ showLoader(false); }
-  loadTop10Games();
-  // Eliberăm lock-ul după 1s pentru a preveni apeluri duble rapide
-  setTimeout(() => { _loadAllRunning = false; }, 1000);
+  
+  _loadAllRunning = false;
+  if (_loadAllPending) {
+    setTimeout(loadAll, 50);
+  }
 }
 
 async function loadDashboardLiveCard() {
@@ -2281,7 +2376,13 @@ window.addEventListener('hashchange', () => {
   document.querySelectorAll('.sidebar .nav-item').forEach(i => i.classList.remove('active'));
   
   const kpiSection = document.getElementById('kpi-section');
-  if (kpiSection) kpiSection.style.display = mainHash === 'live' ? 'none' : 'grid';
+  if (kpiSection) {
+    if (mainHash === 'live' || (mainHash === 'rapoarte' && subHash === 'retentie')) {
+      kpiSection.style.display = 'none';
+    } else {
+      kpiSection.style.display = 'grid';
+    }
+  }
 
   const targetView = document.getElementById('view-' + mainHash);
   if(targetView) targetView.classList.add('active');
@@ -2399,6 +2500,8 @@ window.addEventListener('hashchange', () => {
         loadExpensesReport();
         const btnExpSettings = document.getElementById('btn-exp-settings');
         if (btnExpSettings) btnExpSettings.style.display = (currentUser && currentUser.role === 'Super Admin') ? 'inline-flex' : 'none';
+      } else if (subHash === 'retentie') {
+        loadRetentionReport();
       }
     } else {
       window.location.hash = 'rapoarte/ore';
@@ -2692,6 +2795,7 @@ window.loadHhReport = async function() {
           const bg = colors[p.id % colors.length];
           return `
           <tr style="border-bottom:1px solid var(--border)" onmouseenter="this.style.background='var(--surface2)'" onmouseleave="this.style.background=''">
+            <td style="font-weight:700; color:var(--muted); padding-left:16px; width:40px;">${i + 1}</td>
             <td style="text-align:left;">
               <div style="display:flex; align-items:center; gap:10px;">
                 <div style="width:32px; height:32px; border-radius:50%; background:${bg}; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:11px; flex-shrink:0; overflow:hidden; box-shadow:0 2px 5px rgba(0,0,0,0.2);">
@@ -2713,7 +2817,7 @@ window.loadHhReport = async function() {
         `;
         });
       } else {
-        tableStates['hh-players'].rows = ['<tr><td colspan="5" style="text-align:center; padding:24px; color:var(--muted);">Nu au fost găsiți jucători activi în orele de HH.</td></tr>'];
+        tableStates['hh-players'].rows = ['<tr><td colspan="6" style="text-align:center; padding:24px; color:var(--muted);">Nu au fost găsiți jucători activi în orele de HH.</td></tr>'];
       }
       renderTablePaginated('hh-players');
     }
@@ -3746,9 +3850,10 @@ async function loadLive() {
     
     // Update live cards (moved to Live page)
     loadDashboardLiveCard();
+    loadTop10Games();
 
     if (!_liveTimer) {
-      // _liveTimer = setInterval(loadLive, 10000); // Dezactivat pentru a preveni refresh-ul continuu
+      _liveTimer = setInterval(loadLive, 30000); 
     }
 
     const tl = d.totals_live || {};
@@ -3866,9 +3971,9 @@ async function loadLive() {
 // Auto-refresh every 30s
 function startLiveTimer() {
   if(_liveTimer) clearInterval(_liveTimer);
-  // _liveTimer = setInterval(() => {
-  //   if(document.getElementById('view-live')?.classList.contains('active')) loadLive();
-  // }, 30000); // Dezactivat pentru a preveni refresh-ul continuu
+  _liveTimer = setInterval(() => {
+    if(document.getElementById('view-live')?.classList.contains('active')) loadLive();
+  }, 30000);
 }
 startLiveTimer();
 
@@ -6044,7 +6149,14 @@ window.deleteExpense = async function(id) {
   });
 }
 
-window.exportExpensesCSV = function() {
+window.exportActiveDashTable = function() {
+  const activePanel = document.querySelector('.tab-panel.active');
+  if (!activePanel) return;
+  const key = activePanel.id.replace('tab-', '');
+  exportToExcel(key);
+};
+
+window.exportExpensesCSV = async function() {
   if (!_expensesData || !_expensesData.length) { showAlert('Nu există date de exportat.'); return; }
   const q = (document.getElementById('exp-search')?.value || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const rows = _expensesData.filter(r => {
@@ -7296,6 +7408,11 @@ async function updateLdMonthCalendar(y, m) {
   const lastDay = new Date(y, m+1, 0).getDate();
   const mEnd = `${y}-${String(m+1).padStart(2,'0')}-${String(lastDay).padStart(2,'0')}`;
   
+  ldDailyMonthData = {};
+  ldHourlyDayData = {};
+  drawLdMonthGrid(y, m);
+  drawLdHourGrid(mEnd);
+
   const dMonth = await api(`/api/daily?res=day&start=${mStart}&end=${mEnd}&loc_ids=${ldCurrentLocId}`);
   ldDailyMonthData = {};
   let maxValidDate = '0000-00-00';
@@ -7324,7 +7441,7 @@ async function updateLdMonthCalendar(y, m) {
 function drawLdMonthGrid(y, m) {
   document.getElementById('ld-cal-title').textContent = `${MO_RO[m]} ${y}`;
   const grid = document.getElementById('ld-calendar-grid'); grid.innerHTML = '';
-  grid.style.gridTemplateColumns = 'repeat(7, 1fr)';
+  grid.style.gridTemplateColumns = 'repeat(7, minmax(0, 1fr))';
   DA_RO.forEach(d => { const h=document.createElement('div'); h.className='cal-day-header'; h.textContent=d; grid.appendChild(h); });
   
   const first=new Date(y,m,1), last=new Date(y,m+1,0), today=new Date();
@@ -7370,7 +7487,10 @@ function drawLdMonthGrid(y, m) {
 function drawLdHourGrid(selectedDate) {
   document.getElementById('ld-cal-hour-title').textContent = `Evoluție Orară - ${selectedDate}`;
   const grid=document.getElementById('ld-calendar-hour-grid'); grid.innerHTML='';
-  grid.style.gridTemplateColumns = 'repeat(6, 1fr)';
+  grid.style.gridTemplateColumns = 'repeat(7, minmax(0, 1fr))';
+  let emptyHeaders = '';
+  for(let i=0; i<7; i++) emptyHeaders += '<div class="cal-day-header" style="visibility:hidden;">&nbsp;</div>';
+  grid.innerHTML = emptyHeaders;
   
   let sumIn = 0, countIn = 0;
   const vals = [];
@@ -7404,6 +7524,19 @@ function drawLdHourGrid(selectedDate) {
     }
     grid.appendChild(cell);
   }
+  
+  // Pad with empty cells to match the exact number of rows as the Month Calendar
+  const y = ldCalViewDate.getFullYear(), m = ldCalViewDate.getMonth();
+  const first = new Date(y, m, 1), last = new Date(y, m + 1, 0);
+  let off = first.getDay() - 1; if(off < 0) off = 6;
+  const totalMonthCells = off + last.getDate();
+  const numRows = Math.ceil(totalMonthCells / 7);
+  const targetHourCells = numRows * 7;
+  for(let i=24; i<targetHourCells; i++) {
+    const e = document.createElement('div');
+    e.className = 'cal-day empty';
+    grid.appendChild(e);
+  }
 }
 
 document.getElementById('ld-cal-prev').addEventListener('click', async ()=>{
@@ -7425,8 +7558,8 @@ async function loadRetentionReport() {
   const {s, e} = getPeriod();
   if (!s || !e) return;
   
-  const tbody = document.getElementById('ret-table-body');
-  if(tbody) tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:30px; color:var(--muted); font-size:12px;">Se încarcă datele...</td></tr>';
+  const tbody = document.getElementById('body-retentie');
+  if(tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:30px; color:var(--muted); font-size:12px;">Se încarcă datele...</td></tr>';
   
   try {
     const data = await api(`/api/reports/retention?start=${s}&end=${e}`);
@@ -7437,7 +7570,7 @@ async function loadRetentionReport() {
     
     if (tbody) {
       if (!data.players || data.players.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:30px; color:var(--muted); font-size:12px;">Niciun jucător cu activitate promoțională în această perioadă.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:30px; color:var(--muted); font-size:12px;">Niciun jucător cu activitate promoțională în această perioadă.</td></tr>';
         return;
       }
       
@@ -7451,21 +7584,50 @@ async function loadRetentionReport() {
         if (recycled > 0 && recycled < promo) hrBadge = '<span style="background:var(--yellow);color:#000;padding:2px 8px;border-radius:12px;font-size:9px;font-weight:700">Parțial</span>';
         if (recycled >= promo && promo > 0) hrBadge = '<span style="background:var(--green);color:#fff;padding:2px 8px;border-radius:12px;font-size:9px;font-weight:700">Reciclat 100%</span>';
 
+        const locName = p.loc_name || 'Necunoscut';
+
         html += `
           <tr>
             <td style="padding-left:16px;">${idx + 1}</td>
             <td style="font-weight:600; color:var(--text);">${p.fname} ${p.lname} <span style="color:var(--muted); font-size:10px;">(#${p.player_id})</span></td>
-            <td style="text-align:right; font-weight:600; color:var(--pink);">${fmt(promo)}</td>
-            <td style="text-align:right; font-weight:600; color:var(--green);">${fmt(recycled)}</td>
-            <td style="text-align:right; padding-right:16px;">${hrBadge}</td>
+            <td>${locName}</td>
+            <td class="num" style="font-weight:600; color:var(--pink);">${fmt(promo)}</td>
+            <td class="num" style="font-weight:600; color:var(--green);">${fmt(recycled)}</td>
+            <td class="num" style="padding-right:16px;">${hrBadge}</td>
           </tr>
         `;
       });
-      tbody.innerHTML = html;
+      
+      tableStates['retentie'] = { page: 1, limit: dLimit, rows: html.match(/<tr>[\s\S]*?<\/tr>/g) || [] };
+      renderTablePaginated('retentie');
     }
   } catch(err) {
-    if (tbody) tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:30px; color:var(--red);">${err.message}</td></tr>`;
+    if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:30px; color:var(--red);">${err.message}</td></tr>`;
   }
+}
+
+function filterRetentionTable() {
+  const input = document.getElementById('ret-search');
+  if(!input) return;
+  const filter = input.value.toLowerCase();
+  const st = tableStates['retentie'];
+  if(!st) return;
+  
+  if(!st.origRows) st.origRows = [...st.rows];
+  
+  if(!filter) {
+    st.rows = [...st.origRows];
+  } else {
+    st.rows = st.origRows.filter(r => {
+      const div = document.createElement('table');
+      div.innerHTML = r;
+      const text = div.textContent.toLowerCase();
+      return text.includes(filter);
+    });
+  }
+  delete st.parsedRows;
+  st.page = 1;
+  renderTablePaginated('retentie');
 }
 
 window.showGlobalHpTooltip = function(el) {

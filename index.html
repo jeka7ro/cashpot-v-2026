@@ -8,7 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<link rel="stylesheet" href="style.css?v=145">
+<link rel="stylesheet" href="style.css?v=147">
 <script>
   if (window.location.hash.startsWith('#invite')) {
     document.write('<style>#app-container, #view-login { display: none !important; } #view-register { display: flex !important; }</style>');
@@ -396,9 +396,9 @@
     <div id="view-dashboard" class="view-panel active">
 
   <!-- CALENDAR GGR WIDGET -->
-  <div style="display: flex; gap: 24px; margin: 0 24px 24px;">
+  <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin: 0 24px 24px;">
     <!-- Month Calendar -->
-    <section class="calendar-section" style="flex: 1; margin: 0;">
+    <section class="calendar-section" style="grid-column: span 2; margin: 0;">
       <div class="calendar-header">
         <button class="cal-nav" id="cal-prev">‹</button>
         <div class="calendar-title" id="cal-title">—</div>
@@ -408,7 +408,7 @@
     </section>
 
     <!-- Hour Calendar -->
-    <section class="calendar-section" style="flex: 1; margin: 0;">
+    <section class="calendar-section" style="grid-column: span 2; margin: 0;">
       <div class="calendar-header" style="justify-content: space-between;">
         <div class="calendar-title" id="cal-hour-title" style="margin-left: 10px;">Evoluție Orară</div>
         <div class="cal-legend">
@@ -420,10 +420,11 @@
     </section>
   </div>
 
-  <!-- CHARTS ROW -->
-  <section class="trend-row" style="margin: 0 24px 24px;">
-    <div class="chart-card" style="width: 100%;">
-      <div class="chart-title" style="display:flex; justify-content:space-between; align-items:center;">
+  <!-- CHARTS ROW: all 3 charts in one horizontal row, equal height -->
+  <section style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin: 0 24px 24px; align-items: stretch;">
+    <!-- Trend card: ~half width -->
+    <div class="chart-card" style="grid-column: span 2; min-width:0; display:flex; flex-direction:column;">
+      <div class="chart-title" style="display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
         <span>Trend — IN / GGR</span>
         <div class="chart-toggles" style="display:flex; gap:4px;">
           <button class="settings-btn" onclick="setTrendGroup('hour', this)" style="padding:2px 8px; font-size:10px;">Oră</button>
@@ -432,42 +433,46 @@
           <button class="settings-btn" onclick="setTrendGroup('year', this)" style="padding:2px 8px; font-size:10px;">An</button>
         </div>
       </div>
-      <div class="canvas-wrap" style="height: 320px;"><canvas id="trend-chart"></canvas></div>
+      <div class="canvas-wrap" style="flex:1; min-height:200px;"><canvas id="trend-chart"></canvas></div>
     </div>
-  </section>
-
-  <section class="charts-row" style="grid-template-columns: 1fr 1fr;">
-    <div class="chart-card">
-      <div class="chart-title">GGR per Locație</div>
-      <div class="canvas-wrap"><canvas id="loc-pie"></canvas></div>
+    <!-- GGR per Locatie: ~quarter width -->
+    <div class="chart-card" style="grid-column: span 1; min-width:0; padding:10px 14px; display:flex; flex-direction:column;">
+      <div class="chart-title" style="font-size:11px; padding:0; margin-bottom:6px; flex-shrink:0;">GGR per Locație</div>
+      <div class="canvas-wrap" style="flex:1; min-height:0;"><canvas id="loc-pie"></canvas></div>
     </div>
-    <div class="chart-card">
-      <div class="chart-title">GGR per Provider</div>
-      <div class="canvas-wrap" id="prov-bar-container" style="overflow-y: auto; padding-right: 8px;"></div>
-    </div>
-  </section>
-
-  <!-- TOP 10 JOCURI HORIZONTAL -->
-  <section class="charts-row" style="grid-template-columns: 1fr;">
-    <div class="chart-card" style="padding-bottom:8px;">
-      <div class="chart-title" style="color:var(--yellow); display:flex; align-items:center; gap:6px;">
-        <span style="width:8px; height:8px; border-radius:50%; background:var(--yellow);"></span> Top 10 Jocuri (Live)
-      </div>
-      <div id="top10-games-body" style="display:flex; gap:16px; overflow-x:auto; padding-bottom:8px; scroll-snap-type: x mandatory;">
-        <div style="color:var(--muted);padding:16px;font-size:11px">Încărcare...</div>
-      </div>
+    <!-- GGR per Provider: ~quarter width -->
+    <div class="chart-card" style="grid-column: span 1; min-width:0; padding:10px 14px; display:flex; flex-direction:column;">
+      <div class="chart-title" style="font-size:11px; padding:0; margin-bottom:6px; flex-shrink:0;">GGR per Provider</div>
+      <div class="canvas-wrap" id="prov-bar-container" style="flex:1; min-height:0; overflow-y:auto; padding-right:4px;"></div>
     </div>
   </section>
 
   <!-- TABS + TABLES -->
-  <section class="tables-section">
-    <div class="tabs">
-      <button class="tab active" onclick="switchTab('locatii',this)">Per Locație</button>
-      <button class="tab" onclick="switchTab('provideri',this)">Per Provider</button>
-      <button class="tab" onclick="switchTab('tipuri',this)">Per Tip Slot</button>
-      <button class="tab" onclick="switchTab('cabinete',this)">Per Cabinet</button>
-      <button class="tab" onclick="switchTab('aparate',this)">Aparate Individuale</button>
-      <button class="tab" onclick="switchTab('clienti',this)">Clienți</button>
+  <section class="card tables-section" style="padding:0; overflow:hidden; margin-bottom:24px;">
+    <div class="card-header tabs" style="padding:14px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px;">
+      <div style="display:flex; gap:2px; flex-wrap:wrap;">
+        <button class="tab active" onclick="switchTab('locatii',this)">Per Locație</button>
+        <button class="tab" onclick="switchTab('provideri',this)">Per Provider</button>
+        <button class="tab" onclick="switchTab('tipuri',this)">Per Tip Slot</button>
+        <button class="tab" onclick="switchTab('cabinete',this)">Per Cabinet</button>
+        <button class="tab" onclick="switchTab('aparate',this)">Aparate Individuale</button>
+        <button class="tab" onclick="switchTab('clienti',this)">Clienți</button>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <div style="position:relative; display:flex; align-items:center;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute; left:10px; color:var(--muted); pointer-events:none;">
+            <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="dash-table-search" placeholder="Caută în tabel..." oninput="filterDashTables()"
+            style="padding:5px 10px 5px 30px; font-size:12px; background:var(--surface2); border:1px solid var(--border); border-radius:20px; color:var(--text); outline:none; width:190px; transition:border-color 0.2s;"
+            onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+          <span id="dash-search-count" style="position:absolute; right:10px; font-size:10px; font-weight:700; color:var(--muted); pointer-events:none; display:none;"></span>
+        </div>
+        <button class="btn-primary" onclick="exportActiveDashTable()" style="padding:4px 12px; font-size:11px; height:24px; border:1px solid rgba(30, 215, 96, 0.3); border-radius:12px; background:rgba(30, 215, 96, 0.1); color:var(--green); display:flex; align-items:center; cursor:pointer; font-weight:600; transition:all 0.2s;">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          Excel
+        </button>
+      </div>
     </div>
 
     <div class="tab-panel active" id="tab-locatii">
@@ -1013,24 +1018,34 @@
               <div class="kpi-value" id="ret-kpi-rate">0%</div>
             </div>
           </div>
-          <section class="card" style="margin-top:0; border-top-left-radius:0; padding:0; overflow:hidden;">
-            <div style="padding:14px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
-              <span style="font-size:11px; font-weight:700; color:var(--text); text-transform:uppercase; letter-spacing:.05em;">Clasament Retenție Jucători</span>
+          
+          <section class="table-card" style="margin-top:0;">
+            <div style="padding:14px 20px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between;">
+              <span style="font-size:11px;font-weight:700;color:var(--text);text-transform:uppercase;letter-spacing:.05em; display:inline-flex; align-items:center; flex-shrink:0;" title="Tabelul măsoară cât din sumele oferite ca PROMOȚII (Tombole, Campanii, JP) sunt rejucate de clienți. Hit&Run = A luat promoția și a plecat fără să ruleze nimic.">
+                Clasament Retenție Jucători
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left:6px; color:var(--muted); cursor:help;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+              </span>
+              <div style="position:relative; width:320px; margin: 0 16px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute; left:16px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" id="ret-search" class="glass-input" placeholder="Caută jucător sau locație..." style="width:100%; padding:6px 10px 6px 42px; font-size:12px; height:32px;" oninput="filterRetentionTable()">
+              </div>
             </div>
             <div class="table-scroll">
               <table class="data-table">
                 <thead><tr>
                   <th style="padding-left:16px; width:40px;">#</th>
                   <th>Nume Jucător</th>
-                  <th style="text-align:right;">Investiție Promo</th>
-                  <th style="text-align:right;">Reciclat (Rulaj)</th>
-                  <th style="text-align:right; padding-right:16px;">Hit & Run?</th>
+                  <th>Locație (Principală)</th>
+                  <th class="num">Investiție Promo</th>
+                  <th class="num">Reciclat (Rulaj)</th>
+                  <th class="num" style="padding-right:16px;">Hit & Run?</th>
                 </tr></thead>
-                <tbody id="ret-table-body">
-                  <tr><td colspan="5" style="text-align:center; padding:30px; color:var(--muted); font-size:12px;">Se încarcă datele...</td></tr>
+                <tbody id="body-retentie">
+                  <tr><td colspan="6" style="text-align:center; padding:30px; color:var(--muted); font-size:12px;">Se încarcă datele...</td></tr>
                 </tbody>
               </table>
             </div>
+            <div id="pg-retentie" class="pagination-wrapper"></div>
           </section>
         </div>
 
@@ -1639,7 +1654,17 @@
         </div>
       </section>
 
-
+      <!-- TOP 10 JOCURI (Live) -->
+      <section style="margin-bottom:24px;">
+        <div class="chart-card" style="padding-bottom:8px;">
+          <div class="chart-title" style="color:var(--yellow); display:flex; align-items:center; gap:6px;">
+            <span style="width:8px; height:8px; border-radius:50%; background:var(--yellow); animation:livePulse 1.5s infinite;"></span> Top 10 Jocuri (Live)
+          </div>
+          <div id="top10-games-body" style="display:flex; gap:16px; overflow-x:auto; padding-bottom:8px; scroll-snap-type: x mandatory;">
+            <div style="color:var(--muted);padding:16px;font-size:11px">Încărcare...</div>
+          </div>
+        </div>
+      </section>
 
       <!-- Top Machines - full width table -->
       <section class="card" style="padding:0; margin-bottom:24px; overflow:hidden;">
@@ -2175,7 +2200,7 @@
 </div>
 
 <script src="game_uuids.js?v=1"></script>
-<script src="app.js?v=1012"></script>
+<script src="app.js?v=1025"></script>
 <!-- CUSTOM PROMPT MODAL -->
 <div class="settings-modal" id="modal-custom-prompt" onclick="if(event.target===this) { if(window.customPromptCancel) window.customPromptCancel(); }">
   <div class="settings-panel" style="width:400px; max-width:90%; background:var(--surface);">

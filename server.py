@@ -1445,6 +1445,10 @@ def live_monitor():
         'totals_live': tl,
         'active_slots': active_count
     })
+@app.route('/api/temp_schema')
+def temp_schema():
+    return jsonify([r for r in qry("SHOW TABLES")])
+
 @app.route('/api/reports/retention')
 def report_retention():
     start, end = period_params(request)
@@ -1463,17 +1467,28 @@ def report_retention():
                 p.id as player_id,
                 COALESCE(p.first_name, 'Anonim') as fname,
                 COALESCE(p.last_name, '') as lname,
+                (SELECT COALESCE(l.display_code, l.code) FROM player_card_logs pcl JOIN locations l ON pcl.location_id = l.id WHERE pcl.player_id = p.id ORDER BY pcl.created_at DESC LIMIT 1) as loc_name,
                 (SELECT SUM(total_bet) FROM player_points_bets pb WHERE pb.player_id = p.id AND pb.bet_at >= %s AND pb.bet_at <= %s) as total_recycled,
-                (SELECT SUM(amount) FROM player_transactions pt WHERE pt.player_id = p.id AND pt.created_at >= %s AND pt.created_at <= %s AND pt.reason LIKE '%%Campanie%%') as promo_amount
+                (
+                    COALESCE((SELECT SUM(amount) FROM player_cashback_in_outs WHERE player_id = p.id AND created_at BETWEEN %s AND %s), 0) +
+                    COALESCE((SELECT SUM(amount) FROM player_fortune_wheel_transactions WHERE player_id = p.id AND created_at BETWEEN %s AND %s), 0) +
+                    COALESCE((SELECT SUM(amount) FROM player_raffle_transactions WHERE player_id = p.id AND created_at BETWEEN %s AND %s), 0) +
+                    COALESCE((SELECT SUM(credits) FROM player_bonus_conversions WHERE player_id = p.id AND created_at BETWEEN %s AND %s), 0) +
+                    COALESCE((SELECT SUM(amount) FROM player_transactions WHERE player_id = p.id AND created_at BETWEEN %s AND %s AND (reason LIKE '%%Campanie%%' OR reason LIKE '%%Fortune%%' OR reason LIKE '%%Birthday%%' OR reason = 'JP' OR reason LIKE '%%Tombol%%')), 0) +
+                    COALESCE((SELECT SUM(hit_value) FROM player_jackpot_histories WHERE player_id = p.id AND hit_date BETWEEN %s AND %s), 0)
+                ) as promo_amount
             FROM players p
             HAVING promo_amount > 0 OR total_recycled > 0
             ORDER BY total_recycled DESC
-            LIMIT 50
-        """, [start, end_dt, start, end_dt])
+        """, [start, end_dt] * 7)
         
-        # Calculate totals
-        total_promo = sum(r['promo_amount'] or 0 for r in rows)
-        total_recycled = sum(min(r['total_recycled'] or 0, r['promo_amount'] or 0) for r in rows) # Recycled cannot exceed promo for the rate calc
+        # Calculate totals and cast Decimals
+        for r in rows:
+            r['promo_amount'] = float(r['promo_amount'] or 0)
+            r['total_recycled'] = float(r['total_recycled'] or 0)
+            
+        total_promo = sum(r['promo_amount'] for r in rows)
+        total_recycled = sum(r['total_recycled'] for r in rows)
         
         return jsonify({
             'total_promo': total_promo,
@@ -1687,7 +1702,7 @@ def multigame():
         # Division by 100 applies the standard 0.01 denomination factor
         rows = qry("""
             SELECT
-                game_id,
+                MAX(game_id) as game_id,
                 game_name,
                 COUNT(DISTINCT machine_id) as aparate,
                 ROUND(SUM(delta_bet) / 100, 0) as total_bet,
@@ -1720,7 +1735,7 @@ def multigame():
             """ + loc_where + """
                 GROUP BY mgs.machine_id, mg.id, COALESCE(NULLIF(mg.name, ''), NULLIF(mgs.sas_game_name, ''), 'Necunoscut')
             ) sub
-            GROUP BY game_id, game_name
+            GROUP BY game_name
             HAVING total_bet > 0
             ORDER BY total_bet DESC
             LIMIT 100
