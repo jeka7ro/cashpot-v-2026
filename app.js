@@ -241,7 +241,7 @@ function renderTablePaginated(key) {
   // Attach Excel button to card header if not already done
   if (thead && !thead.dataset.excelAttached) {
     let card = tbody.closest('.card') || tbody.closest('.table-card');
-    if (card) {
+    if (card && !card.classList.contains('tables-section')) {
       let headerDiv = card.querySelector('div'); // The first div is the header
       if (headerDiv && headerDiv.querySelector('span')) {
         let btnWrap = headerDiv.querySelector('.excel-btn-wrap');
@@ -253,13 +253,16 @@ function renderTablePaginated(key) {
           btnWrap.className = 'excel-btn-wrap';
           headerDiv.appendChild(btnWrap);
         }
-        let btn = document.createElement('button');
-        btn.style.cssText = 'padding:4px 12px; font-size:11px; height:24px; border:1px solid rgba(30, 215, 96, 0.3); border-radius:12px; background:rgba(30, 215, 96, 0.1); color:var(--green); display:flex; align-items:center; cursor:pointer; font-weight:600; transition:all 0.2s; margin-left: auto;';
-        btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Export Excel`;
-        btn.onmouseover = () => btn.style.background = 'rgba(30, 215, 96, 0.2)';
-        btn.onmouseout = () => btn.style.background = 'rgba(30, 215, 96, 0.1)';
-        btn.onclick = () => exportToExcel(key);
-        btnWrap.appendChild(btn);
+        // Only append if empty
+        if (btnWrap.children.length === 0) {
+          let btn = document.createElement('button');
+          btn.style.cssText = 'padding:4px 12px; font-size:11px; height:24px; border:1px solid rgba(30, 215, 96, 0.3); border-radius:12px; background:rgba(30, 215, 96, 0.1); color:var(--green); display:flex; align-items:center; cursor:pointer; font-weight:600; transition:all 0.2s; margin-left: auto;';
+          btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Export Excel`;
+          btn.onmouseover = () => btn.style.background = 'rgba(30, 215, 96, 0.2)';
+          btn.onmouseout = () => btn.style.background = 'rgba(30, 215, 96, 0.1)';
+          btn.onclick = () => exportToExcel(key);
+          btnWrap.appendChild(btn);
+        }
       }
     }
     thead.dataset.excelAttached = 'true';
@@ -267,8 +270,8 @@ function renderTablePaginated(key) {
   
   let rowsToRender = st.filteredRows || st.rows;
   if (st.sortCol !== undefined) {
-    if (!st.parsedRows) {
-      st.parsedRows = st.rows.map(html => {
+    if (!st.parsedRows || st._parsedRowsRef !== rowsToRender) {
+      st.parsedRows = rowsToRender.map(html => {
         const tr = document.createElement('tr');
         tr.innerHTML = html;
         return {
@@ -281,6 +284,7 @@ function renderTablePaginated(key) {
           })
         };
       });
+      st._parsedRowsRef = rowsToRender;
     }
     
     st.parsedRows.sort((a, b) => {
