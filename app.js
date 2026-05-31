@@ -7741,3 +7741,24 @@ window.hideGlobalHpTooltip = function() {
   const tt = document.getElementById('global-hp-tooltip');
   if (tt) tt.style.display = 'none';
 };
+
+// Mobile UI Adjustments
+function adjustMobileUI() {
+  const presets = document.querySelector('.timeline-presets');
+  const modalContainer = document.getElementById('mobile-period-container');
+  const topRow = document.querySelector('.timeline-top-row');
+  
+  if (window.innerWidth <= 600) {
+    if (presets && modalContainer && presets.parentElement !== modalContainer) {
+      modalContainer.appendChild(presets);
+    }
+  } else {
+    if (presets && topRow && presets.parentElement !== topRow) {
+      topRow.appendChild(presets);
+    }
+  }
+}
+window.addEventListener('resize', adjustMobileUI);
+window.addEventListener('DOMContentLoaded', adjustMobileUI);
+adjustMobileUI();
+
