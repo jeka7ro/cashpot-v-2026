@@ -1994,6 +1994,8 @@ function switchTab(name,btn){
   if (countEl)  { countEl.style.display = 'none'; countEl.textContent = ''; }
   // Reset any hidden rows
   document.querySelectorAll('.tab-panel tbody tr').forEach(r => r.style.display = '');
+  
+  if (typeof filterDashTables === 'function') filterDashTables();
 }
 
 window.filterDashTables = function() {
@@ -2002,14 +2004,23 @@ window.filterDashTables = function() {
   const activePanel = document.querySelector('.tab-panel.active');
   if (!activePanel) return;
   
-  const key = activePanel.id.replace('tab-', '');
-  const st = tableStates[key];
-  if (!st) return;
-
+  const activeKey = activePanel.id.replace('tab-', '');
+  
   if (!q) {
-    st.filteredRows = null;
+    // Clear filters and render ALL dashboard tables so inactive tabs get the new data
+    Object.keys(tableStates).forEach(key => {
+      const st = tableStates[key];
+      if (st && document.getElementById(`body-${key}`)) {
+        st.filteredRows = null;
+        st.page = 1;
+        renderTablePaginated(key);
+      }
+    });
     if (countEl) { countEl.style.display = 'none'; countEl.textContent = ''; }
   } else {
+    const st = tableStates[activeKey];
+    if (!st) return;
+    
     // Filter the RAW string rows! Need to strip HTML to search properly.
     const temp = document.createElement('div');
     st.filteredRows = st.rows.filter(rStr => {
@@ -2022,9 +2033,9 @@ window.filterDashTables = function() {
       countEl.style.display = visible > 0 ? 'block' : 'none';
       countEl.style.color = visible === 0 ? 'var(--red)' : 'var(--muted)';
     }
+    st.page = 1; // reset to page 1
+    renderTablePaginated(activeKey);
   }
-  st.page = 1; // reset to page 1
-  renderTablePaginated(key);
 };
 
 
@@ -2139,7 +2150,6 @@ window.sortDashClienti = function(field) {
 
 let _loadAllRunning = false;
 let _loadAllPending = false;
-let _dashAutoRefreshTimer = null;
 
 async function loadAll(silent = false){
   if (_loadAllRunning) {
@@ -2530,7 +2540,8 @@ window.addEventListener('hashchange', () => {
     if(subHash === 'utilizatori') loadAdminUtilizatori();
     if(subHash === 'sloturi') loadAdminSloturi();
   }
-  if(mainHash === 'live') loadLive();
+  if(mainHash === 'live') { loadLive(); startLiveTimer(); }
+  else { if(_liveTimer){ clearInterval(_liveTimer); _liveTimer = null; } }
   if(mainHash === 'dashboard') loadAll();
 
   // Show/Hide kpi-profit (Expenses & Net Profit) based on context
@@ -3976,14 +3987,15 @@ async function loadLive() {
   }
 }
 
-// Auto-refresh every 30s
+// Auto-refresh every 30s — only starts when user navigates to Live view
 function startLiveTimer() {
   if(_liveTimer) clearInterval(_liveTimer);
   _liveTimer = setInterval(() => {
     if(document.getElementById('view-live')?.classList.contains('active')) loadLive();
+    else { clearInterval(_liveTimer); _liveTimer = null; }
   }, 30000);
 }
-startLiveTimer();
+// startLiveTimer() is now called only from hashchange when navigating to #live
 
 // ─── Multigame Report ─────────────────────────────────────────────────────────
 window.loadMultigameReport = window.loadMultigame = async function() {
