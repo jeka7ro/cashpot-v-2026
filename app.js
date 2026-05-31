@@ -432,10 +432,6 @@ function applyPreset(p){
   document.getElementById('date-start').value=yMd(s);
   document.getElementById('date-end').value=yMd(e);
   document.getElementById('tl-range-display').textContent=`${yMd(s)} ➔ ${yMd(e)}`;
-  // Salveaza atat preset-ul cat si datele exacte
-  localStorage.setItem('cp2_last_preset', p);
-  localStorage.setItem('cp2_last_start', yMd(s));
-  localStorage.setItem('cp2_last_end', yMd(e));
 }
 
 function autoSetTrend() {
@@ -1705,7 +1701,7 @@ async function loadLocations(s,e){
   let tIn=0,tGgr=0,tJp=0,tHh=0,tCb=0,tGm=0,tMkt=0,tBet=0,tClientiCard=0,tClientiTotal=0;
   data.forEach(r => tGgr += +r.ggr||0);
   const maxG=Math.max(1,...data.map(r=>Math.abs(parseFloat(r.ggr||0))));
-  tableStates.locatii.filteredRows=null; tableStates.locatii.rows=data.map((r, i)=>{
+  tableStates.locatii.rows=data.map((r, i)=>{
     tIn+=+r.total_in||0;tJp+=+r.jackpot||0;tHh+=+r.hh||0;
     tCb+=+r.cashback||0;tGm+=+r.games||0;tMkt+=+r.marketing||0;tBet+=+r.bet||0;
     tClientiCard+=+(r.clienti_card||0); tClientiTotal+=+(r.clienti_total||0);
@@ -1833,7 +1829,7 @@ async function loadProviders(s,e){
   const data = res[0], prevData = c ? res[1] : [], currExclData = c ? res[2] : data;
 
   const maxG=Math.max(1,...data.map(r=>+r.ggr||0));
-  tableStates.provideri.filteredRows=null; tableStates.provideri.rows=data.map((r, i)=>{
+  tableStates.provideri.rows=data.map((r, i)=>{
     const cc=cellCls(+r.ggr||0,maxG);
     const prev = prevData.find(x => x.id === r.id);
     const currE = currExclData.find(x => x.id === r.id);
@@ -1893,7 +1889,7 @@ async function loadTypes(s,e){
   const data = res[0], prevData = c ? res[1] : [], currExclData = c ? res[2] : data;
 
   const maxG=Math.max(1,...data.map(r=>+r.ggr||0));
-  tableStates.tipuri.filteredRows=null; tableStates.tipuri.rows=data.map((r, i)=>{
+  tableStates.tipuri.rows=data.map((r, i)=>{
     const cc=cellCls(+r.ggr||0,maxG);
     const prev = prevData.find(x => x.tip_slot === r.tip_slot && x.cabinet === r.cabinet);
     const currE = currExclData.find(x => x.tip_slot === r.tip_slot && x.cabinet === r.cabinet);
@@ -1920,7 +1916,7 @@ async function loadCabinets(s,e){
   const data = res[0], prevData = c ? res[1] : [], currExclData = c ? res[2] : data;
 
   const maxG=Math.max(1,...data.map(r=>+r.ggr||0));
-  tableStates.cabinete.filteredRows=null; tableStates.cabinete.rows=data.map((r, i)=>{
+  tableStates.cabinete.rows=data.map((r, i)=>{
     const cc=cellCls(+r.ggr||0,maxG);
     const prev = prevData.find(x => x.cabinet === r.cabinet);
     const currE = currExclData.find(x => x.cabinet === r.cabinet);
@@ -1957,7 +1953,7 @@ async function loadMachines(){
 
     document.getElementById('machines-count').textContent=data.length+' aparate';
     const maxG=Math.max(1,...data.map(r=>+r.ggr||0));
-    tableStates.aparate.filteredRows=null; tableStates.aparate.rows=data.map((r, i)=>{
+    tableStates.aparate.rows=data.map((r, i)=>{
       const cc=cellCls(+r.ggr||0,maxG);
       const prev = prevData.find(x => x.serial_nr === r.serial_nr);
       const currE = currExclData.find(x => x.serial_nr === r.serial_nr);
@@ -1998,8 +1994,6 @@ function switchTab(name,btn){
   if (countEl)  { countEl.style.display = 'none'; countEl.textContent = ''; }
   // Reset any hidden rows
   document.querySelectorAll('.tab-panel tbody tr').forEach(r => r.style.display = '');
-  
-  if (typeof filterDashTables === 'function') filterDashTables();
 }
 
 window.filterDashTables = function() {
@@ -2008,23 +2002,14 @@ window.filterDashTables = function() {
   const activePanel = document.querySelector('.tab-panel.active');
   if (!activePanel) return;
   
-  const activeKey = activePanel.id.replace('tab-', '');
-  
+  const key = activePanel.id.replace('tab-', '');
+  const st = tableStates[key];
+  if (!st) return;
+
   if (!q) {
-    // Clear filters and render ALL dashboard tables so inactive tabs get the new data
-    Object.keys(tableStates).forEach(key => {
-      const st = tableStates[key];
-      if (st && document.getElementById(`body-${key}`)) {
-        st.filteredRows = null;
-        st.page = 1;
-        renderTablePaginated(key);
-      }
-    });
+    st.filteredRows = null;
     if (countEl) { countEl.style.display = 'none'; countEl.textContent = ''; }
   } else {
-    const st = tableStates[activeKey];
-    if (!st) return;
-    
     // Filter the RAW string rows! Need to strip HTML to search properly.
     const temp = document.createElement('div');
     st.filteredRows = st.rows.filter(rStr => {
@@ -2037,9 +2022,9 @@ window.filterDashTables = function() {
       countEl.style.display = visible > 0 ? 'block' : 'none';
       countEl.style.color = visible === 0 ? 'var(--red)' : 'var(--muted)';
     }
-    st.page = 1; // reset to page 1
-    renderTablePaginated(activeKey);
   }
+  st.page = 1; // reset to page 1
+  renderTablePaginated(key);
 };
 
 
@@ -2154,8 +2139,7 @@ window.sortDashClienti = function(field) {
 
 let _loadAllRunning = false;
 let _loadAllPending = false;
-
-async function loadAll(silent = false){
+async function loadAll(){
   if (_loadAllRunning) {
     _loadAllPending = true;
     return;
@@ -2164,26 +2148,17 @@ async function loadAll(silent = false){
   _loadAllPending = false;
   const{s,e}=getPeriod();
   if(!s||!e){ _loadAllRunning = false; return; }
-  
-  if (!silent) showLoader(true);
+  showLoader(true);
   try{
-    const results = await Promise.allSettled([
-      loadKPI(s,e), loadTrend(s,e), loadLocations(s,e),
-      loadProviders(s,e), loadTypes(s,e), loadCabinets(s,e),
-      loadCalendars(s,e), loadMachines(), loadDashClienti(s,e)
-    ]);
-    results.forEach((r, i) => {
-      if (r.status === 'rejected') console.warn(`[loadAll] loader ${i} failed:`, r.reason);
-    });
-    if (typeof filterDashTables === 'function') filterDashTables();
+    await Promise.all([loadKPI(s,e),loadTrend(s,e),loadLocations(s,e),loadProviders(s,e),loadTypes(s,e),loadCabinets(s,e),loadCalendars(s,e),loadMachines(),loadDashClienti(s,e)]);
     if (document.getElementById('view-rapoarte') && document.getElementById('view-rapoarte').classList.contains('active')) {
       const hh  = document.getElementById('rep-page-hh');
       const mg  = document.getElementById('rep-page-multigame');
       const cl  = document.getElementById('rep-page-clienti');
       const mkt = document.getElementById('rep-page-marketing');
       const co  = document.getElementById('rep-page-cashout');
-      if (hh  && hh.style.display  !== 'none' && hh.style.display  !== '') loadHourlyReport();
-      else if (mg  && mg.style.display  !== 'none' && mg.style.display  !== '') loadMultigameReport();
+      if (hh  && hh.style.display !== 'none' && hh.style.display !== '')  loadHhReport();
+      else if (mg  && mg.style.display  !== 'none' && mg.style.display  !== '') loadMultigame();
       else if (cl  && cl.style.display  !== 'none' && cl.style.display  !== '') loadClientiReport();
       else if (mkt && mkt.style.display !== 'none' && mkt.style.display !== '') loadMarketingReport();
       else if (co  && co.style.display  !== 'none' && co.style.display  !== '') loadCashoutReport();
@@ -2344,24 +2319,7 @@ setTimeout(async () => {
   }
   await loadBNR();
   await loadFilters();
-  // Restaureaza ultima perioada selectata de user
-  const savedPreset = localStorage.getItem('cp2_last_preset') || 'month';
-  const savedStart  = localStorage.getItem('cp2_last_start');
-  const savedEnd    = localStorage.getItem('cp2_last_end');
-  if (savedStart && savedEnd) {
-    // Restaureaza datele exacte salvate
-    document.getElementById('native-date-start').value = savedStart;
-    document.getElementById('native-date-end').value   = savedEnd;
-    document.getElementById('date-start').value        = savedStart;
-    document.getElementById('date-end').value          = savedEnd;
-    document.getElementById('tl-range-display').textContent = `${savedStart} ➔ ${savedEnd}`;
-  } else {
-    applyPreset(savedPreset);
-  }
-  // Marcheaza butonul activ corect
-  document.querySelectorAll('.preset-btn').forEach(b => {
-    b.classList.toggle('active', b.dataset.preset === savedPreset);
-  });
+  applyPreset('month');
   // dispatch AFTER filters+period are ready so hash-specific loaders have data
   window.dispatchEvent(new Event('hashchange'));
   if(window.location.hash === '' || window.location.hash === '#dashboard') await loadAll();
@@ -2568,8 +2526,7 @@ window.addEventListener('hashchange', () => {
     if(subHash === 'utilizatori') loadAdminUtilizatori();
     if(subHash === 'sloturi') loadAdminSloturi();
   }
-  if(mainHash === 'live') { loadLive(); startLiveTimer(); }
-  else { if(_liveTimer){ clearInterval(_liveTimer); _liveTimer = null; } }
+  if(mainHash === 'live') loadLive();
   if(mainHash === 'dashboard') loadAll();
 
   // Show/Hide kpi-profit (Expenses & Net Profit) based on context
@@ -4015,15 +3972,14 @@ async function loadLive() {
   }
 }
 
-// Auto-refresh every 30s — only starts when user navigates to Live view
+// Auto-refresh every 30s
 function startLiveTimer() {
   if(_liveTimer) clearInterval(_liveTimer);
   _liveTimer = setInterval(() => {
     if(document.getElementById('view-live')?.classList.contains('active')) loadLive();
-    else { clearInterval(_liveTimer); _liveTimer = null; }
   }, 30000);
 }
-// startLiveTimer() is now called only from hashchange when navigating to #live
+startLiveTimer();
 
 // ─── Multigame Report ─────────────────────────────────────────────────────────
 window.loadMultigameReport = window.loadMultigame = async function() {
