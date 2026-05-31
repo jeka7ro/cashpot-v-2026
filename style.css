@@ -419,3 +419,9 @@ td.cell-neg-3 { background:rgba(239,68,68,.38) !important; }
 #mobile-period-container .mobile-preset-dropdown { margin: 0 !important; }
 #mobile-period-container .mobile-preset-dropdown select { height: 44px !important; font-size: 14px !important; }
 
+
+@media(max-width: 600px) {
+  .mobile-bottom-bar.mobile-show { display: flex !important; }
+  #view-dashboard.active { display: flex !important; flex-direction: column; }
+  #view-dashboard > .table-section { order: -1; margin-bottom: 24px; }
+}
