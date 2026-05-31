@@ -2365,7 +2365,7 @@ const savedTheme = localStorage.getItem('theme') || 'dark';
 document.documentElement.setAttribute('data-theme', savedTheme);
 Chart.defaults.color = savedTheme === 'light' ? '#64748b' : '#94a3b8';
 Chart.defaults.borderColor = savedTheme === 'light' ? '#e2e8f0' : 'rgba(255,255,255,0.06)';
-document.getElementById('theme-toggle').addEventListener('click', () => {
+window.toggleTheme = function() {
   const current = document.documentElement.getAttribute('data-theme');
   const next = current === 'light' ? 'dark' : 'light';
   document.documentElement.setAttribute('data-theme', next);
@@ -2383,7 +2383,8 @@ document.getElementById('theme-toggle').addEventListener('click', () => {
   if(trendChart) trendChart.update();
   if(barChart) barChart.update();
   if(pieChart) pieChart.update();
-});
+};
+document.getElementById('theme-toggle').addEventListener('click', window.toggleTheme);
 
 // ─── Views & Reports ──────────────────────────────────────────────────────
 window.addEventListener('hashchange', () => {
