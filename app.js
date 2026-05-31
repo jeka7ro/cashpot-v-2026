@@ -2346,7 +2346,6 @@ setTimeout(async () => {
   }
   // dispatch AFTER filters+period are ready so hash-specific loaders have data
   window.dispatchEvent(new Event('hashchange'));
-  if(window.location.hash === '' || window.location.hash === '#dashboard') await loadAll();
 }, 0);
 
 const savedTheme = localStorage.getItem('theme') || 'dark';
@@ -5043,7 +5042,6 @@ window.doLogin = async function(e) {
           applyPreset('month');
         }
         window.dispatchEvent(new Event('hashchange'));
-        if (window.location.hash === '' || window.location.hash === '#dashboard') await loadAll();
       }
     }
   } catch (err) {
