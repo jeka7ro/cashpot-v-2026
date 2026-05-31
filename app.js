@@ -427,11 +427,19 @@ function applyPreset(p){
   else if(p==='30d'){e=new Date(today);s=new Date(today);s.setDate(today.getDate()-29);}
   else if(p==='ytd'){s=new Date(today.getFullYear(),0,1);e=new Date(today);}
   const yMd=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  document.getElementById('native-date-start').value=yMd(s);
-  document.getElementById('native-date-end').value=yMd(e);
-  document.getElementById('date-start').value=yMd(s);
-  document.getElementById('date-end').value=yMd(e);
-  document.getElementById('tl-range-display').textContent=`${yMd(s)} ➔ ${yMd(e)}`;
+  
+  const finalS = yMd(s);
+  const finalE = yMd(e);
+  
+  document.getElementById('native-date-start').value=finalS;
+  document.getElementById('native-date-end').value=finalE;
+  document.getElementById('date-start').value=finalS;
+  document.getElementById('date-end').value=finalE;
+  document.getElementById('tl-range-display').textContent=`${finalS} ➔ ${finalE}`;
+  
+  localStorage.setItem('cp2_preset', p);
+  localStorage.setItem('cp2_start', finalS);
+  localStorage.setItem('cp2_end', finalE);
 }
 
 function autoSetTrend() {
@@ -2138,19 +2146,15 @@ window.sortDashClienti = function(field) {
 };
 
 let _loadAllRunning = false;
-let _loadAllPending = false;
 async function loadAll(){
-  if (_loadAllRunning) {
-    _loadAllPending = true;
-    return;
-  }
+  if (_loadAllRunning) return;
   _loadAllRunning = true;
-  _loadAllPending = false;
   const{s,e}=getPeriod();
   if(!s||!e){ _loadAllRunning = false; return; }
   showLoader(true);
   try{
-    await Promise.all([loadKPI(s,e),loadTrend(s,e),loadLocations(s,e),loadProviders(s,e),loadTypes(s,e),loadCabinets(s,e),loadCalendars(s,e),loadMachines(),loadDashClienti(s,e)]);
+    await Promise.allSettled([loadKPI(s,e),loadTrend(s,e),loadLocations(s,e),loadProviders(s,e),loadTypes(s,e),loadCabinets(s,e),loadCalendars(s,e),loadMachines(),loadDashClienti(s,e)]);
+    if (typeof filterDashTables === 'function') filterDashTables();
     if (document.getElementById('view-rapoarte') && document.getElementById('view-rapoarte').classList.contains('active')) {
       const hh  = document.getElementById('rep-page-hh');
       const mg  = document.getElementById('rep-page-multigame');
@@ -2172,11 +2176,9 @@ async function loadAll(){
     }
   }
   catch(err){console.error('loadAll error:', err);}
-  finally{ showLoader(false); }
-  
-  _loadAllRunning = false;
-  if (_loadAllPending) {
-    setTimeout(loadAll, 50);
+  finally{ 
+    showLoader(false); 
+    _loadAllRunning = false;
   }
 }
 
@@ -2319,7 +2321,25 @@ setTimeout(async () => {
   }
   await loadBNR();
   await loadFilters();
-  applyPreset('month');
+  
+  const savedP = localStorage.getItem('cp2_preset');
+  const savedS = localStorage.getItem('cp2_start');
+  const savedE = localStorage.getItem('cp2_end');
+  
+  if (savedS && savedE) {
+    document.getElementById('native-date-start').value = savedS;
+    document.getElementById('native-date-end').value = savedE;
+    document.getElementById('date-start').value = savedS;
+    document.getElementById('date-end').value = savedE;
+    document.getElementById('tl-range-display').textContent = `${savedS} ➔ ${savedE}`;
+    if (savedP) {
+      document.querySelectorAll('.preset-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.preset === savedP);
+      });
+    }
+  } else {
+    applyPreset('month');
+  }
   // dispatch AFTER filters+period are ready so hash-specific loaders have data
   window.dispatchEvent(new Event('hashchange'));
   if(window.location.hash === '' || window.location.hash === '#dashboard') await loadAll();
@@ -5001,7 +5021,23 @@ window.doLogin = async function(e) {
       await checkAuth();
       if (currentUser) {
         await loadBNR();
-        applyPreset('month');
+        const savedS = localStorage.getItem('cp2_start');
+        const savedE = localStorage.getItem('cp2_end');
+        if (savedS && savedE) {
+          document.getElementById('native-date-start').value = savedS;
+          document.getElementById('native-date-end').value = savedE;
+          document.getElementById('date-start').value = savedS;
+          document.getElementById('date-end').value = savedE;
+          document.getElementById('tl-range-display').textContent = `${savedS} ➔ ${savedE}`;
+          const savedP = localStorage.getItem('cp2_preset');
+          if (savedP) {
+            document.querySelectorAll('.preset-btn').forEach(b => {
+              b.classList.toggle('active', b.dataset.preset === savedP);
+            });
+          }
+        } else {
+          applyPreset('month');
+        }
         window.dispatchEvent(new Event('hashchange'));
         if (window.location.hash === '' || window.location.hash === '#dashboard') await loadAll();
       }
