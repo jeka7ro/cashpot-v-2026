@@ -463,16 +463,29 @@ function autoSetTrend() {
 }
 
 document.querySelectorAll('.preset-btn').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    if (btn.tagName === 'SELECT' || btn.id === 'btn-month-multi') return;
+  if (btn.id === 'btn-month-multi') return;
+  btn.addEventListener('click', ()=>{
     document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
-    const sel = document.getElementById('preset-month-select');
-    if(sel) sel.value = '';
     btn.classList.add('active');applyPreset(btn.dataset.preset);
+    const ms = document.getElementById('mobile-preset-select');
+    if (ms) ms.value = btn.dataset.preset;
     autoSetTrend();
     reloadCurrentView();
   });
 });
+
+const mobileSelect = document.getElementById('mobile-preset-select');
+if (mobileSelect) {
+  mobileSelect.addEventListener('change', (e) => {
+    const val = e.target.value;
+    document.querySelectorAll('.preset-btn').forEach(b=>{
+      b.classList.toggle('active', b.dataset.preset === val);
+    });
+    applyPreset(val);
+    autoSetTrend();
+    reloadCurrentView();
+  });
+}
 
 window.toggleMonthMulti = function(e) {
   e.stopPropagation();
@@ -1734,10 +1747,10 @@ async function loadLocations(s,e){
     return`<tr>
       <td style="text-align:center; color:var(--muted); font-size:11px">${i+1}</td>
       <td><span class="drill-link" onclick="drillTo('location',${r.id},'${(r.locatie||'').replace(/'/g,"\\'")}')">${r.locatie||'—'}</span></td>
-      <td style="text-align:center">${r.buc}</td><td style="text-align:center">${r.zile}</td><td class="num">${clientiVal}</td>
-      <td class="num">${fmt(r.total_in)}${inB}</td>
       <td class="num ${cc}">${fmt(r.ggr)}${ggrB}</td>
       <td class="num">${fmtE(r.ggr)}</td>
+      <td style="text-align:center">${r.buc}</td><td style="text-align:center">${r.zile}</td><td class="num">${clientiVal}</td>
+      <td class="num">${fmt(r.total_in)}${inB}</td>
       <td class="num">${fmt(r.jackpot)}</td><td class="num">${fmt(r.hh)}</td><td class="num">${fmt(r.cashback)}</td><td class="num">${fmt(r.roata||0)}</td><td class="num" style="color:var(--blue)">${fmt(r.raffles||0)}</td>
       <td class="num">${fmt(r.games)}</td><td class="num">${pill(r.hold_pct)}</td><td class="num">${bonusCost(r.bonus_cost_pct||0)}</td>
     </tr>`;
@@ -1779,12 +1792,12 @@ async function loadLocations(s,e){
   }
   document.getElementById('foot-locatii').innerHTML=`<tr style="font-weight:700">
     <td colspan="2">TOTAL / MEDIE</td>
+    <td class="num">${fmt(tGgr)}${totalGgrBadge}</td>
+    <td class="num">${fmtE(tGgr)}</td>
     <td style="text-align:center">${totalBuc}</td>
     <td style="text-align:center">—</td>
     <td class="num">${footerClienti}</td>
     <td class="num">${fmt(tIn)}${totalInBadge}</td>
-    <td class="num">${fmt(tGgr)}${totalGgrBadge}</td>
-    <td class="num">${fmtE(tGgr)}</td>
     <td class="num">${fmt(tJp)}</td>
     <td class="num">${fmt(tHh)}</td>
     <td class="num">${fmt(tCb)}</td>

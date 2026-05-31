@@ -380,3 +380,11 @@ td.cell-neg-3 { background:rgba(239,68,68,.38) !important; }
 
 /* Fix padding for search bar to fit icon and bubble */
 #exp-search { padding-left: 36px !important; padding-right: 32px !important; }
+
+.table-scroll { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+@media(max-width: 600px) {
+  .mobile-hide { display: none !important; }
+  .mobile-show { display: block !important; }
+}
+
+.preset-buttons-wrap { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }

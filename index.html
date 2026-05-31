@@ -282,23 +282,34 @@
       <div class="timeline-presets">
         <input type="date" id="native-date-start" class="date-picker-input">
         <input type="date" id="native-date-end" class="date-picker-input">
-        <button class="preset-btn" data-preset="today">Azi</button>
-        <button class="preset-btn" data-preset="yesterday">Ieri</button>
-        <button class="preset-btn active" data-preset="month">Luna curentă</button>
-        <button class="preset-btn" data-preset="prev_month">Luna anterioară</button>
-        <button class="preset-btn" data-preset="q">Trimestrul actual</button>
-        
-        <div style="position:relative; display:inline-block;" id="multi-month-container">
-          <button id="btn-month-multi" class="preset-btn" onclick="toggleMonthMulti(event)" style="min-width:140px; display:flex; justify-content:space-between; align-items:center;">
-             <span>Alege luna...</span>
-             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
-          </button>
-          <div id="dropdown-month-multi" class="glass-panel" style="display:none; position:absolute; top:calc(100% + 4px); left:0; width:220px; z-index:9999; padding:8px; border:1px solid var(--border); border-radius:8px; max-height:280px; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.3); background:var(--surface); flex-direction:column; gap:4px;">
-            <!-- JS will populate -->
+        <div class="preset-buttons-wrap mobile-hide">
+          <button class="preset-btn" data-preset="today">Azi</button>
+          <button class="preset-btn" data-preset="yesterday">Ieri</button>
+          <button class="preset-btn active" data-preset="month">Luna curentă</button>
+          <button class="preset-btn" data-preset="prev_month">Luna anterioară</button>
+          <button class="preset-btn" data-preset="q">Trimestrul actual</button>
+          
+          <div style="position:relative; display:inline-block;" id="multi-month-container">
+            <button id="btn-month-multi" class="preset-btn" onclick="toggleMonthMulti(event)" style="min-width:140px; display:flex; justify-content:space-between; align-items:center;">
+               <span>Alege luna...</span>
+               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+            <div id="dropdown-month-multi" class="glass-panel" style="display:none; position:absolute; top:calc(100% + 4px); left:0; width:220px; z-index:9999; padding:8px; border:1px solid var(--border); border-radius:8px; max-height:280px; overflow-y:auto; box-shadow:0 8px 32px rgba(0,0,0,0.3); background:var(--surface); flex-direction:column; gap:4px;">
+            </div>
           </div>
-        </div>
 
-        <button class="preset-btn" data-preset="ytd">An curent</button>
+          <button class="preset-btn" data-preset="ytd">An curent</button>
+        </div>
+        <div class="mobile-preset-dropdown mobile-show" style="display:none; margin-left: 8px;">
+          <select id="mobile-preset-select" class="glass-input" style="padding: 4px 8px; font-size: 13px;">
+            <option value="today">Azi</option>
+            <option value="yesterday">Ieri</option>
+            <option value="month" selected>Luna curentă</option>
+            <option value="prev_month">Luna anterioară</option>
+            <option value="q">Trimestrul actual</option>
+            <option value="ytd">An curent</option>
+          </select>
+        </div>
       </div>
     </div>
 
@@ -479,8 +490,8 @@
       <div class="table-scroll">
         <table class="data-table">
           <thead><tr>
-            <th>Nr.</th><th>Locație</th><th>Buc</th><th>Zile</th><th class="num" style="width:50px; text-align:right">Clienți/zi</th>
-            <th class="num">Total IN</th><th class="num">GGR</th><th class="num">GGR €</th>
+            <th>Nr.</th><th>Locație</th><th class="num">GGR</th><th class="num">GGR €</th><th>Buc</th><th>Zile</th><th class="num" style="width:50px; text-align:right">Clienți/zi</th>
+            <th class="num">Total IN</th>
             <th class="num">Jackpot</th><th class="num">HH</th><th class="num">Cashback</th><th class="num">Roata</th><th class="num">Tombole</th>
             <th class="num">Games</th><th class="num">Hold%</th><th class="num">Bonus Cost</th>
           </tr></thead>
