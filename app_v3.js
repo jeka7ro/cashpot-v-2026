@@ -619,6 +619,9 @@ populateMonthDropdown();
       document.getElementById('date-start').value = s;
       document.getElementById('date-end').value = e;
       document.getElementById('tl-range-display').textContent=`${s} ➔ ${e}`;
+      localStorage.setItem('cp2_start', s);
+      localStorage.setItem('cp2_end', e);
+      localStorage.removeItem('cp2_preset');
       autoSetTrend();
       reloadCurrentView();
     }
@@ -2007,32 +2010,37 @@ function switchTab(name,btn){
 window.filterDashTables = function() {
   const q = (document.getElementById('dash-table-search')?.value || '').toLowerCase().trim();
   const countEl = document.getElementById('dash-search-count');
-  const activePanel = document.querySelector('.tab-panel.active');
-  if (!activePanel) return;
   
-  const key = activePanel.id.replace('tab-', '');
-  const st = tableStates[key];
-  if (!st) return;
+  const dashKeys = ['locatii', 'provideri', 'tipuri', 'cabinete', 'aparate', 'clienti'];
+  let totalVisible = 0;
+  
+  dashKeys.forEach(key => {
+    const st = tableStates[key];
+    if (!st) return;
+    
+    if (!q) {
+      st.filteredRows = null;
+    } else {
+      const temp = document.createElement('div');
+      st.filteredRows = st.rows.filter(rStr => {
+        temp.innerHTML = rStr;
+        return temp.textContent.toLowerCase().includes(q);
+      });
+      totalVisible += st.filteredRows.length;
+    }
+    st.page = 1;
+    renderTablePaginated(key);
+  });
 
   if (!q) {
-    st.filteredRows = null;
     if (countEl) { countEl.style.display = 'none'; countEl.textContent = ''; }
   } else {
-    // Filter the RAW string rows! Need to strip HTML to search properly.
-    const temp = document.createElement('div');
-    st.filteredRows = st.rows.filter(rStr => {
-      temp.innerHTML = rStr;
-      return temp.textContent.toLowerCase().includes(q);
-    });
-    let visible = st.filteredRows.length;
     if (countEl) {
-      countEl.textContent = visible;
-      countEl.style.display = visible > 0 ? 'block' : 'none';
-      countEl.style.color = visible === 0 ? 'var(--red)' : 'var(--muted)';
+      countEl.textContent = totalVisible;
+      countEl.style.display = totalVisible > 0 ? 'block' : 'none';
+      countEl.style.color = totalVisible === 0 ? 'var(--red)' : 'var(--muted)';
     }
   }
-  st.page = 1; // reset to page 1
-  renderTablePaginated(key);
 };
 
 
@@ -2145,12 +2153,9 @@ window.sortDashClienti = function(field) {
   window.renderDashClientiTable();
 };
 
-let _loadAllRunning = false;
 async function loadAll(){
-  if (_loadAllRunning) return;
-  _loadAllRunning = true;
   const{s,e}=getPeriod();
-  if(!s||!e){ _loadAllRunning = false; return; }
+  if(!s||!e){ return; }
   showLoader(true);
   try{
     await Promise.allSettled([loadKPI(s,e),loadTrend(s,e),loadLocations(s,e),loadProviders(s,e),loadTypes(s,e),loadCabinets(s,e),loadCalendars(s,e),loadMachines(),loadDashClienti(s,e)]);
@@ -2178,7 +2183,6 @@ async function loadAll(){
   catch(err){console.error('loadAll error:', err);}
   finally{ 
     showLoader(false); 
-    _loadAllRunning = false;
   }
 }
 
