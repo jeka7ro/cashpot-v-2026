@@ -461,6 +461,8 @@ document.querySelectorAll('.preset-btn').forEach(btn=>{
     const sel = document.getElementById('preset-month-select');
     if(sel) sel.value = '';
     btn.classList.add('active');applyPreset(btn.dataset.preset);
+    // Salveaza preset-ul ales in localStorage
+    if (btn.dataset.preset) localStorage.setItem('cp2_last_preset', btn.dataset.preset);
     autoSetTrend();
     reloadCurrentView();
   });
@@ -2333,7 +2335,13 @@ setTimeout(async () => {
   }
   await loadBNR();
   await loadFilters();
-  applyPreset('month');
+  // Restaureaza ultima perioada selectata de user, default: luna curenta
+  const savedPreset = localStorage.getItem('cp2_last_preset') || 'month';
+  applyPreset(savedPreset);
+  // Marcheaza butonul activ corect
+  document.querySelectorAll('.preset-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.preset === savedPreset);
+  });
   // dispatch AFTER filters+period are ready so hash-specific loaders have data
   window.dispatchEvent(new Event('hashchange'));
   if(window.location.hash === '' || window.location.hash === '#dashboard') await loadAll();
