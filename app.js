@@ -2165,7 +2165,14 @@ async function loadAll(silent = false){
   
   if (!silent) showLoader(true);
   try{
-    await Promise.all([loadKPI(s,e),loadTrend(s,e),loadLocations(s,e),loadProviders(s,e),loadTypes(s,e),loadCabinets(s,e),loadCalendars(s,e),loadMachines(),loadDashClienti(s,e)]);
+    const results = await Promise.allSettled([
+      loadKPI(s,e), loadTrend(s,e), loadLocations(s,e),
+      loadProviders(s,e), loadTypes(s,e), loadCabinets(s,e),
+      loadCalendars(s,e), loadMachines(), loadDashClienti(s,e)
+    ]);
+    results.forEach((r, i) => {
+      if (r.status === 'rejected') console.warn(`[loadAll] loader ${i} failed:`, r.reason);
+    });
     if (typeof filterDashTables === 'function') filterDashTables();
     if (document.getElementById('view-rapoarte') && document.getElementById('view-rapoarte').classList.contains('active')) {
       const hh  = document.getElementById('rep-page-hh');
