@@ -432,6 +432,10 @@ function applyPreset(p){
   document.getElementById('date-start').value=yMd(s);
   document.getElementById('date-end').value=yMd(e);
   document.getElementById('tl-range-display').textContent=`${yMd(s)} ➔ ${yMd(e)}`;
+  // Salveaza atat preset-ul cat si datele exacte
+  localStorage.setItem('cp2_last_preset', p);
+  localStorage.setItem('cp2_last_start', yMd(s));
+  localStorage.setItem('cp2_last_end', yMd(e));
 }
 
 function autoSetTrend() {
@@ -461,8 +465,6 @@ document.querySelectorAll('.preset-btn').forEach(btn=>{
     const sel = document.getElementById('preset-month-select');
     if(sel) sel.value = '';
     btn.classList.add('active');applyPreset(btn.dataset.preset);
-    // Salveaza preset-ul ales in localStorage
-    if (btn.dataset.preset) localStorage.setItem('cp2_last_preset', btn.dataset.preset);
     autoSetTrend();
     reloadCurrentView();
   });
@@ -2342,9 +2344,20 @@ setTimeout(async () => {
   }
   await loadBNR();
   await loadFilters();
-  // Restaureaza ultima perioada selectata de user, default: luna curenta
+  // Restaureaza ultima perioada selectata de user
   const savedPreset = localStorage.getItem('cp2_last_preset') || 'month';
-  applyPreset(savedPreset);
+  const savedStart  = localStorage.getItem('cp2_last_start');
+  const savedEnd    = localStorage.getItem('cp2_last_end');
+  if (savedStart && savedEnd) {
+    // Restaureaza datele exacte salvate
+    document.getElementById('native-date-start').value = savedStart;
+    document.getElementById('native-date-end').value   = savedEnd;
+    document.getElementById('date-start').value        = savedStart;
+    document.getElementById('date-end').value          = savedEnd;
+    document.getElementById('tl-range-display').textContent = `${savedStart} ➔ ${savedEnd}`;
+  } else {
+    applyPreset(savedPreset);
+  }
   // Marcheaza butonul activ corect
   document.querySelectorAll('.preset-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.preset === savedPreset);
