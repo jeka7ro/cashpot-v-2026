@@ -175,7 +175,7 @@
         <button onclick="toggleSidebar()" class="settings-btn" style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:50%; padding:0; background:var(--surface); border:1px solid var(--border);" title="Toggle Sidebar">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
         </button>
-        <span class="badge" id="db-status" style="margin:0;">● Live</span>
+        <span class="badge" id="db-status" style="display:none; margin:0;">● Live</span>
       </div>
       <div class="header-right" style="display:flex; align-items:center;">
         <button id="theme-toggle" class="settings-btn" style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:50%; padding:0;" title="Schimbă tema">
@@ -203,7 +203,7 @@
   <div class="app-layout" id="app-body" style="display:none; flex:1; gap:16px; padding:0; height:auto; overflow:hidden;">
     
     <!-- SIDEBAR -->
-    <aside class="sidebar" style="height:100%;">
+    <aside class="sidebar collapsed" style="height:100%;">
       <div class="sidebar-card" style="flex:1; display:flex; flex-direction:column; padding-top:16px; margin-bottom:0;">
         <nav class="sidebar-nav" style="flex:1;">
         <a href="#dashboard" class="nav-item active">
@@ -407,7 +407,7 @@
     <div id="view-dashboard" class="view-panel active">
 
   <!-- CALENDAR GGR WIDGET -->
-  <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin: 0 24px 24px;">
+  <div class="cal-wrapper-row" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin: 0 24px 24px;">
     <!-- Month Calendar -->
     <section class="calendar-section" style="grid-column: span 2; margin: 0;">
       <div class="calendar-header">
@@ -432,9 +432,9 @@
   </div>
 
   <!-- CHARTS ROW: all 3 charts in one horizontal row, equal height -->
-  <section style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin: 0 24px 24px; align-items: stretch;">
+  <section class="charts-row" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin: 0 24px 24px; align-items: stretch;">
     <!-- Trend card: ~half width -->
-    <div class="chart-card" style="grid-column: span 2; min-width:0; display:flex; flex-direction:column;">
+    <div class="chart-card trend-card" style="grid-column: span 2; min-width:0; display:flex; flex-direction:column;">
       <div class="chart-title" style="display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
         <span>Trend — IN / GGR</span>
         <div class="chart-toggles" style="display:flex; gap:4px;">
@@ -447,12 +447,12 @@
       <div class="canvas-wrap" style="flex:1; min-height:200px;"><canvas id="trend-chart"></canvas></div>
     </div>
     <!-- GGR per Locatie: ~quarter width -->
-    <div class="chart-card" style="grid-column: span 1; min-width:0; padding:10px 14px; display:flex; flex-direction:column;">
+    <div class="chart-card mobile-hide" style="grid-column: span 1; min-width:0; padding:10px 14px; display:flex; flex-direction:column;">
       <div class="chart-title" style="font-size:11px; padding:0; margin-bottom:6px; flex-shrink:0;">GGR per Locație</div>
       <div class="canvas-wrap" style="flex:1; min-height:0;"><canvas id="loc-pie"></canvas></div>
     </div>
     <!-- GGR per Provider: ~quarter width -->
-    <div class="chart-card" style="grid-column: span 1; min-width:0; padding:10px 14px; display:flex; flex-direction:column;">
+    <div class="chart-card mobile-hide" style="grid-column: span 1; min-width:0; padding:10px 14px; display:flex; flex-direction:column;">
       <div class="chart-title" style="font-size:11px; padding:0; margin-bottom:6px; flex-shrink:0;">GGR per Provider</div>
       <div class="canvas-wrap" id="prov-bar-container" style="flex:1; min-height:0; overflow-y:auto; padding-right:4px;"></div>
     </div>

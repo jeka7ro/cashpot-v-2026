@@ -2387,6 +2387,14 @@ document.getElementById('theme-toggle').addEventListener('click', () => {
 
 // ─── Views & Reports ──────────────────────────────────────────────────────
 window.addEventListener('hashchange', () => {
+  if (window.innerWidth > 1024) {
+    const sb = document.querySelector('.sidebar');
+    if(sb) sb.classList.remove('collapsed');
+  } else {
+    const sb = document.querySelector('.sidebar');
+    if(sb) sb.classList.add('collapsed');
+  }
+
   const fullHash = window.location.hash;
   const rawHash = (fullHash.split('?')[0]).replace('#', '') || 'dashboard';
   const parts = rawHash.split('/');
@@ -2478,7 +2486,10 @@ window.addEventListener('hashchange', () => {
 
   if(mainHash === 'rapoarte') {
     document.getElementById('subnav-rapoarte').style.display = 'block';
-    if(window.innerWidth <= 1024) toggleSidebar();
+    if(window.innerWidth > 1024) {
+      const sb = document.querySelector('.sidebar');
+      if(sb) sb.classList.remove('collapsed');
+    }
     
     if (subHash) {
       const subLink = document.querySelector(`.subnav-group .nav-item[href="#rapoarte/${subHash}"]`);
