@@ -423,12 +423,10 @@ td.cell-neg-3 { background:rgba(239,68,68,.38) !important; }
 @media(max-width: 600px) {
   .mobile-bottom-bar.mobile-show { display: flex !important; }
   #view-dashboard.active { display: flex !important; flex-direction: column; }
-  #view-dashboard > .table-section { order: -1; margin-bottom: 24px; }
-}
-
-@media(max-width: 600px) {
-  body, html { height: auto !important; overflow: visible !important; }
-  .app-layout { overflow: visible !important; height: auto !important; }
-  .main-content { overflow: visible !important; height: auto !important; padding-bottom: 90px !important; }
+  #view-dashboard > .tables-section { order: -1; margin-bottom: 24px; }
+  
+  body, html { height: 100dvh !important; overflow: hidden !important; }
+  .app-layout { height: 100dvh !important; overflow: hidden !important; }
+  .main-content { padding-bottom: 90px !important; -webkit-overflow-scrolling: touch; }
   .home-fab { bottom: 12px !important; }
 }
