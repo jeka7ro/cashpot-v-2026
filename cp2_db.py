@@ -58,17 +58,19 @@ def init_db():
     c.execute("SELECT id FROM users WHERE email = 'jeka7ro@gmail.com'")
     if not c.fetchone():
         pwd_hash = hashlib.sha256('11Mai2026!'.encode()).hexdigest()
-        c.execute('''INSERT INTO users (name, email, password_hash, role, permissions) 
-                     VALUES (?, ?, ?, ?, ?)''', 
-                  ('Super Admin', 'jeka7ro@gmail.com', pwd_hash, 'Super Admin', '{}'))
+        tok1 = hashlib.sha256(('jeka7ro@gmail.com' + "CASHPOT_STATIC_SEC_2026").encode()).hexdigest()
+        c.execute('''INSERT INTO users (name, email, password_hash, role, permissions, token) 
+                     VALUES (?, ?, ?, ?, ?, ?)''', 
+                  ('Super Admin', 'jeka7ro@gmail.com', pwd_hash, 'Super Admin', '{}', tok1))
     
     # Check for Andrei Chiaperi
     c.execute("SELECT id FROM users WHERE email = 'andrei@chiaperi.ro'")
     if not c.fetchone():
         pwd_hash_andrei = hashlib.sha256('Andreigay'.encode()).hexdigest()
-        c.execute('''INSERT INTO users (name, email, password_hash, role, permissions) 
-                     VALUES (?, ?, ?, ?, ?)''', 
-                  ('Andrei Chiaperi', 'andrei@chiaperi.ro', pwd_hash_andrei, 'Super Admin', '{}'))
+        tok2 = hashlib.sha256(('andrei@chiaperi.ro' + "CASHPOT_STATIC_SEC_2026").encode()).hexdigest()
+        c.execute('''INSERT INTO users (name, email, password_hash, role, permissions, token) 
+                     VALUES (?, ?, ?, ?, ?, ?)''', 
+                  ('Andrei Chiaperi', 'andrei@chiaperi.ro', pwd_hash_andrei, 'Super Admin', '{}', tok2))
     
     conn.commit()
     conn.close()

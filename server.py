@@ -2344,7 +2344,7 @@ def login():
     c.execute("SELECT * FROM users WHERE email=? AND password_hash=?", (email, pwd_hash))
     user = c.fetchone()
     if user:
-        token = secrets.token_hex(32)
+        token = hashlib.sha256((email + "CASHPOT_STATIC_SEC_2026").encode()).hexdigest()
         c.execute("UPDATE users SET token=? WHERE id=?", (token, user['id']))
         conn.commit()
         u = dict_from_row(user)

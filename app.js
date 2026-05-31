@@ -1633,12 +1633,14 @@ async function loadTrend(s,e){
   };
 
   if(trendChart)trendChart.destroy();
+  const isMobile = window.innerWidth <= 600;
   trendChart=new Chart(document.getElementById('trend-chart').getContext('2d'),{
     plugins: [window.ChartDataLabels],
     data:{
       labels:finalData.map(r=>formatLabel(r.luna)),
       datasets:[
         {type:'bar',label:'Total IN',data:finalData.map(r=>r.total_in),
+          hidden: isMobile,
           backgroundColor:'rgba(99,102,241,.55)',
           hoverBackgroundColor:'rgba(99,102,241,.85)',
           borderColor:'rgba(99,102,241,.8)',
@@ -1655,6 +1657,7 @@ async function loadTrend(s,e){
             padding:{bottom:2}
           }},
         {type:'bar',label:'BET',data:finalData.map(r=>r.bet),
+          hidden: isMobile,
           backgroundColor:'rgba(245,158,11,.35)',
           hoverBackgroundColor:'rgba(245,158,11,.65)',
           borderWidth:0, borderRadius:3, borderSkipped:false,
@@ -1699,11 +1702,11 @@ async function loadTrend(s,e){
           ticks:{color:'#64748b', maxRotation: 0, autoSkip: true, maxTicksLimit: 12},
           grid:{color:'rgba(255,255,255,.04)'}
         },
-        y1:{position:'left',
+        y1:{position:'left', display: !isMobile,
           ticks:{color:'#6366f1',callback:v=>v>=1000000?(v/1000000).toFixed(1)+'M':(v/1000).toFixed(0)+'k'},
           grid:{color:'rgba(255,255,255,.04)'},
           title:{display:true,text:'Total IN (RON)',color:'#6366f1',font:{size:10}}},
-        y2:{position:'right',
+        y2:{position:'right', display: !isMobile,
           ticks:{color:'#10b981',callback:v=>(v/1000).toFixed(0)+'k'},
           grid:{display:false},
           title:{display:true,text:'GGR (RON)',color:'#10b981',font:{size:10}}},
@@ -2394,6 +2397,8 @@ window.addEventListener('hashchange', () => {
   } else {
     const sb = document.querySelector('.sidebar');
     if(sb) sb.classList.add('collapsed');
+    const overlay = document.getElementById('sidebar-overlay');
+    if(overlay) overlay.style.display = 'none';
   }
 
   const fullHash = window.location.hash;
@@ -5568,7 +5573,11 @@ window.doRegister = async function(e) {
 window.toggleSidebar = function() {
   const sidebar = document.querySelector('.sidebar');
   if (sidebar) {
-    sidebar.classList.toggle('collapsed');
+    const isCollapsed = sidebar.classList.toggle('collapsed');
+    const overlay = document.getElementById('sidebar-overlay');
+    if (overlay && window.innerWidth <= 600) {
+      overlay.style.display = isCollapsed ? 'none' : 'block';
+    }
   }
 };
 
