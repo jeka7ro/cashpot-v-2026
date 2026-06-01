@@ -1754,7 +1754,7 @@ async function loadLocations(s,e){
     return`<tr>
       <td style="text-align:center; color:var(--muted); font-size:11px">${i+1}</td>
       <td><span class="drill-link" onclick="drillTo('location',${r.id},'${(r.locatie||'').replace(/'/g,"\\'")}')">${r.locatie||'—'}</span></td>
-      <td class="mobile-show num" style="display:none; color:var(--purple)">${fmt(r.total_in)}${inB}</td>
+      <td class="mobile-show-cell num" style="display:none; color:var(--purple)">${fmt(r.total_in)}${inB}</td>
       <td class="num ${cc}">${fmt(r.ggr)}${ggrB}</td>
       <td class="num">${fmtE(r.ggr)}</td>
       <td style="text-align:center">${r.buc}</td><td style="text-align:center">${r.zile}</td><td class="num">${clientiVal}</td>
@@ -1800,12 +1800,13 @@ async function loadLocations(s,e){
   }
   document.getElementById('foot-locatii').innerHTML=`<tr style="font-weight:700">
     <td colspan="2">TOTAL / MEDIE</td>
+    <td class="mobile-show-cell num" style="display:none; color:var(--purple)">${fmt(tIn)}${totalInBadge}</td>
     <td class="num">${fmt(tGgr)}${totalGgrBadge}</td>
     <td class="num">${fmtE(tGgr)}</td>
     <td style="text-align:center">${totalBuc}</td>
     <td style="text-align:center">—</td>
     <td class="num">${footerClienti}</td>
-    <td class="num">${fmt(tIn)}${totalInBadge}</td>
+    <td class="mobile-hide num">${fmt(tIn)}${totalInBadge}</td>
     <td class="num">${fmt(tJp)}</td>
     <td class="num">${fmt(tHh)}</td>
     <td class="num">${fmt(tCb)}</td>
@@ -1871,7 +1872,7 @@ async function loadProviders(s,e){
       <td>${i+1}</td>
       <td><span class="drill-link" onclick="drillTo('provider',${r.id},'${(r.provider||'').replace(/'/g,"\\'")}')"><img src="${getProviderLogo(r.provider)}" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(r.provider||'P')}&background=random&color=fff&rounded=true'" class="prov-logo" alt="icon"> ${r.provider||'—'}</span></td>
       <td>${r.buc}</td><td>${r.zile}</td>
-      <td class="mobile-show num" style="display:none; color:var(--purple)">${fmt(r.total_in)}${inB}</td>
+      <td class="mobile-show-cell num" style="display:none; color:var(--purple)">${fmt(r.total_in)}${inB}</td>
       <td class="mobile-hide num">${fmt(r.total_in)}${inB}</td>
       <td class="num ${cc}">${fmt(r.ggr)}${ggrB}</td>
       <td class="num">${fmtE(r.ggr)}</td>
@@ -1931,7 +1932,7 @@ async function loadTypes(s,e){
     return`<tr>
       <td>${i+1}</td>
       <td><strong>${r.provider||'—'}</strong></td><td>${r.cabinet||'—'}</td><td><img src="/slot_icon.png" class="slot-icon" alt="icon"> ${r.tip_slot||'—'}</td><td>${r.buc}</td>
-      <td class="mobile-show num" style="display:none; color:var(--purple)">${fmt(r.total_in)}${inB}</td>
+      <td class="mobile-show-cell num" style="display:none; color:var(--purple)">${fmt(r.total_in)}${inB}</td>
       <td class="mobile-hide num">${fmt(r.total_in)}${inB}</td>
       <td class="num ${cc}">${fmt(r.ggr)}${ggrB}</td>
       <td class="num">${fmtE(r.ggr)}</td>
@@ -1960,7 +1961,7 @@ async function loadCabinets(s,e){
       <td>${i+1}</td>
       <td><strong>${r.provider||'Necunoscut'}</strong></td><td><span class="drill-link" onclick="drillTo('cabinet',0,'${(r.cabinet||'').replace(/'/g,"\\'")}')"><img src="/slot_icon.png" class="slot-icon" alt="icon"> ${r.cabinet||'—'}</span></td>
       <td>${r.buc}</td>
-      <td class="mobile-show num" style="display:none; color:var(--purple)">${fmt(r.total_in)}${inB}</td>
+      <td class="mobile-show-cell num" style="display:none; color:var(--purple)">${fmt(r.total_in)}${inB}</td>
       <td class="mobile-hide num">${fmt(r.total_in)}${inB}</td>
       <td class="num ${cc}">${fmt(r.ggr)}${ggrB}</td>
       <td class="num">${fmtE(r.ggr)}</td>
@@ -2006,7 +2007,7 @@ async function loadMachines(){
         <td><strong>${r.provider||'—'}</strong></td><td>${r.cabinet||'—'}</td>
         <td><span class="drill-link" onclick="goToMultigame('${(r.mix||'').replace(/'/g,"\\'")}')">${r.mix||'—'}</span></td>
         <td>${r.locatie||'—'}</td><td>${r.zile}</td>
-        <td class="mobile-show num" style="display:none; color:var(--purple)">${fmt(r.total_in)}${inB}</td>
+        <td class="mobile-show-cell num" style="display:none; color:var(--purple)">${fmt(r.total_in)}${inB}</td>
         <td class="mobile-hide num">${fmt(r.total_in)}${inB}</td><td class="num">${fmt(r.in_zi)}</td>
         <td class="num ${cc}">${fmt(r.ggr)}${ggrB}</td>
         <td class="num">${fmtE(r.ggr)}</td>

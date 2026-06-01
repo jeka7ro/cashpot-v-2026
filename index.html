@@ -505,7 +505,7 @@
         <table class="data-table">
           <thead><tr>
             <th>Nr.</th><th>Locație</th>
-            <th class="mobile-show num" style="display:none; color:var(--purple)">Total IN</th>
+            <th class="mobile-show-cell num" style="display:none; color:var(--purple)">Total IN</th>
             <th class="num">GGR</th><th class="num">GGR €</th><th>Buc</th><th>Zile</th><th class="num" style="width:50px; text-align:right">Clienți/zi</th>
             <th class="mobile-hide num">Total IN</th>
             <th class="num">Jackpot</th><th class="num">HH</th><th class="num">Cashback</th><th class="num">Roata</th><th class="num">Tombole</th>
@@ -523,7 +523,7 @@
         <table class="data-table">
           <thead><tr>
             <th>Nr.</th><th>Provider</th><th>Buc</th><th>Zile</th>
-            <th class="mobile-show num" style="display:none; color:var(--purple)">Total IN</th>
+            <th class="mobile-show-cell num" style="display:none; color:var(--purple)">Total IN</th>
             <th class="mobile-hide num">Total IN</th><th class="num">GGR</th><th class="num">GGR €</th>
             <th class="num">Jackpot</th><th class="num">Cashback</th><th class="num">Roata</th><th class="num">Tombole</th>
             <th class="num">Games</th><th class="num">Hold%</th><th class="num">Bonus Cost</th>
@@ -539,7 +539,7 @@
         <table class="data-table">
           <thead><tr>
             <th>Nr.</th><th>Provider</th><th>Cabinet</th><th>Tip Slot</th><th>Buc</th>
-            <th class="mobile-show num" style="display:none; color:var(--purple)">Total IN</th>
+            <th class="mobile-show-cell num" style="display:none; color:var(--purple)">Total IN</th>
             <th class="mobile-hide num">Total IN</th><th class="num">GGR</th><th class="num">GGR €</th>
             <th class="num">Games</th><th class="num">Hold%</th><th class="num">Bonus Cost</th>
           </tr></thead>
@@ -554,7 +554,7 @@
         <table class="data-table">
           <thead><tr>
             <th>Nr.</th><th>Provider</th><th>Cabinet</th><th>Buc</th>
-            <th class="mobile-show num" style="display:none; color:var(--purple)">Total IN</th>
+            <th class="mobile-show-cell num" style="display:none; color:var(--purple)">Total IN</th>
             <th class="mobile-hide num">Total IN</th><th class="num">GGR</th><th class="num">GGR €</th>
             <th class="num">Games</th><th class="num">Hold%</th><th class="num">Bonus Cost</th>
           </tr></thead>
@@ -577,7 +577,7 @@
           <thead><tr>
             <th>Nr.</th><th>Serial</th><th>Provider</th><th>Cabinet</th><th>Mix</th><th>Locație</th>
             <th>Zile</th>
-            <th class="mobile-show num" style="display:none; color:var(--purple)">Total IN</th>
+            <th class="mobile-show-cell num" style="display:none; color:var(--purple)">Total IN</th>
             <th class="mobile-hide num">Total IN</th><th class="num">IN/Zi</th>
             <th class="num">GGR</th><th class="num">GGR €</th>
             <th class="num">JP</th><th class="num">HH</th><th class="num">CB</th>
@@ -2313,7 +2313,7 @@
   </nav>
 
   <!-- Mobile Filter Modal -->
-  <div class="settings-modal" id="mobile-filter-modal" style="z-index: 9999;">
+  <div class="settings-modal" id="mobile-filter-modal" style="z-index: 9999;" onclick="if(event.target===this) this.classList.remove('show')">
     <div class="settings-panel glass-panel" style="width: 100%; margin: 0 16px; align-self: flex-end; margin-bottom: 80px; border-radius: 20px; padding: 20px;">
       <h3 style="margin-bottom: 16px; font-size: 16px; text-align: center;">Filtrare & Căutare</h3>
       <div style="display:flex; flex-direction:column; gap:16px;">
@@ -2338,7 +2338,7 @@
   </div>
 
   <!-- Mobile Period Modal -->
-  <div class="settings-modal" id="mobile-period-modal" style="z-index: 9999;">
+  <div class="settings-modal" id="mobile-period-modal" style="z-index: 9999;" onclick="if(event.target===this) this.classList.remove('show')">
     <div class="settings-panel glass-panel" style="width: 100%; margin: 0 16px; align-self: flex-end; margin-bottom: 80px; border-radius: 20px; padding: 20px;">
       <h3 style="margin-bottom: 16px; font-size: 16px; text-align: center;">Alege Perioada</h3>
       <div id="mobile-period-container">
