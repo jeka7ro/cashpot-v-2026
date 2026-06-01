@@ -504,8 +504,10 @@
       <div class="table-scroll">
         <table class="data-table">
           <thead><tr>
-            <th>Nr.</th><th>Locație</th><th class="num">GGR</th><th class="num">GGR €</th><th>Buc</th><th>Zile</th><th class="num" style="width:50px; text-align:right">Clienți/zi</th>
-            <th class="num">Total IN</th>
+            <th>Nr.</th><th>Locație</th>
+            <th class="mobile-show num" style="display:none; color:var(--purple)">Total IN</th>
+            <th class="num">GGR</th><th class="num">GGR €</th><th>Buc</th><th>Zile</th><th class="num" style="width:50px; text-align:right">Clienți/zi</th>
+            <th class="mobile-hide num">Total IN</th>
             <th class="num">Jackpot</th><th class="num">HH</th><th class="num">Cashback</th><th class="num">Roata</th><th class="num">Tombole</th>
             <th class="num">Games</th><th class="num">Hold%</th><th class="num">Bonus Cost</th>
           </tr></thead>
@@ -521,7 +523,8 @@
         <table class="data-table">
           <thead><tr>
             <th>Nr.</th><th>Provider</th><th>Buc</th><th>Zile</th>
-            <th class="num">Total IN</th><th class="num">GGR</th><th class="num">GGR €</th>
+            <th class="mobile-show num" style="display:none; color:var(--purple)">Total IN</th>
+            <th class="mobile-hide num">Total IN</th><th class="num">GGR</th><th class="num">GGR €</th>
             <th class="num">Jackpot</th><th class="num">Cashback</th><th class="num">Roata</th><th class="num">Tombole</th>
             <th class="num">Games</th><th class="num">Hold%</th><th class="num">Bonus Cost</th>
           </tr></thead>
@@ -536,7 +539,8 @@
         <table class="data-table">
           <thead><tr>
             <th>Nr.</th><th>Provider</th><th>Cabinet</th><th>Tip Slot</th><th>Buc</th>
-            <th class="num">Total IN</th><th class="num">GGR</th><th class="num">GGR €</th>
+            <th class="mobile-show num" style="display:none; color:var(--purple)">Total IN</th>
+            <th class="mobile-hide num">Total IN</th><th class="num">GGR</th><th class="num">GGR €</th>
             <th class="num">Games</th><th class="num">Hold%</th><th class="num">Bonus Cost</th>
           </tr></thead>
           <tbody id="body-tipuri"></tbody>
@@ -550,7 +554,8 @@
         <table class="data-table">
           <thead><tr>
             <th>Nr.</th><th>Provider</th><th>Cabinet</th><th>Buc</th>
-            <th class="num">Total IN</th><th class="num">GGR</th><th class="num">GGR €</th>
+            <th class="mobile-show num" style="display:none; color:var(--purple)">Total IN</th>
+            <th class="mobile-hide num">Total IN</th><th class="num">GGR</th><th class="num">GGR €</th>
             <th class="num">Games</th><th class="num">Hold%</th><th class="num">Bonus Cost</th>
           </tr></thead>
           <tbody id="body-cabinete"></tbody>
@@ -571,7 +576,9 @@
         <table class="data-table">
           <thead><tr>
             <th>Nr.</th><th>Serial</th><th>Provider</th><th>Cabinet</th><th>Mix</th><th>Locație</th>
-            <th>Zile</th><th class="num">Total IN</th><th class="num">IN/Zi</th>
+            <th>Zile</th>
+            <th class="mobile-show num" style="display:none; color:var(--purple)">Total IN</th>
+            <th class="mobile-hide num">Total IN</th><th class="num">IN/Zi</th>
             <th class="num">GGR</th><th class="num">GGR €</th>
             <th class="num">JP</th><th class="num">HH</th><th class="num">CB</th>
             <th class="num">Games</th><th class="num">Hold%</th><th class="num">Bonus Cost</th>
@@ -2289,6 +2296,10 @@
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
       <span>Meniu</span>
     </button>
+    <button class="bot-nav-btn" onclick="document.getElementById('mobile-filter-modal').classList.add('show')" title="Filtru">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
+      <span>Filtru</span>
+    </button>
     <button class="bot-nav-btn bot-nav-home" onclick="window.location.hash='#dashboard'; window.scrollTo(0,0); reloadCurrentView();" title="Acasă">
       <div class="home-fab">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
@@ -2300,6 +2311,31 @@
       <span>Dată</span>
     </button>
   </nav>
+
+  <!-- Mobile Filter Modal -->
+  <div class="settings-modal" id="mobile-filter-modal" style="z-index: 9999;">
+    <div class="settings-panel glass-panel" style="width: 100%; margin: 0 16px; align-self: flex-end; margin-bottom: 80px; border-radius: 20px; padding: 20px;">
+      <h3 style="margin-bottom: 16px; font-size: 16px; text-align: center;">Filtrare & Căutare</h3>
+      <div style="display:flex; flex-direction:column; gap:16px;">
+        <div>
+          <label style="font-size:12px; color:var(--muted); margin-bottom:8px; display:block;">Caută (serial, tip, cabinet...)</label>
+          <input type="text" id="mobile-dash-search" placeholder="Introdu textul..." oninput="const e=document.getElementById('dash-table-search'); if(e){e.value=this.value; filterDashTables();}" class="glass-input" style="width:100%; padding:12px; border-radius:12px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:14px; outline:none;">
+        </div>
+        <div>
+          <label style="font-size:12px; color:var(--muted); margin-bottom:8px; display:block;">Vizualizare</label>
+          <select class="glass-select" style="width:100%; padding:12px; border-radius:12px; font-size:14px; background:var(--surface); border:1px solid var(--border); color:var(--text);" onchange="const t = document.querySelector(`.tab[onclick*='${this.value}']`); if(t) t.click();">
+            <option value="locatii">Per Locație</option>
+            <option value="provideri">Per Provider</option>
+            <option value="tipuri">Per Tip Slot</option>
+            <option value="cabinete">Per Cabinet</option>
+            <option value="aparate">Aparate Individuale</option>
+            <option value="clienti">Clienți</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn-primary" onclick="document.getElementById('mobile-filter-modal').classList.remove('show')" style="width: 100%; margin-top: 24px;">Aplică / Închide</button>
+    </div>
+  </div>
 
   <!-- Mobile Period Modal -->
   <div class="settings-modal" id="mobile-period-modal" style="z-index: 9999;">

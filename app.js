@@ -471,6 +471,8 @@ document.querySelectorAll('.preset-btn').forEach(btn=>{
     if (ms) ms.value = btn.dataset.preset;
     autoSetTrend();
     reloadCurrentView();
+    const modal = document.getElementById('mobile-period-modal');
+    if (modal) modal.classList.remove('show');
   });
 });
 
@@ -547,6 +549,8 @@ window.updateMultiMonthSelection = function() {
   
   autoSetTrend();
   reloadCurrentView();
+  const modal = document.getElementById('mobile-period-modal');
+  if (modal) modal.classList.remove('show');
 };
 
 function populateMonthDropdown() {
@@ -1750,10 +1754,11 @@ async function loadLocations(s,e){
     return`<tr>
       <td style="text-align:center; color:var(--muted); font-size:11px">${i+1}</td>
       <td><span class="drill-link" onclick="drillTo('location',${r.id},'${(r.locatie||'').replace(/'/g,"\\'")}')">${r.locatie||'—'}</span></td>
+      <td class="mobile-show num" style="display:none; color:var(--purple)">${fmt(r.total_in)}${inB}</td>
       <td class="num ${cc}">${fmt(r.ggr)}${ggrB}</td>
       <td class="num">${fmtE(r.ggr)}</td>
       <td style="text-align:center">${r.buc}</td><td style="text-align:center">${r.zile}</td><td class="num">${clientiVal}</td>
-      <td class="num">${fmt(r.total_in)}${inB}</td>
+      <td class="mobile-hide num">${fmt(r.total_in)}${inB}</td>
       <td class="num">${fmt(r.jackpot)}</td><td class="num">${fmt(r.hh)}</td><td class="num">${fmt(r.cashback)}</td><td class="num">${fmt(r.roata||0)}</td><td class="num" style="color:var(--blue)">${fmt(r.raffles||0)}</td>
       <td class="num">${fmt(r.games)}</td><td class="num">${pill(r.hold_pct)}</td><td class="num">${bonusCost(r.bonus_cost_pct||0)}</td>
     </tr>`;
@@ -1866,7 +1871,8 @@ async function loadProviders(s,e){
       <td>${i+1}</td>
       <td><span class="drill-link" onclick="drillTo('provider',${r.id},'${(r.provider||'').replace(/'/g,"\\'")}')"><img src="${getProviderLogo(r.provider)}" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(r.provider||'P')}&background=random&color=fff&rounded=true'" class="prov-logo" alt="icon"> ${r.provider||'—'}</span></td>
       <td>${r.buc}</td><td>${r.zile}</td>
-      <td class="num">${fmt(r.total_in)}${inB}</td>
+      <td class="mobile-show num" style="display:none; color:var(--purple)">${fmt(r.total_in)}${inB}</td>
+      <td class="mobile-hide num">${fmt(r.total_in)}${inB}</td>
       <td class="num ${cc}">${fmt(r.ggr)}${ggrB}</td>
       <td class="num">${fmtE(r.ggr)}</td>
       <td class="num">${fmt(r.jackpot)}</td><td class="num">${fmt(r.cashback)}</td><td class="num">${fmt(r.roata||0)}</td><td class="num" style="color:var(--blue)">${fmt(r.raffles||0)}</td>
@@ -1925,7 +1931,8 @@ async function loadTypes(s,e){
     return`<tr>
       <td>${i+1}</td>
       <td><strong>${r.provider||'—'}</strong></td><td>${r.cabinet||'—'}</td><td><img src="/slot_icon.png" class="slot-icon" alt="icon"> ${r.tip_slot||'—'}</td><td>${r.buc}</td>
-      <td class="num">${fmt(r.total_in)}${inB}</td>
+      <td class="mobile-show num" style="display:none; color:var(--purple)">${fmt(r.total_in)}${inB}</td>
+      <td class="mobile-hide num">${fmt(r.total_in)}${inB}</td>
       <td class="num ${cc}">${fmt(r.ggr)}${ggrB}</td>
       <td class="num">${fmtE(r.ggr)}</td>
       <td class="num">${fmt(r.games)}</td><td class="num">${pill(r.hold_pct)}</td><td class="num">${bonusCost(r.bonus_cost_pct||0)}</td>
@@ -1953,7 +1960,8 @@ async function loadCabinets(s,e){
       <td>${i+1}</td>
       <td><strong>${r.provider||'Necunoscut'}</strong></td><td><span class="drill-link" onclick="drillTo('cabinet',0,'${(r.cabinet||'').replace(/'/g,"\\'")}')"><img src="/slot_icon.png" class="slot-icon" alt="icon"> ${r.cabinet||'—'}</span></td>
       <td>${r.buc}</td>
-      <td class="num">${fmt(r.total_in)}${inB}</td>
+      <td class="mobile-show num" style="display:none; color:var(--purple)">${fmt(r.total_in)}${inB}</td>
+      <td class="mobile-hide num">${fmt(r.total_in)}${inB}</td>
       <td class="num ${cc}">${fmt(r.ggr)}${ggrB}</td>
       <td class="num">${fmtE(r.ggr)}</td>
       <td class="num">${fmt(r.games)}</td><td class="num">${pill(r.hold_pct)}</td><td class="num">${bonusCost(r.bonus_cost_pct||0)}</td>
@@ -1998,7 +2006,8 @@ async function loadMachines(){
         <td><strong>${r.provider||'—'}</strong></td><td>${r.cabinet||'—'}</td>
         <td><span class="drill-link" onclick="goToMultigame('${(r.mix||'').replace(/'/g,"\\'")}')">${r.mix||'—'}</span></td>
         <td>${r.locatie||'—'}</td><td>${r.zile}</td>
-        <td class="num">${fmt(r.total_in)}${inB}</td><td class="num">${fmt(r.in_zi)}</td>
+        <td class="mobile-show num" style="display:none; color:var(--purple)">${fmt(r.total_in)}${inB}</td>
+        <td class="mobile-hide num">${fmt(r.total_in)}${inB}</td><td class="num">${fmt(r.in_zi)}</td>
         <td class="num ${cc}">${fmt(r.ggr)}${ggrB}</td>
         <td class="num">${fmtE(r.ggr)}</td>
         <td class="num">${fmt(r.jackpot)}</td><td class="num">${fmt(r.hh)}</td><td class="num">${fmt(r.cashback)}</td>
