@@ -705,10 +705,10 @@ function renderMonthCalendar(){
       if(row.locs && row.locs.length > 1) {
         htmlTip += `<div class="tt-divider"></div><div class="tt-loc-title" style="margin-bottom:4px">Detalii pe Sali</div>`;
         htmlTip += `<table style="width:100%;border-collapse:collapse;font-size:10px;table-layout:fixed">`;
-        htmlTip += `<tr style="color:#94a3b8;border-bottom:1px solid rgba(255,255,255,0.1)">`;
+        htmlTip += `<tr style="color:var(--text);border-bottom:1px solid var(--border);font-weight:700">`;
         htmlTip += `<th style="text-align:left;padding-bottom:4px;width:38%">Sala</th><th style="text-align:right;padding-bottom:4px;width:22%">IN</th><th style="text-align:right;padding-bottom:4px;width:22%">GGR</th><th style="text-align:right;padding-bottom:4px;width:18%">HH</th></tr>`;
         row.locs.forEach(l => {
-          htmlTip += `<tr><td style="padding:3px 0;color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${l.locatie}">${l.locatie}</td><td style="text-align:right;padding:3px 0;color:#94a3b8">${fmtK(l.in)}</td><td style="text-align:right;padding:3px 0" class="tt-val ${l.ggr>=0?'pos':'neg'}">${fmtK(l.ggr)}</td><td style="text-align:right;padding:3px 0" class="tt-val hl">${l.hh>0?fmtK(l.hh):'—'}</td></tr>`;
+          htmlTip += `<tr><td style="padding:3px 0;color:var(--text);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${l.locatie}">${l.locatie}</td><td style="text-align:right;padding:3px 0;color:var(--text)">${fmtK(l.in)}</td><td style="text-align:right;padding:3px 0" class="tt-val ${l.ggr>=0?'pos':'neg'}">${fmtK(l.ggr)}</td><td style="text-align:right;padding:3px 0" class="tt-val hl">${l.hh>0?fmtK(l.hh):'—'}</td></tr>`;
         });
         htmlTip += `</table>`;
       }
@@ -773,8 +773,8 @@ function renderHourCalendar(selectedDate) {
         `<div class="cal-day-metrics">IN: ${fmtK(row.tin)} <span style="color:${inColor}; font-size:9px;">${inArr}${Math.abs(inPct).toFixed(1)}%</span><br>BET:${fmtK(row.bet)} &bull; HH:${fmtK(row.hh)}</div>`;
       let htmlTip = `<div class="tt-header">${selectedDate} ${k}</div><div class="tt-row"><span class="tt-label">GGR</span><span class="tt-val ${ggr>=0?'pos':'neg'}">${fmt(ggr)}</span></div><div class="tt-row"><span class="tt-label">Total IN</span><span class="tt-val">${fmt(row.tin)}</span></div><div class="tt-row"><span class="tt-label">Total BET</span><span class="tt-val">${fmt(row.bet)}</span></div><div class="tt-row"><span class="tt-label">Happy Hour</span><span class="tt-val hl">${fmt(row.hh)}</span></div>`;
       if (row.locs && row.locs.length) {
-        htmlTip += `<div class="tt-divider"></div><table style="width:100%; border-collapse:collapse; font-size:10px; table-layout:fixed;"><tr style="color:#94a3b8; border-bottom:1px solid rgba(255,255,255,0.1);"><th style="text-align:left; padding-bottom:4px; width:40%;">Locație</th><th style="text-align:right; padding-bottom:4px; width:25%;">GGR</th><th style="text-align:right; padding-bottom:4px; width:15%;">IN</th><th style="text-align:right; padding-bottom:4px; width:20%;">HH</th></tr>`;
-        row.locs.forEach(l => { htmlTip += `<tr><td style="padding:4px 0; color:#cbd5e1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${l.locatie}">${l.locatie}</td><td style="text-align:right; padding:4px 0;" class="tt-val ${l.ggr>=0?'pos':'neg'}">${fmtK(l.ggr)}</td><td style="text-align:right; padding:4px 0;" class="tt-val">${fmtK(l.in)}</td><td style="text-align:right; padding:4px 0;" class="tt-val hl">${fmtK(l.hh)}</td></tr>`; });
+        htmlTip += `<div class="tt-divider"></div><table style="width:100%; border-collapse:collapse; font-size:10px; table-layout:fixed;"><tr style="color:var(--text); font-weight:700; border-bottom:1px solid var(--border);"><th style="text-align:left; padding-bottom:4px; width:40%;">Locație</th><th style="text-align:right; padding-bottom:4px; width:25%;">GGR</th><th style="text-align:right; padding-bottom:4px; width:15%;">IN</th><th style="text-align:right; padding-bottom:4px; width:20%;">HH</th></tr>`;
+        row.locs.forEach(l => { htmlTip += `<tr><td style="padding:4px 0; color:var(--text); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${l.locatie}">${l.locatie}</td><td style="text-align:right; padding:4px 0;" class="tt-val ${l.ggr>=0?'pos':'neg'}">${fmtK(l.ggr)}</td><td style="text-align:right; padding:4px 0; color:var(--text);">${fmtK(l.in)}</td><td style="text-align:right; padding:4px 0;" class="tt-val hl">${fmtK(l.hh)}</td></tr>`; });
         htmlTip += `</table>`;
       }
       const _showHourTooltip = () => {
@@ -2441,7 +2441,7 @@ window.addEventListener('hashchange', () => {
   
   const kpiSection = document.getElementById('kpi-section');
   if (kpiSection) {
-    if (mainHash === 'live' || (mainHash === 'rapoarte' && subHash === 'retentie')) {
+    if (mainHash === 'live' || (mainHash === 'rapoarte' && subHash === 'retentie') || mainHash === 'admin') {
       kpiSection.style.display = 'none';
     } else {
       kpiSection.style.display = 'grid';
@@ -2584,6 +2584,11 @@ window.addEventListener('hashchange', () => {
     loadAnalize();
   }
   if(mainHash === 'admin') {
+    if (!subHash) {
+      window.location.hash = '#admin/utilizatori';
+      return;
+    }
+    document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
     const adminView = document.getElementById('view-admin-' + subHash);
     if(adminView) adminView.classList.add('active');
     if(subHash === 'utilizatori') loadAdminUtilizatori();
