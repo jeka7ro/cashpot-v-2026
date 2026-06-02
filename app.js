@@ -183,6 +183,13 @@ window.reloadCurrentView = function() {
     loadKPI(s,e);
     window.loadMultigameReport ? loadMultigameReport() : loadMultigame();
   }
+  else if (hash.startsWith('#locatie/')) {
+    const parts = hash.split('?');
+    const locId = parts[0].replace('#locatie/', '');
+    const searchParams = new URLSearchParams(parts[1] || '');
+    const locName = searchParams.get('name') || 'Locație';
+    loadLocationDetails(locId, locName);
+  }
   else if (hash.startsWith('#admin/sloturi')) loadAdminSloturi();
   else if (hash.startsWith('#live')) { /* live se gestioneaza prin hashchange */ }
   else loadAll();
@@ -1004,9 +1011,8 @@ async function loadLocationDetails(locId, locName) {
     // 2. Trend Chart & Calendar
     renderLocDetailChart(dailyData);
     renderLocDetailCalendar(locId, e);
-
-    // 3. Machines Table
     renderLocDetailMachines(machData);
+    updateLocDetailPeriodLabel();
 
   } catch (err) {
     console.error('Error loading location details', err);
@@ -1020,6 +1026,23 @@ function closeLocDetail() {
     window.history.back();
   } else {
     window.location.hash = '#dashboard';
+  }
+}
+
+// Deschide modalul de perioadă din pagina de locație (mobil)
+window.openMobilePeriodFromLocDetail = function() {
+  const modal = document.getElementById('mobile-period-modal');
+  if (modal) modal.classList.add('show');
+};
+
+// Actualizeaza eticheta perioadei pe butonul din loc-detail
+function updateLocDetailPeriodLabel() {
+  const btn = document.getElementById('ld-period-label');
+  if (!btn) return;
+  const { s, e } = getPeriod();
+  if (s && e) {
+    const fmtD = d => d ? d.slice(5).replace('-', '.') : '';
+    btn.textContent = `${fmtD(s)} – ${fmtD(e)}`;
   }
 }
 

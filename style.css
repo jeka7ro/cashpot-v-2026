@@ -438,6 +438,11 @@ td.cell-neg-3 { background:rgba(239,68,68,.38) !important; }
   /* Padding redus */
   #view-loc-detail > div { padding: 12px !important; }
 
+  /* Butonul de perioadă: vizibil pe mobil în loc-detail */
+  #ld-period-btn {
+    display: inline-flex !important;
+  }
+
   /* KPI grid: 2 coloane pe mobil */
   #ld-kpi-row {
     grid-template-columns: repeat(2, 1fr) !important;
@@ -470,15 +475,36 @@ td.cell-neg-3 { background:rgba(239,68,68,.38) !important; }
     gap: 12px !important;
   }
 
-  /* Ascunde coloanele mai putin importante din tabelul de masini */
-  #view-loc-detail .data-table th:nth-child(3),
-  #view-loc-detail .data-table td:nth-child(3),
-  #view-loc-detail .data-table th:nth-child(4),
-  #view-loc-detail .data-table td:nth-child(4),
-  #view-loc-detail .data-table th:nth-child(9),
-  #view-loc-detail .data-table td:nth-child(9),
-  #view-loc-detail .data-table th:nth-child(10),
-  #view-loc-detail .data-table td:nth-child(10) {
+  /* ── Tabelul de Aparate: ascunde Provider, Tip Joc, Jackpot, Games, Bonus Cost ── */
+  /* Coloane: Nr(1) Cabinet(2) Provider(3) TipJoc(4) TotalIN(5) Bet(6) GGR(7) Hold%(8) Jackpot(9) Games(10) BonusCost(11) */
+  #ld-machines-body tr td:nth-child(3),
+  #ld-machines-body tr td:nth-child(4),
+  #ld-machines-body tr td:nth-child(9),
+  #ld-machines-body tr td:nth-child(10),
+  #ld-machines-body tr td:nth-child(11),
+  #ld-machines-foot tr td:nth-child(3),
+  #ld-machines-foot tr td:nth-child(4),
+  #ld-machines-foot tr td:nth-child(9),
+  #ld-machines-foot tr td:nth-child(10),
+  #ld-machines-foot tr td:nth-child(11) {
+    display: none !important;
+  }
+  /* Header-ul tabelului de aparate */
+  #view-loc-detail section table.data-table:has(#ld-machines-body) th:nth-child(3),
+  #view-loc-detail section table.data-table:has(#ld-machines-body) th:nth-child(4),
+  #view-loc-detail section table.data-table:has(#ld-machines-body) th:nth-child(9),
+  #view-loc-detail section table.data-table:has(#ld-machines-body) th:nth-child(10),
+  #view-loc-detail section table.data-table:has(#ld-machines-body) th:nth-child(11) {
+    display: none !important;
+  }
+
+  /* ── Top Performante / Top Slabe: ascunde Nr. Handpays (col 5) ── */
+  /* Coloane: Cabinet(1) Provider(2) Hold%(3) GGR(4) Nr.Handpays(5) */
+  #ld-top-machines-body tr td:nth-child(5),
+  #ld-bottom-machines-body tr td:nth-child(5) {
+    display: none !important;
+  }
+  #ld-performers-row table.data-table th:nth-child(5) {
     display: none !important;
   }
 
