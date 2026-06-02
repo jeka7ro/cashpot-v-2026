@@ -453,6 +453,11 @@ td.cell-neg-3 { background:rgba(239,68,68,.38) !important; }
   /* Ascunde cardul Games pe mobil */
   .ld-kpi-games { display: none !important; }
 
+  /* Ascunde graficul Evolutie Zilnica pe mobil */
+  #ld-daily-chart-wrap {
+    display: none !important;
+  }
+
   /* Calendare: stivuite vertical */
   #ld-cal-row {
     flex-direction: column !important;
@@ -501,10 +506,8 @@ td.cell-neg-3 { background:rgba(239,68,68,.38) !important; }
   /* ── Top Performante / Top Slabe: ascunde Nr. Handpays (col 5) ── */
   /* Coloane: Cabinet(1) Provider(2) Hold%(3) GGR(4) Nr.Handpays(5) */
   #ld-top-machines-body tr td:nth-child(5),
-  #ld-bottom-machines-body tr td:nth-child(5) {
-    display: none !important;
-  }
-  #ld-performers-row table.data-table th:nth-child(5) {
+  #ld-bottom-machines-body tr td:nth-child(5),
+  .ld-handpays-hide {
     display: none !important;
   }
 
