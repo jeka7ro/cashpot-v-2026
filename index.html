@@ -1449,21 +1449,19 @@
   <div id="view-loc-detail" class="view-panel" style="overflow-y:auto;">
     <div style="padding:24px;">
       <!-- Header -->
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;">
-        <div style="display:flex; align-items:center; gap:16px;">
-          <button class="settings-btn" onclick="closeLocDetail()" style="display:inline-flex; align-items:center; gap:6px; padding:6px 14px; border-radius:20px; font-size:12px; font-weight:600;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg> Înapoi
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <div style="display:flex; align-items:center; gap:12px; min-width:0;">
+          <button class="settings-btn" onclick="closeLocDetail()" style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:20px; font-size:12px; font-weight:600; flex-shrink:0;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            <span class="ld-back-label">Înapoi</span>
           </button>
-          <div>
-            <h1 id="ld-title" style="font-size:24px; font-weight:800; color:var(--text); margin:0;">Locație</h1>
-            <div style="font-size:12px; color:var(--muted); margin-top:2px;">Aparate: <strong id="ld-buc">0</strong> &bull; Status: <strong style="color:var(--green)">Activ</strong></div>
+          <div style="min-width:0; overflow:hidden;">
+            <div style="display:flex; align-items:baseline; gap:8px; flex-wrap:wrap;">
+              <h1 id="ld-title" style="font-size:20px; font-weight:800; color:var(--text); margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Locație</h1>
+              <span style="font-size:12px; color:var(--muted); white-space:nowrap;"><strong id="ld-buc" style="color:var(--text)">0</strong> aparate</span>
+            </div>
           </div>
         </div>
-        <!-- Buton Perioadă: vizibil doar pe mobil -->
-        <button class="settings-btn mobile-show" id="ld-period-btn" onclick="openMobilePeriodFromLocDetail()" style="display:none; align-items:center; gap:6px; padding:6px 14px; border-radius:20px; font-size:12px; font-weight:600;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-          <span id="ld-period-label">Perioadă</span>
-        </button>
       </div>
 
       <!-- KPI Grid -->

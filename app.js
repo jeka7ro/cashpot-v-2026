@@ -1246,10 +1246,10 @@ function renderLocDetailMachinesPaginated() {
 
     tbody.innerHTML += `<tr>
       <td class="ld-mob-hide" style="text-align:center; color:var(--muted); font-size:11px">${i+1}</td>
-      <td><strong>${r.cabinet||'—'}</strong></td>
+      <td><strong>${r.cabinet||'—'}</strong><div style="font-size:9px;color:var(--muted);line-height:1.4;margin-top:2px">${r.provider||''} · SN: ${r.serial_nr||'—'}</div></td>
       <td class="ld-mob-hide">${r.provider||'—'}</td>
       <td class="ld-mob-hide">${r.tip_slot||'—'}</td>
-      <td class="num">${fmt(r.total_in)}<div style="font-size:9px;color:var(--muted);font-weight:400">SN: ${r.serial_nr||'—'}</div></td>
+      <td class="num">${fmt(r.total_in)}</td>
       <td class="num">${fmt(r.bet)}</td>
       <td class="num ${cc}">${fmt(r.ggr)}</td>
       <td class="num">${pill(r.hold_pct)}</td>
