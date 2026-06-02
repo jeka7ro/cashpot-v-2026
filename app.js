@@ -1048,15 +1048,12 @@ function updateLocDetailPeriodLabel() {
 
 // Smart switch vizualizare din bara de jos mobil
 window.mobileSwitchView = function(tabKey) {
-  // Inchide modalul de filtre
   const modal = document.getElementById('mobile-filter-modal');
   if (modal) modal.classList.remove('show');
 
-  // Daca suntem pe o pagina de locatie, mergi intai la dashboard
   const hash = window.location.hash || '';
   if (hash.startsWith('#locatie/') || hash.startsWith('#admin') || hash.startsWith('#live')) {
     window.location.hash = '#dashboard';
-    // Asteapta ca pagina sa se incarce, apoi selecteaza tab-ul
     setTimeout(() => switchToTab(tabKey), 350);
   } else {
     switchToTab(tabKey);
@@ -1064,18 +1061,58 @@ window.mobileSwitchView = function(tabKey) {
 };
 
 function switchToTab(tabKey) {
-  // Incearca sa gaseasca tab-ul si sa il activeze
   const tab = document.querySelector(`.tab[onclick*="${tabKey}"]`);
   if (tab) {
     tab.click();
   } else {
-    // Fallback: apeleaza switchTab direct daca exista
     if (typeof window.switchTab === 'function') window.switchTab(tabKey);
   }
-  // Actualizeaza selectul sa reflecte alegerea curenta
   const sel = document.getElementById('mobile-view-select');
   if (sel) sel.value = tabKey;
 }
+
+// Salt rapid la alta locatie din bara de jos
+window.mobileSwitchLocation = function(locId) {
+  if (!locId) return;
+  const modal = document.getElementById('mobile-filter-modal');
+  if (modal) modal.classList.remove('show');
+  // Gaseste numele locatiei din select
+  const sel = document.getElementById('mobile-loc-switch');
+  const opt = sel ? sel.querySelector(`option[value="${locId}"]`) : null;
+  const locName = opt ? opt.textContent : 'Locație';
+  // Reseteaza selectul
+  if (sel) sel.value = '';
+  // Navigheaza la locatia selectata
+  window.location.hash = `#locatie/${locId}?name=${encodeURIComponent(locName)}`;
+};
+
+// Populeaza lista de locatii in selectul de switch rapid
+window.populateMobileLocSwitch = function() {
+  const sel = document.getElementById('mobile-loc-switch');
+  if (!sel) return;
+  const rows = (tableStates && tableStates.locatii && tableStates.locatii.rows) ? tableStates.locatii.rows : [];
+  const curHash = window.location.hash || '';
+  const curLocId = curHash.startsWith('#locatie/') ? curHash.split('?')[0].replace('#locatie/', '') : '';
+
+  sel.innerHTML = '<option value="">— Alege locația —</option>';
+  rows.forEach(r => {
+    const opt = document.createElement('option');
+    opt.value = r.loc_id || r.id || '';
+    opt.textContent = r.locatie || r.name || '—';
+    if (String(opt.value) === String(curLocId)) opt.selected = true;
+    if (opt.value) sel.appendChild(opt);
+  });
+};
+
+// Deschide filter modal si populeaza locatii
+document.addEventListener('DOMContentLoaded', () => {
+  const filterBtn = document.querySelector('.bot-nav-btn[onclick*="mobile-filter-modal"]');
+  if (filterBtn) {
+    filterBtn.addEventListener('click', () => {
+      setTimeout(window.populateMobileLocSwitch, 50);
+    });
+  }
+});
 
 function renderLocDetailChart(data) {
   const ctx = document.getElementById('ld-daily-chart').getContext('2d');

@@ -2331,12 +2331,19 @@
         <div>
           <label style="font-size:12px; color:var(--muted); margin-bottom:8px; display:block;">Vizualizare</label>
           <select id="mobile-view-select" class="glass-select" style="width:100%; padding:12px; border-radius:12px; font-size:14px; background:var(--surface); border:1px solid var(--border); color:var(--text);" onchange="mobileSwitchView(this.value)">
-            <option value="locatii">📍 Per Locație</option>
-            <option value="provideri">🏭 Per Provider</option>
-            <option value="tipuri">🎰 Per Tip Slot</option>
-            <option value="cabinete">🖥️ Per Cabinet</option>
-            <option value="aparate">🎮 Aparate Individuale</option>
-            <option value="clienti">👤 Clienți</option>
+            <option value="locatii">Per Locație</option>
+            <option value="provideri">Per Provider</option>
+            <option value="tipuri">Per Tip Slot</option>
+            <option value="cabinete">Per Cabinet</option>
+            <option value="aparate">Aparate Individuale</option>
+            <option value="clienti">Clienți</option>
+          </select>
+        </div>
+        <!-- Switch rapid locatie (apare doar pe pagina de locatie) -->
+        <div id="mobile-loc-switch-wrap">
+          <label style="font-size:12px; color:var(--muted); margin-bottom:8px; display:block;">Salt rapid la locație</label>
+          <select id="mobile-loc-switch" class="glass-select" style="width:100%; padding:12px; border-radius:12px; font-size:14px; background:var(--surface); border:1px solid var(--border); color:var(--text);" onchange="mobileSwitchLocation(this.value)">
+            <option value="">— Alege locația —</option>
           </select>
         </div>
       </div>
