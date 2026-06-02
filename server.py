@@ -39,8 +39,8 @@ def require_auth():
     token = request.headers.get('Authorization', '').replace('Bearer ', '')
     if not token: return None
     conn = cp2_db.get_db()
-    c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE token=?", (token,))
+    c = conn.cursor(cursor_factory=RealDictCursor)
+    c.execute("SELECT * FROM cp2_users WHERE token=%s", (token,))
     user = c.fetchone()
     conn.close()
     return user
@@ -77,6 +77,7 @@ def get_conn():
 
 
 import psycopg2
+from psycopg2.extras import RealDictCursor
 import unicodedata
 
 PG_DB_CFG = dict(
@@ -2340,12 +2341,12 @@ def login():
     pwd_hash = hashlib.sha256(pwd.encode()).hexdigest()
     
     conn = cp2_db.get_db()
-    c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE email=? AND password_hash=?", (email, pwd_hash))
+    c = conn.cursor(cursor_factory=RealDictCursor)
+    c.execute("SELECT * FROM cp2_users WHERE email=%s AND password_hash=%s", (email, pwd_hash))
     user = c.fetchone()
     if user:
         token = hashlib.sha256((email + "CASHPOT_STATIC_SEC_2026").encode()).hexdigest()
-        c.execute("UPDATE users SET token=? WHERE id=?", (token, user['id']))
+        c.execute("UPDATE cp2_users SET token=%s WHERE id=%s", (token, user['id']))
         conn.commit()
         u = dict_from_row(user)
         u['token'] = token
@@ -2368,8 +2369,8 @@ def logout():
     token = request.headers.get('Authorization', '').replace('Bearer ', '')
     if token:
         conn = cp2_db.get_db()
-        c = conn.cursor()
-        c.execute("UPDATE users SET token=NULL WHERE token=?", (token,))
+        c = conn.cursor(cursor_factory=RealDictCursor)
+        c.execute("UPDATE cp2_users SET token=NULL WHERE token=%s", (token,))
         conn.commit()
         conn.close()
     return jsonify({"success": True})
@@ -2382,15 +2383,15 @@ def update_my_theme():
     new_theme = data.get('theme')
     if new_theme not in ['light', 'dark']: return jsonify({'error': 'Invalid theme'}), 400
     conn = cp2_db.get_db()
-    c = conn.cursor()
-    c.execute('SELECT permissions FROM users WHERE id = ?', (user['id'],))
+    c = conn.cursor(cursor_factory=RealDictCursor)
+    c.execute('SELECT permissions FROM cp2_users WHERE id = %s', (user['id'],))
     row = c.fetchone()
     if row:
         import json
         try: perms = json.loads(row['permissions'] or '{}')
         except: perms = {}
         perms['theme'] = new_theme
-        c.execute('UPDATE users SET permissions = ? WHERE id = ?', (json.dumps(perms), user['id']))
+        c.execute('UPDATE cp2_users SET permissions = %s WHERE id = %s', (json.dumps(perms), user['id']))
         conn.commit()
     conn.close()
     return jsonify({'success': True})
@@ -2401,8 +2402,8 @@ def get_users():
     user = require_auth()
     if not user or user['role'] != 'Super Admin': return jsonify({"error": "Unauthorized"}), 401
     conn = cp2_db.get_db()
-    c = conn.cursor()
-    c.execute("SELECT id, name, email, role, phone, permissions FROM users")
+    c = conn.cursor(cursor_factory=RealDictCursor)
+    c.execute("SELECT id, name, email, role, phone, permissions FROM cp2_users")
     users = [dict_from_row(r) for r in c.fetchall()]
     conn.close()
     return jsonify(users)
@@ -2414,10 +2415,10 @@ def create_user():
     data = request.json
     pwd_hash = hashlib.sha256(data['password'].encode()).hexdigest()
     conn = cp2_db.get_db()
-    c = conn.cursor()
+    c = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        c.execute('''INSERT INTO users (name, email, password_hash, role, phone, permissions)
-                     VALUES (?, ?, ?, ?, ?, ?)''',
+        c.execute('''INSERT INTO cp2_users (name, email, password_hash, role, phone, permissions)
+                     VALUES (%s, %s, %s, %s, %s, %s)''',
                   (data.get('name'), data.get('email'), pwd_hash, data.get('role', 'Operational'),
                    data.get('phone', ''), json.dumps(data.get('permissions', {}))))
         conn.commit()
@@ -2447,14 +2448,14 @@ def user_uid_ops(uid):
         
         try:
             conn = cp2_db.get_db()
-            c = conn.cursor()
+            c = conn.cursor(cursor_factory=RealDictCursor)
             
             if new_password:
                 pwd_hash = hashlib.sha256(new_password.encode()).hexdigest()
-                c.execute("UPDATE users SET name=?, email=?, phone=?, permissions=?, role=?, password_hash=? WHERE id=?", 
+                c.execute("UPDATE cp2_users SET name=%s, email=%s, phone=%s, permissions=%s, role=%s, password_hash=%s WHERE id=%s", 
                           (name, email, phone, permissions, role, pwd_hash, uid))
             else:
-                c.execute("UPDATE users SET name=?, email=?, phone=?, permissions=?, role=? WHERE id=?", 
+                c.execute("UPDATE cp2_users SET name=%s, email=%s, phone=%s, permissions=%s, role=%s WHERE id=%s", 
                           (name, email, phone, permissions, role, uid))
                 
             conn.commit()
@@ -2469,8 +2470,8 @@ def user_uid_ops(uid):
         if user['role'] != 'Super Admin': return jsonify({"error": "Unauthorized"}), 401
         if user['id'] == uid: return jsonify({"error": "Cannot delete self"}), 400
         conn = cp2_db.get_db()
-        c = conn.cursor()
-        c.execute("DELETE FROM users WHERE id=?", (uid,))
+        c = conn.cursor(cursor_factory=RealDictCursor)
+        c.execute("DELETE FROM cp2_users WHERE id=%s", (uid,))
         conn.commit()
         conn.close()
         return jsonify({"success": True})
@@ -2517,15 +2518,15 @@ def slots_inventory():
                     hold_pcts[r['machine_id']] = round(r['ggr'] / r['tot_in'] * 100, 2)
                     
         # Get notes and files from local DB
-        c2 = cp_conn.cursor()
-        c2.execute("SELECT machine_id, note, created_at FROM slot_notes ORDER BY created_at DESC")
+        c2 = cp_conn.cursor(cursor_factory=RealDictCursor)
+        c2.execute("SELECT machine_id, note, created_at FROM cp2_slot_notes ORDER BY created_at DESC")
         notes_map = {}
         for row in c2.fetchall():
             mid = row['machine_id']
             if mid not in notes_map: notes_map[mid] = []
             notes_map[mid].append(dict_from_row(row))
             
-        c2.execute("SELECT machine_id, filename, filepath, created_at FROM slot_files ORDER BY created_at DESC")
+        c2.execute("SELECT machine_id, filename, filepath, created_at FROM cp2_slot_files ORDER BY created_at DESC")
         files_map = {}
         for row in c2.fetchall():
             mid = row['machine_id']
@@ -2555,8 +2556,8 @@ def add_slot_note(mid):
     note = data.get('note')
     if not note: return jsonify({"error": "Note empty"}), 400
     conn = cp2_db.get_db()
-    c = conn.cursor()
-    c.execute("INSERT INTO slot_notes (machine_id, note) VALUES (?, ?)", (mid, note))
+    c = conn.cursor(cursor_factory=RealDictCursor)
+    c.execute("INSERT INTO cp2_slot_notes (machine_id, note) VALUES (%s, %s)", (mid, note))
     conn.commit()
     conn.close()
     return jsonify({"success": True})
@@ -2573,8 +2574,8 @@ def upload_slot_file(mid):
     file.save(filepath)
     
     conn = cp2_db.get_db()
-    c = conn.cursor()
-    c.execute("INSERT INTO slot_files (machine_id, filename, filepath) VALUES (?, ?, ?)", 
+    c = conn.cursor(cursor_factory=RealDictCursor)
+    c.execute("INSERT INTO cp2_slot_files (machine_id, filename, filepath) VALUES (%s, %s, %s)", 
               (mid, filename, filepath))
     conn.commit()
     conn.close()
@@ -2599,13 +2600,13 @@ def create_invitation():
     
     code = secrets.token_urlsafe(16)
     conn = cp2_db.get_db()
-    c = conn.cursor()
+    c = conn.cursor(cursor_factory=RealDictCursor)
     # Ensure invitations table has permissions column
     try:
-        c.execute('ALTER TABLE invitations ADD COLUMN permissions TEXT')
+        c.execute('ALTER TABLE cp2_invitations ADD COLUMN permissions TEXT')
     except:
         pass
-    c.execute("INSERT INTO invitations (code, email, role, permissions) VALUES (?, ?, ?, ?)", (code, email, role, permissions))
+    c.execute("INSERT INTO cp2_invitations (code, email, role, permissions) VALUES (%s, %s, %s, %s)", (code, email, role, permissions))
     conn.commit()
     conn.close()
     return jsonify({"success": True, "code": code})
@@ -2615,8 +2616,8 @@ def list_invitations():
     user = require_auth()
     if not user or user['role'] != 'Super Admin': return jsonify({"error": "Unauthorized"}), 401
     conn = cp2_db.get_db()
-    c = conn.cursor()
-    c.execute("SELECT code, email, role, permissions, created_at FROM invitations")
+    c = conn.cursor(cursor_factory=RealDictCursor)
+    c.execute("SELECT code, email, role, permissions, created_at FROM cp2_invitations")
     rows = c.fetchall()
     conn.close()
     return jsonify([dict(r) for r in rows])
@@ -2629,15 +2630,15 @@ def check_invitation(code):
         if not user or user['role'] != 'Super Admin': return jsonify({"error": "Unauthorized"}), 401
         
     conn = cp2_db.get_db()
-    c = conn.cursor()
+    c = conn.cursor(cursor_factory=RealDictCursor)
     
     if request.method == 'DELETE':
-        c.execute("DELETE FROM invitations WHERE code = ?", (code,))
+        c.execute("DELETE FROM cp2_invitations WHERE code = %s", (code,))
         conn.commit()
         conn.close()
         return jsonify({"success": True})
         
-    c.execute("SELECT * FROM invitations WHERE code=? AND used=0", (code,))
+    c.execute("SELECT * FROM cp2_invitations WHERE code=%s AND used=FALSE", (code,))
     inv = c.fetchone()
     conn.close()
     if not inv: return jsonify({"error": "Cod invalid sau deja folosit"}), 400
@@ -2654,8 +2655,8 @@ def register_with_invite():
     if not all([code, name, password]): return jsonify({"error": "Missing fields"}), 400
     
     conn = cp2_db.get_db()
-    c = conn.cursor()
-    c.execute("SELECT * FROM invitations WHERE code=? AND used=0", (code,))
+    c = conn.cursor(cursor_factory=RealDictCursor)
+    c.execute("SELECT * FROM cp2_invitations WHERE code=%s AND used=FALSE", (code,))
     inv = c.fetchone()
     if not inv:
         conn.close()
@@ -2664,9 +2665,9 @@ def register_with_invite():
     pwd_hash = hashlib.sha256(password.encode()).hexdigest()
     try:
         perms = inv['permissions'] if 'permissions' in inv.keys() and inv['permissions'] else '{}'
-        c.execute("INSERT INTO users (name, email, phone, password_hash, role, permissions) VALUES (?, ?, ?, ?, ?, ?)",
+        c.execute("INSERT INTO users (name, email, phone, password_hash, role, permissions) VALUES (%s, %s, %s, %s, %s, %s)",
                   (name, inv['email'], phone, pwd_hash, inv['role'], perms))
-        c.execute("UPDATE invitations SET used=1 WHERE id=?", (inv['id'],))
+        c.execute("UPDATE cp2_invitations SET used=TRUE WHERE id=%s", (inv['id'],))
         conn.commit()
         success = True
     except sqlite3.IntegrityError:
