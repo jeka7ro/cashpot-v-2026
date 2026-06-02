@@ -1020,23 +1020,128 @@ def serve_favicon():
     return send_from_directory(BASE_DIR, 'favicon.ico')
 
 # ─── Raport pe Ore ────────────────────────────────────────────────────────────
+def sync_hourly_incomes():
+    try:
+        conn = get_pg_conn()
+        c = conn.cursor()
+        c.execute("SELECT MAX(dt) FROM cp2_hourly_incomes")
+        row = c.fetchone()
+        max_dt = row[0] if row and row[0] else None
+        
+        import datetime
+        now = datetime.datetime.now()
+        # Cutoff is today at 08:00
+        cutoff = now.replace(hour=8, minute=0, second=0, microsecond=0)
+        if now < cutoff:
+            cutoff = cutoff - datetime.timedelta(days=1)
+            
+        if max_dt is None:
+            # Start from 30 days ago to avoid pulling years of hourly data live
+            start_sync = cutoff - datetime.timedelta(days=30)
+        else:
+            start_sync = max_dt + datetime.timedelta(hours=1)
+            
+        if start_sync >= cutoff:
+            conn.close()
+            return
+            
+        mysql_sql = '''
+            SELECT 
+                mas.date as dt, mas.location_id, mas.machine_id, mas.machine_type_id,
+                mas.`in` as total_in, mas.`out` as total_out, mas.games, mas.bet, mas.win,
+                mas.jackpot, mas.hh, mas.cb_fortune_wheel, mas.cashback
+            FROM machine_audit_summary_per_hours mas
+            WHERE mas.date >= %s AND mas.date < %s
+        '''
+        mysql_data = qry(mysql_sql, [start_sync.strftime('%Y-%m-%d %H:%M:%S'), cutoff.strftime('%Y-%m-%d %H:%M:%S')])
+        
+        if mysql_data:
+            for row in mysql_data:
+                try:
+                    c.execute('''
+                        INSERT INTO cp2_hourly_incomes 
+                        (dt, location_id, machine_id, machine_type_id, total_in, total_out, games, bet, win, jackpot, hh, cb_fortune_wheel, cashback)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (dt, location_id, machine_id) DO NOTHING
+                    ''', (
+                        row['dt'], str(row['location_id']), str(row['machine_id']), str(row['machine_type_id']),
+                        row['total_in'] or 0, row['total_out'] or 0, row['games'] or 0, row['bet'] or 0, row['win'] or 0,
+                        row['jackpot'] or 0, row['hh'] or 0, row['cb_fortune_wheel'] or 0, row['cashback'] or 0
+                    ))
+                except:
+                    pass
+            conn.commit()
+        conn.close()
+    except Exception as e:
+        print("Error in sync_hourly_incomes:", e)
+
 @app.route('/api/reports/hourly')
 def reports_hourly():
+    sync_hourly_incomes()
+    
     start, end = period_params(request)
-    lf, lp = loc_filter(request)
+    lf_mysql, lp_mysql = loc_filter(request, alias='mas')
     
     prov_id = request.args.get('prov_id', '')
     if prov_id:
-        lf += " AND mas.machine_type_id = %s "
-        lp.append(prov_id)
+        lf_mysql += " AND mas.machine_type_id = %s "
+        lp_mysql.append(prov_id)
         
     end_dt = end + ' 23:59:59'
     
-    rows = qry("""
+    import datetime
+    now = datetime.datetime.now()
+    cutoff = now.replace(hour=8, minute=0, second=0, microsecond=0)
+    if now < cutoff:
+        cutoff = cutoff - datetime.timedelta(days=1)
+    
+    cutoff_str = cutoff.strftime('%Y-%m-%d %H:%M:%S')
+    
+    # PG Filter
+    lf_pg = ""
+    lp_pg = []
+    ids_raw = request.args.get('loc_ids', '')
+    if ids_raw:
+        try:
+            ids = [int(x) for x in ids_raw.split(',') if x.strip().isdigit()]
+            expanded = set()
+            from server import LOC_CHILDREN
+            for i in ids:
+                expanded.add(i)
+                expanded.update(LOC_CHILDREN.get(i, []))
+            if expanded:
+                ph = ','.join(['%s'] * len(expanded))
+                lf_pg = f" AND mas.location_id::int IN ({ph})"
+                lp_pg = list(expanded)
+        except:
+            pass
+            
+    if prov_id:
+        lf_pg += " AND mas.machine_type_id = %s "
+        lp_pg.append(str(prov_id))
+    
+    # Postgres query for historical data (up to cutoff)
+    pg_sql = f"""
+        SELECT
+            mas.dt as dt,
+            mas.location_id,
+            mas.machine_id as serial_nr,
+            mas.machine_type_id,
+            mas.total_in as "in", mas.total_out as "out", mas.total_in - mas.total_out as ggr,
+            mas.games, mas.bet, mas.win, mas.jackpot, mas.hh
+        FROM cp2_hourly_incomes mas
+        WHERE mas.dt >= %s AND mas.dt <= %s AND mas.dt < %s AND mas.total_in > 0
+    """ + lf_pg + """
+        ORDER BY mas.dt DESC, mas.total_in DESC
+    """
+    pg_rows = pg_qry(pg_sql, [start, end_dt, cutoff_str] + lp_pg)
+    
+    # MySQL query for today (after cutoff)
+    mysql_sql = f"""
         SELECT
             mas.date as dt,
             mas.location_id,
-            REPLACE(REPLACE(COALESCE(l.display_code, l.code), ' E.S', ''), 'E.S', '') as locatie,
+            mas.machine_id,
             m.slot_machine_id as serial_nr,
             COALESCE(NULLIF(mm.name,''), NULLIF(mt.manufacturer,''), 'Necunoscut') as provider,
             mas.`in`, mas.`out`, mas.`in`-mas.`out` as ggr,
@@ -1048,18 +1153,46 @@ def reports_hourly():
         LEFT JOIN machine_types mt ON mas.machine_type_id = mt.id
         LEFT JOIN machine_manufacturers mm ON mt.manufacturer_id = mm.id
         LEFT JOIN players p ON m.player_id = p.id
-        WHERE mas.date >= %s AND mas.date <= %s AND mas.`in` > 0
-    """ + lf + """
+        WHERE mas.date >= %s AND mas.date <= %s AND mas.date >= %s AND mas.`in` > 0
+    """ + lf_mysql + """
         ORDER BY mas.date DESC, mas.`in` DESC
-    """, [start, end_dt] + lp)
+    """
+    mysql_rows = qry(mysql_sql, [start, end_dt, cutoff_str] + lp_mysql)
     
-    # Apply canonical location names
-    for r in rows:
+    # Post-process PG rows (add name/provider/player)
+    # We can pre-fetch mappings from MySQL
+    machines_map = qry("SELECT m.id as machine_id, m.slot_machine_id, COALESCE(NULLIF(mm.name,''), NULLIF(mt.manufacturer,''), 'Necunoscut') as provider, CONCAT(p.first_name, ' ', p.last_name) as player_name FROM machines m LEFT JOIN machine_types mt ON m.machine_type_id = mt.id LEFT JOIN machine_manufacturers mm ON mt.manufacturer_id = mm.id LEFT JOIN players p ON m.player_id = p.id")
+    m_dict = {str(r['machine_id']): r for r in machines_map}
+    
+    combined = []
+    for r in mysql_rows:
         if r.get('dt'):
             r['dt'] = str(r['dt'])
-        r['locatie'] = LOC_NAMES.get(r.get('location_id'), r.get('locatie', '—'))
+        r['locatie'] = LOC_NAMES.get(r.get('location_id'), '—')
+        combined.append(r)
         
-    return jsonify(rows)
+    for r in pg_rows:
+        mid = str(r.get('serial_nr')) # It was stored as machine_id actually
+        m_info = m_dict.get(mid, {})
+        r['serial_nr'] = m_info.get('slot_machine_id', mid)
+        r['provider'] = m_info.get('provider', 'Necunoscut')
+        r['player_name'] = m_info.get('player_name', None)
+        
+        if r.get('dt'):
+            r['dt'] = str(r['dt'])
+        r['locatie'] = LOC_NAMES.get(r.get('location_id'), '—')
+        
+        # Format numbers
+        for k in ['in', 'out', 'ggr', 'games', 'bet', 'win', 'jackpot', 'hh']:
+            if r.get(k) is not None:
+                r[k] = float(r[k])
+        
+        combined.append(r)
+        
+    # Sort combined
+    combined.sort(key=lambda x: (x['dt'], x['in']), reverse=True)
+        
+    return jsonify(combined)
 
 @app.route('/api/reports/hourly_machine_games')
 def hourly_machine_games():
@@ -1107,14 +1240,58 @@ def day_smart():
     
     # Totals from machine_audit_summaries
     lf_mas, lp_mas = loc_filter(request, alias='mas')
-    mas_totals = qry(f"""
+    
+    # PG Filter
+    lf_pg = ""
+    lp_pg = []
+    ids_raw = request.args.get('loc_ids', '')
+    if ids_raw:
+        try:
+            ids = [int(x) for x in ids_raw.split(',') if x.strip().isdigit()]
+            expanded = set()
+            from server import LOC_CHILDREN
+            for i in ids:
+                expanded.add(i)
+                expanded.update(LOC_CHILDREN.get(i, []))
+            if expanded:
+                ph = ','.join(['%s'] * len(expanded))
+                lf_pg = f" AND mas.location_id::int IN ({ph})"
+                lp_pg = list(expanded)
+        except:
+            pass
+            
+    import datetime
+    now = datetime.datetime.now()
+    cutoff = now.replace(hour=8, minute=0, second=0, microsecond=0)
+    if now < cutoff:
+        cutoff = cutoff - datetime.timedelta(days=1)
+    
+    cutoff_str = cutoff.strftime('%Y-%m-%d %H:%M:%S')
+    end_dt_str = end + " 23:59:59"
+    
+    pg_totals = pg_qry(f"""
         SELECT 
             SUM(mas.jackpot) as jp, 
             SUM(mas.cb_fortune_wheel) as wh, 
             SUM(mas.cashback) as cb 
-        FROM machine_audit_summaries mas 
-        WHERE mas.date >= %s AND mas.date <= %s {lf_mas}
-    """, [start, end] + lp_mas)[0]
+        FROM cp2_hourly_incomes mas 
+        WHERE mas.dt >= %s AND mas.dt <= %s AND mas.dt < %s {lf_pg}
+    """, [start, end_dt_str, cutoff_str] + lp_pg)[0]
+    
+    mysql_totals = qry(f"""
+        SELECT 
+            SUM(mas.jackpot) as jp, 
+            SUM(mas.cb_fortune_wheel) as wh, 
+            SUM(mas.cashback) as cb 
+        FROM machine_audit_summary_per_hours mas 
+        WHERE mas.date >= %s AND mas.date <= %s AND mas.date >= %s {lf_mas}
+    """, [start, end_dt_str, cutoff_str] + lp_mas)[0]
+    
+    mas_totals = {
+        'jp': (pg_totals['jp'] or 0) + (mysql_totals['jp'] or 0),
+        'wh': (pg_totals['wh'] or 0) + (mysql_totals['wh'] or 0),
+        'cb': (pg_totals['cb'] or 0) + (mysql_totals['cb'] or 0),
+    }
     
     jp_val = mas_totals['jp'] or 0
     wh_val = mas_totals['wh'] or 0
