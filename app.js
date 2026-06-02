@@ -1247,15 +1247,15 @@ function renderLocDetailMachinesPaginated() {
     tbody.innerHTML += `<tr>
       <td style="text-align:center; color:var(--muted); font-size:11px">${i+1}</td>
       <td><strong>${r.cabinet||'—'}</strong><div style="font-size:10px;color:var(--muted)">SN: ${r.serial_nr||'—'}</div></td>
-      <td>${r.provider||'—'}</td>
-      <td>${r.tip_slot||'—'}</td>
+      <td class="ld-mob-hide">${r.provider||'—'}</td>
+      <td class="ld-mob-hide">${r.tip_slot||'—'}</td>
       <td class="num">${fmt(r.total_in)}</td>
       <td class="num">${fmt(r.bet)}</td>
       <td class="num ${cc}">${fmt(r.ggr)}</td>
       <td class="num">${pill(r.hold_pct)}</td>
-      <td class="num">${fmt(r.jackpot)}</td>
-      <td class="num">${fmt(r.games)}</td>
-      <td class="num">${bonusCost(bPct)}</td>
+      <td class="num ld-mob-hide">${fmt(r.jackpot)}</td>
+      <td class="num ld-mob-hide">${fmt(r.games)}</td>
+      <td class="num ld-mob-hide">${bonusCost(bPct)}</td>
     </tr>`;
   });
 
@@ -1263,16 +1263,17 @@ function renderLocDetailMachinesPaginated() {
   const avgBonus = tBet>0 ? (tMkt/tBet)*100 : 0;
 
   tfoot.innerHTML = `<tr style="font-weight:800; background:var(--surface2);">
-    <td colspan="4">TOTAL</td>
+    <td colspan="2">TOTAL</td>
+    <td class="ld-mob-hide"></td>
+    <td class="ld-mob-hide"></td>
     <td class="num">${fmt(tIn)}</td>
     <td class="num">${fmt(tBet)}</td>
     <td class="num">${fmt(tGgr)}</td>
     <td class="num">${pill(avgHold)}</td>
-    <td class="num">${fmt(tJp)}</td>
-    <td class="num">${fmt(tGames)}</td>
-    <td class="num">${bonusCost(avgBonus)}</td>
+    <td class="num ld-mob-hide">${fmt(tJp)}</td>
+    <td class="num ld-mob-hide">${fmt(tGames)}</td>
+    <td class="num ld-mob-hide">${bonusCost(avgBonus)}</td>
   </tr>`;
-
   const totalPages = Math.ceil(_locMachData.length / _locMachPerPage);
   document.getElementById('ld-machines-info').textContent = `Arată ${start + 1} - ${Math.min(end, _locMachData.length)} din ${_locMachData.length} rânduri`;
   

@@ -516,4 +516,10 @@ td.cell-neg-3 { background:rgba(239,68,68,.38) !important; }
 
   /* Search input: full width */
   #ld-mach-search { width: 100% !important; box-sizing: border-box !important; }
+
+  /* Scoate min-width din tabelul de aparate pe mobil */
+  #view-loc-detail section table.data-table {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
 }
