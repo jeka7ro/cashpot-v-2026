@@ -46,7 +46,9 @@ def require_auth():
     return user
 
 def dict_from_row(row):
-    return dict(zip(row.keys(), row))
+    if row is None:
+        return None
+    return dict(row)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 app = Flask(__name__)
