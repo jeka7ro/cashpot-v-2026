@@ -435,12 +435,15 @@ td.cell-neg-3 { background:rgba(239,68,68,.38) !important; }
 
 /* ─── Location Detail: Mobile Optimizations ─────────────────────────────── */
 @media(max-width: 600px) {
-  /* Padding redus */
-  #view-loc-detail > div { padding: 12px !important; }
+  /* Padding redus + spatiu pentru bara de jos */
+  #view-loc-detail > div {
+    padding: 12px !important;
+    padding-bottom: 100px !important; /* spatiu pentru bara de jos ~80px + marja */
+  }
 
-  /* Butonul de perioadă: vizibil pe mobil în loc-detail */
+  /* Butonul de perioadă: ASCUNS pe mobil (e deja in bara de jos) */
   #ld-period-btn {
-    display: inline-flex !important;
+    display: none !important;
   }
 
   /* KPI grid: 2 coloane pe mobil */
@@ -521,5 +524,15 @@ td.cell-neg-3 { background:rgba(239,68,68,.38) !important; }
   #view-loc-detail section table.data-table {
     min-width: 0 !important;
     width: 100% !important;
+  }
+
+  /* Butonul de analiza din calendar: mai jos si mai mare pe mobil */
+  #view-loc-detail .cal-analyze-btn {
+    top: auto !important;
+    bottom: 4px !important;
+    right: 4px !important;
+    width: 24px !important;
+    height: 24px !important;
+    opacity: 0.8 !important;
   }
 }
