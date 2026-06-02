@@ -2975,22 +2975,138 @@ def bulk_edit_expenses():
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+def sync_historical_incomes():
+    try:
+        # Get max date from Postgres
+        pg_rows = pg_qry("SELECT MAX(date) as max_d FROM cp2_daily_incomes")
+        max_d = pg_rows[0]['max_d'] if pg_rows and pg_rows[0]['max_d'] else None
+        
+        import datetime
+        today = datetime.date.today()
+        yesterday = today - datetime.timedelta(days=1)
+        
+        if max_d is None:
+            # First run, get last 12 months
+            start_sync = today - datetime.timedelta(days=365)
+        else:
+            start_sync = max_d + datetime.timedelta(days=1)
+            
+        if start_sync > yesterday:
+            return
+            
+        # Query MySQL for these dates
+        mysql_sql = '''
+            SELECT 
+                mas.date,
+                mas.location_id,
+                SUM(mas.`in`) as total_in,
+                SUM(mas.`out`) as total_out,
+                SUM(mas.`in` - mas.`out`) as total_ggr
+            FROM machine_audit_summaries mas
+            WHERE mas.date >= %s AND mas.date <= %s
+            GROUP BY mas.date, mas.location_id
+        '''
+        mysql_data = qry(mysql_sql, [start_sync.strftime('%Y-%m-%d'), yesterday.strftime('%Y-%m-%d')])
+        
+        if not mysql_data:
+            return
+            
+        conn = get_pg_conn()
+        c = conn.cursor()
+        
+        for row in mysql_data:
+            c.execute('''
+                INSERT INTO cp2_daily_incomes (date, location_id, total_in, total_out, total_ggr)
+                VALUES (%s, %s, %s, %s, %s)
+                ON CONFLICT (date, location_id) DO NOTHING
+            ''', (row['date'], str(row['location_id']), row['total_in'], row['total_out'], row['total_ggr']))
+            
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print("Error in sync_historical_incomes:", e)
+
+
 @app.route('/api/reports/pl_heatmap')
 def api_pl_heatmap():
-    lf, lp = loc_filter(request, alias='mas')
+    sync_historical_incomes()
     
+    lf_mysql, lp_mysql = loc_filter(request, alias='mas')
+    
+    # Build a specific pg filter because cp2_daily_incomes uses varchar for location_id
+    lf_pg = ""
+    lp_pg = []
+    ids_raw = request.args.get('loc_ids', '')
+    if ids_raw:
+        try:
+            ids = [int(x) for x in ids_raw.split(',') if x.strip().isdigit()]
+            expanded = set()
+            from server import LOC_CHILDREN
+            for i in ids:
+                expanded.add(i)
+                expanded.update(LOC_CHILDREN.get(i, []))
+            if expanded:
+                ph = ','.join(['%s'] * len(expanded))
+                lf_pg = f" AND cp.location_id::int IN ({ph})"
+                lp_pg = list(expanded)
+        except:
+            pass
+
+    mysql_locs = qry("SELECT id, COALESCE(display_code, code) as name FROM locations")
+    mysql_name_map = {str(l['id']): l['name'] for l in mysql_locs}
+
+    # 1. Postgres historical query (up to yesterday)
+    pg_sql = f"""
+        SELECT 
+            TO_CHAR(cp.date, 'YYYY-MM') AS month,
+            cp.location_id,
+            SUM(cp.total_ggr) as ngr
+        FROM cp2_daily_incomes cp
+        WHERE cp.date >= CURRENT_DATE - INTERVAL '12 months'
+          AND cp.date < CURRENT_DATE
+        {lf_pg}
+        GROUP BY month, cp.location_id
+    """
+    pg_rev_rows = pg_qry(pg_sql, lp_pg)
+    
+    # 2. MySQL today query
     mysql_sql = f"""
         SELECT 
             DATE_FORMAT(mas.date, '%%Y-%%m') AS month,
-            COALESCE(l.display_code, l.code) AS location_name,
+            mas.location_id,
             SUM(mas.`in`-mas.`out`) as ngr
         FROM machine_audit_summaries mas
-        JOIN locations l ON mas.location_id = l.id
-        WHERE mas.date >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
-        {lf}
-        GROUP BY month, location_name
+        WHERE mas.date = CURDATE()
+        {lf_mysql}
+        GROUP BY month, mas.location_id
     """
-    rev_rows = qry(mysql_sql, lp)
+    mysql_rev_rows = qry(mysql_sql, lp_mysql)
+    
+    # Combine results
+    combined_rev = {}
+    
+    for r in pg_rev_rows:
+        key = (r['month'], str(r['location_id']))
+        if key not in combined_rev:
+            combined_rev[key] = {'month': r['month'], 'location_id': str(r['location_id']), 'ngr': 0}
+        combined_rev[key]['ngr'] += float(r['ngr'])
+        
+    for r in mysql_rev_rows:
+        key = (r['month'], str(r['location_id']))
+        if key not in combined_rev:
+            combined_rev[key] = {'month': r['month'], 'location_id': str(r['location_id']), 'ngr': 0}
+        combined_rev[key]['ngr'] += float(r['ngr'] or 0)
+        
+    # Format for output
+    rev_rows = []
+    for k, v in combined_rev.items():
+        rev_rows.append({
+            'month': v['month'],
+            'location_name': mysql_name_map.get(v['location_id'], 'Unknown'),
+            'ngr': v['ngr']
+        })
+
     
     cfg = get_exp_config()
     excl_types = cfg.get('excluded_types', [])
