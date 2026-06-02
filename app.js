@@ -1046,6 +1046,37 @@ function updateLocDetailPeriodLabel() {
   }
 }
 
+// Smart switch vizualizare din bara de jos mobil
+window.mobileSwitchView = function(tabKey) {
+  // Inchide modalul de filtre
+  const modal = document.getElementById('mobile-filter-modal');
+  if (modal) modal.classList.remove('show');
+
+  // Daca suntem pe o pagina de locatie, mergi intai la dashboard
+  const hash = window.location.hash || '';
+  if (hash.startsWith('#locatie/') || hash.startsWith('#admin') || hash.startsWith('#live')) {
+    window.location.hash = '#dashboard';
+    // Asteapta ca pagina sa se incarce, apoi selecteaza tab-ul
+    setTimeout(() => switchToTab(tabKey), 350);
+  } else {
+    switchToTab(tabKey);
+  }
+};
+
+function switchToTab(tabKey) {
+  // Incearca sa gaseasca tab-ul si sa il activeze
+  const tab = document.querySelector(`.tab[onclick*="${tabKey}"]`);
+  if (tab) {
+    tab.click();
+  } else {
+    // Fallback: apeleaza switchTab direct daca exista
+    if (typeof window.switchTab === 'function') window.switchTab(tabKey);
+  }
+  // Actualizeaza selectul sa reflecte alegerea curenta
+  const sel = document.getElementById('mobile-view-select');
+  if (sel) sel.value = tabKey;
+}
+
 function renderLocDetailChart(data) {
   const ctx = document.getElementById('ld-daily-chart').getContext('2d');
   if (_locDetailChart) _locDetailChart.destroy();

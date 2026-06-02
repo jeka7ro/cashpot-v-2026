@@ -2330,13 +2330,13 @@
         </div>
         <div>
           <label style="font-size:12px; color:var(--muted); margin-bottom:8px; display:block;">Vizualizare</label>
-          <select class="glass-select" style="width:100%; padding:12px; border-radius:12px; font-size:14px; background:var(--surface); border:1px solid var(--border); color:var(--text);" onchange="const t = document.querySelector(`.tab[onclick*='${this.value}']`); if(t) t.click();">
-            <option value="locatii">Per Locație</option>
-            <option value="provideri">Per Provider</option>
-            <option value="tipuri">Per Tip Slot</option>
-            <option value="cabinete">Per Cabinet</option>
-            <option value="aparate">Aparate Individuale</option>
-            <option value="clienti">Clienți</option>
+          <select id="mobile-view-select" class="glass-select" style="width:100%; padding:12px; border-radius:12px; font-size:14px; background:var(--surface); border:1px solid var(--border); color:var(--text);" onchange="mobileSwitchView(this.value)">
+            <option value="locatii">📍 Per Locație</option>
+            <option value="provideri">🏭 Per Provider</option>
+            <option value="tipuri">🎰 Per Tip Slot</option>
+            <option value="cabinete">🖥️ Per Cabinet</option>
+            <option value="aparate">🎮 Aparate Individuale</option>
+            <option value="clienti">👤 Clienți</option>
           </select>
         </div>
       </div>
