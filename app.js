@@ -1178,7 +1178,9 @@ function renderLocDetailMachines(data) {
   _locMachFiltered = [..._locMachData];
   
   // Populate Top/Bottom
-  const storedLimit = localStorage.getItem('locDetailTopLimit') || '10';
+  const isMobile = window.innerWidth <= 600;
+  const defaultLimit = isMobile ? '5' : '10';
+  const storedLimit = localStorage.getItem('locDetailTopLimit') || defaultLimit;
   const selectEl = document.getElementById('ld-top-limit');
   if (selectEl) selectEl.value = storedLimit;
   const topLimit = parseInt(storedLimit);
