@@ -482,6 +482,9 @@ td.cell-neg-3 { background:rgba(239,68,68,.38) !important; }
 
   /* ── Tabelul de Aparate: ascunde Provider, Tip Joc, Jackpot, Games, Bonus Cost ── */
   /* Coloane: Nr(1) Cabinet(2) Provider(3) TipJoc(4) TotalIN(5) Bet(6) GGR(7) Hold%(8) Jackpot(9) Games(10) BonusCost(11) */
+  .ld-mob-hide {
+    display: none !important;
+  }
   #ld-machines-body tr td:nth-child(3),
   #ld-machines-body tr td:nth-child(4),
   #ld-machines-body tr td:nth-child(9),
