@@ -1071,46 +1071,44 @@ function switchToTab(tabKey) {
   if (sel) sel.value = tabKey;
 }
 
-// Salt rapid la alta locatie din bara de jos
-window.mobileSwitchLocation = function(locId) {
-  if (!locId) return;
-  const modal = document.getElementById('mobile-filter-modal');
-  if (modal) modal.classList.remove('show');
-  // Gaseste numele locatiei din select
-  const sel = document.getElementById('mobile-loc-switch');
-  const opt = sel ? sel.querySelector(`option[value="${locId}"]`) : null;
-  const locName = opt ? opt.textContent : 'Locație';
-  // Reseteaza selectul
-  if (sel) sel.value = '';
-  // Navigheaza la locatia selectata
-  window.location.hash = `#locatie/${locId}?name=${encodeURIComponent(locName)}`;
-};
-
-// Populeaza lista de locatii in selectul de switch rapid
+// Populeaza butoanele de locatii in filter modal
 window.populateMobileLocSwitch = function() {
-  const sel = document.getElementById('mobile-loc-switch');
-  if (!sel) return;
+  const container = document.getElementById('mobile-loc-buttons');
+  if (!container) return;
   const rows = (tableStates && tableStates.locatii && tableStates.locatii.rows) ? tableStates.locatii.rows : [];
+  if (!rows.length) {
+    container.innerHTML = '<div style="font-size:12px;color:var(--muted);text-align:center;padding:8px;">Nicio locație disponibilă</div>';
+    return;
+  }
   const curHash = window.location.hash || '';
   const curLocId = curHash.startsWith('#locatie/') ? curHash.split('?')[0].replace('#locatie/', '') : '';
 
-  sel.innerHTML = '<option value="">— Alege locația —</option>';
+  container.innerHTML = '';
   rows.forEach(r => {
-    const opt = document.createElement('option');
-    opt.value = r.loc_id || r.id || '';
-    opt.textContent = r.locatie || r.name || '—';
-    if (String(opt.value) === String(curLocId)) opt.selected = true;
-    if (opt.value) sel.appendChild(opt);
+    const locId = String(r.loc_id || r.id || '');
+    const locName = r.locatie || r.name || '—';
+    if (!locId) return;
+    const isCurrent = locId === String(curLocId);
+    const btn = document.createElement('button');
+    btn.style.cssText = `width:100%; padding:10px 14px; border-radius:10px; border:1px solid ${isCurrent ? 'var(--accent)' : 'var(--border)'}; background:${isCurrent ? 'var(--accent)' : 'var(--surface2)'}; color:${isCurrent ? '#fff' : 'var(--text)'}; font-size:13px; font-weight:${isCurrent ? '700' : '500'}; text-align:left; cursor:pointer;`;
+    btn.textContent = locName;
+    btn.onclick = () => window.mobileSwitchLocation(locId, locName);
+    container.appendChild(btn);
   });
 };
 
-// Deschide filter modal si populeaza locatii
+// Salt rapid la alta locatie
+window.mobileSwitchLocation = function(locId, locName) {
+  if (!locId) return;
+  document.getElementById('mobile-filter-modal')?.classList.remove('show');
+  window.location.hash = `#locatie/${locId}?name=${encodeURIComponent(locName || locId)}`;
+};
+
+// Populeaza la deschiderea filter modal
 document.addEventListener('DOMContentLoaded', () => {
   const filterBtn = document.querySelector('.bot-nav-btn[onclick*="mobile-filter-modal"]');
   if (filterBtn) {
-    filterBtn.addEventListener('click', () => {
-      setTimeout(window.populateMobileLocSwitch, 50);
-    });
+    filterBtn.addEventListener('click', () => setTimeout(window.populateMobileLocSwitch, 50));
   }
 });
 

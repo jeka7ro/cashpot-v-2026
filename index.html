@@ -2339,12 +2339,12 @@
             <option value="clienti">Clienți</option>
           </select>
         </div>
-        <!-- Switch rapid locatie (apare doar pe pagina de locatie) -->
+        <!-- Switch rapid locatie - butoane -->
         <div id="mobile-loc-switch-wrap">
-          <label style="font-size:12px; color:var(--muted); margin-bottom:8px; display:block;">Salt rapid la locație</label>
-          <select id="mobile-loc-switch" class="glass-select" style="width:100%; padding:12px; border-radius:12px; font-size:14px; background:var(--surface); border:1px solid var(--border); color:var(--text);" onchange="mobileSwitchLocation(this.value)">
-            <option value="">— Alege locația —</option>
-          </select>
+          <label style="font-size:12px; color:var(--muted); margin-bottom:10px; display:block;">Salt rapid la locație</label>
+          <div id="mobile-loc-buttons" style="display:flex; flex-direction:column; gap:8px;">
+            <!-- Populat de JS -->
+          </div>
         </div>
       </div>
       <button class="btn-primary" onclick="document.getElementById('mobile-filter-modal').classList.remove('show')" style="width: 100%; margin-top: 24px;">Aplică / Închide</button>
