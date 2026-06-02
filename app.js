@@ -1075,8 +1075,30 @@ function switchToTab(tabKey) {
 window.populateMobileLocSwitch = function() {
   const container = document.getElementById('mobile-loc-buttons');
   if (!container) return;
-  const rows = (tableStates && tableStates.locatii && tableStates.locatii.rows) ? tableStates.locatii.rows : [];
-  if (!rows.length) {
+
+  const rows = (tableStates && tableStates.locatii && tableStates.locatii.rows && tableStates.locatii.rows.length)
+    ? tableStates.locatii.rows : null;
+
+  if (rows) {
+    _renderLocButtons(container, rows);
+  } else {
+    // Daca nu avem date inca, ia din API
+    container.innerHTML = '<div style="font-size:12px;color:var(--muted);text-align:center;padding:8px;">Se încarcă...</div>';
+    const { s, e } = getPeriod();
+    fetch(`${API}/locatii?start=${s}&end=${e}`)
+      .then(r => r.json())
+      .then(data => {
+        if (tableStates && tableStates.locatii) tableStates.locatii.rows = data;
+        _renderLocButtons(container, data);
+      })
+      .catch(() => {
+        container.innerHTML = '<div style="font-size:12px;color:var(--red);text-align:center;padding:8px;">Eroare la încărcare</div>';
+      });
+  }
+};
+
+function _renderLocButtons(container, rows) {
+  if (!rows || !rows.length) {
     container.innerHTML = '<div style="font-size:12px;color:var(--muted);text-align:center;padding:8px;">Nicio locație disponibilă</div>';
     return;
   }
@@ -1095,7 +1117,7 @@ window.populateMobileLocSwitch = function() {
     btn.onclick = () => window.mobileSwitchLocation(locId, locName);
     container.appendChild(btn);
   });
-};
+}
 
 // Salt rapid la alta locatie
 window.mobileSwitchLocation = function(locId, locName) {

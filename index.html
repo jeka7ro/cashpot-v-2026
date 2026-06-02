@@ -2299,7 +2299,7 @@
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
       <span>Meniu</span>
     </button>
-    <button class="bot-nav-btn" onclick="document.getElementById('mobile-filter-modal').classList.add('show')" title="Filtru">
+    <button class="bot-nav-btn" onclick="document.getElementById('mobile-filter-modal').classList.add('show'); setTimeout(window.populateMobileLocSwitch, 80);" title="Filtru">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
       <span>Filtru</span>
     </button>
