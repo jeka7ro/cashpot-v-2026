@@ -994,7 +994,7 @@ async function loadLocationDetails(locId, locName) {
           <div class="kpi-sub">AVG/zi: <strong>${fmt(mkt / Math.max(1, d.nr_zile||1))} RON</strong></div>
         </div>
       </div>
-      <div class="kpi-card" style="padding:16px;">
+      <div class="kpi-card ld-kpi-games" style="padding:16px;">
         <div class="kpi-label">Games</div>
         <div class="kpi-value" style="font-size:20px;">${fmt(d.games)}</div>
         <div class="kpi-sub">Bet Mediu: <strong>${(bet / Math.max(1, d.games||1)).toFixed(4)} RON</strong></div>
