@@ -2441,12 +2441,22 @@ def user_uid_ops(uid):
         name = data.get('name')
         email = data.get('email')
         phone = data.get('phone')
+        role = data.get('role')
         permissions = data.get('permissions')
+        new_password = data.get('new_password')
         
         try:
             conn = cp2_db.get_db()
             c = conn.cursor()
-            c.execute("UPDATE users SET name=?, email=?, phone=?, permissions=? WHERE id=?", (name, email, phone, permissions, uid))
+            
+            if new_password:
+                pwd_hash = hashlib.sha256(new_password.encode()).hexdigest()
+                c.execute("UPDATE users SET name=?, email=?, phone=?, permissions=?, role=?, password_hash=? WHERE id=?", 
+                          (name, email, phone, permissions, role, pwd_hash, uid))
+            else:
+                c.execute("UPDATE users SET name=?, email=?, phone=?, permissions=?, role=? WHERE id=?", 
+                          (name, email, phone, permissions, role, uid))
+                
             conn.commit()
             conn.close()
             return jsonify({"success": True})

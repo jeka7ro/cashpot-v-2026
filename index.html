@@ -1897,6 +1897,7 @@
       <select id="nu-role" class="glass-select" style="width:100%; margin-bottom:20px; padding:10px;">
         <option value="Operational">Operational</option>
         <option value="Marketing">Marketing</option>
+        <option value="Financiar">Financiar</option>
         <option value="Manager">Manager</option>
         <option value="Super Admin">Super Admin</option>
       </select>
@@ -1969,8 +1970,27 @@
         <input type="file" id="eu-avatar-file" accept="image/*" style="display:none;" onchange="handleAvatarUpload(this)">
       </div>
       
-      <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:4px;">Telefon</label>
-      <input type="text" id="eu-phone" placeholder="Telefon" class="glass-select" style="width:100%; margin-bottom:20px; padding:10px;">
+      <div style="display:flex; gap:12px; margin-bottom:12px;">
+        <div style="flex:1;">
+          <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:4px;">Telefon</label>
+          <input type="text" id="eu-phone" placeholder="Telefon" class="glass-select" style="width:100%; padding:10px;">
+        </div>
+        <div style="flex:1;">
+          <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:4px;">Rol</label>
+          <select id="eu-role" class="glass-select" style="width:100%; padding:10px;">
+            <option value="Operational">Operational</option>
+            <option value="Marketing">Marketing</option>
+            <option value="Financiar">Financiar</option>
+            <option value="Manager">Manager</option>
+            <option value="Viewer">Viewer</option>
+            <option value="Super Admin">Super Admin</option>
+          </select>
+        </div>
+      </div>
+      
+      <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:4px;">Resetare Parolă (opțional)</label>
+      <input type="text" id="eu-password" placeholder="Lasă gol pentru a păstra parola actuală" class="glass-select" style="width:100%; margin-bottom:20px; padding:10px;">
+      
       
       <div style="margin-bottom:20px;">
         <label style="display:block; font-size:12px; color:var(--muted); margin-bottom:8px;">Pagini Permise</label>

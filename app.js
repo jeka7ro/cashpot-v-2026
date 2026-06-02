@@ -5366,6 +5366,10 @@ window.openEditUserModal = function(id) {
   document.getElementById('eu-prenume').value = parts.slice(1).join(' ') || '';
   document.getElementById('eu-email').value = u.email || '';
   document.getElementById('eu-phone').value = u.phone || '';
+  const roleSelect = document.getElementById('eu-role');
+  if (roleSelect) roleSelect.value = u.role || 'Viewer';
+  const pwdInput = document.getElementById('eu-password');
+  if (pwdInput) pwdInput.value = '';
   const avatarInput = document.getElementById('eu-avatar');
   if (avatarInput) avatarInput.value = u.avatar || '';
   const locsContainer = document.getElementById('eu-locs-container');
@@ -5402,6 +5406,8 @@ window.saveEditedUser = async function() {
   const prenume = document.getElementById('eu-prenume').value.trim();
   const email = document.getElementById('eu-email').value.trim();
   const phone = document.getElementById('eu-phone').value.trim();
+  const role = document.getElementById('eu-role').value;
+  const new_password = document.getElementById('eu-password').value.trim();
   const avatarInput = document.getElementById('eu-avatar');
   const avatar = avatarInput ? avatarInput.value.trim() : '';
   const pages = Array.from(document.querySelectorAll('.eu-page-cb:checked')).map(cb => cb.value);
@@ -5409,11 +5415,16 @@ window.saveEditedUser = async function() {
   const permissions = JSON.stringify({ pages, locations, avatar });
   const name = nume + (prenume ? ' ' + prenume : '');
   if (!nume || !email) return showAlert('Numele și Email-ul sunt obligatorii!');
+  const body = { name, email, phone, role, permissions };
+  if (new_password) {
+    body.new_password = new_password;
+  }
+  
   try {
     const res = await apiAuth(`/api/users/${id}`, {
       method: 'PUT',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({name, email, phone, permissions})
+      body: JSON.stringify(body)
     });
     if (res.error) showAlert(res.error);
     else {
