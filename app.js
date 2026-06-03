@@ -4536,9 +4536,8 @@ window._renderPlayerDetails = async function(pid) {
             <div style="font-weight:700; color:var(--text);">${s.serial_nr || '—'}</div>
             <div style="font-size:10px; color:var(--muted);">${prod} ${mixName}</div>
           </td>
-          <td class="num" style="font-weight:700; color:var(--success);">${fmt(s.in)}</td>
-          <td class="num">${fmt(s.out)}</td>
-          <td class="num" style="font-weight:800; color:${s.ggr < 0 ? 'var(--danger)' : 'var(--success)'}">${fmt(s.ggr)}</td>
+          <td class="num" style="font-weight:700; color:var(--success);">${fmt(s.points)}</td>
+          <td class="num" style="font-weight:800; color:var(--accent);">${fmt(s.total_bet)}</td>
         </tr>
       `});
     }
@@ -4551,34 +4550,29 @@ window._renderPlayerDetails = async function(pid) {
     let totalIn = 0; let totalOut = 0; let totalGGR = 0; let totalBet = 0;
     
     res.sessions.forEach(s => {
-      const ggr = s.ggr || 0;
-      const sIn = s.in || 0;
-      const sBet = s.bet || 0;
+      const points = s.points || 0;
+      const sBet = s.total_bet || 0;
       
       const prodMix = (s.mix || s.producator || '');
       const mach = prodMix.trim().length > 2 ? prodMix.trim() : (s.serial_nr || 'Necunoscut');
       if (!machStats[mach]) machStats[mach] = 0;
-      machStats[mach] += sIn; // activity metric = IN on machine days
+      machStats[mach] += sBet; // activity metric = Bet on machine days
       
       const day = s.created_at.split(' ')[0].substring(5); // MM-DD
       // Only count unique (machine, day) once in charts to avoid spikes
       if (s.counted !== false) {
         if (!dayStats[day]) dayStats[day] = { in:0, bet:0, ggr:0 };
-        dayStats[day].in  += sIn;
         dayStats[day].bet += sBet;
-        dayStats[day].ggr += ggr;
+        dayStats[day].ggr += points; // re-use ggr field for points in charts
         
         const hr = new Date(s.created_at).getHours();
         if (!isNaN(hr)) {
-          hourStats[hr].in  += sIn;
           hourStats[hr].bet += sBet;
-          hourStats[hr].ggr += ggr;
+          hourStats[hr].ggr += points;
         }
         
-        totalIn  += sIn;
-        totalOut += (s.out || 0);
         totalBet += sBet;
-        totalGGR += ggr;
+        totalGGR += points;
       } else {
         // Still count the day as active even if values are deduplicated
         if (!dayStats[day]) dayStats[day] = { in:0, bet:0, ggr:0 };
