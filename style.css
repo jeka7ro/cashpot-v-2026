@@ -435,6 +435,17 @@ td.cell-neg-3 { background:rgba(239,68,68,.38) !important; }
 
 /* ─── Location Detail: Mobile Optimizations ─────────────────────────────── */
 @media(max-width: 600px) {
+  /* Pagination wrap pe mobil */
+  .table-pagination, .pagination-wrapper {
+    flex-direction: column !important;
+    gap: 12px !important;
+    align-items: center !important;
+  }
+  .table-pagination > div, .pagination-wrapper > div {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
   /* Padding redus + spatiu pentru bara de jos */
   #view-loc-detail > div {
     padding: 12px !important;
@@ -535,4 +546,8 @@ td.cell-neg-3 { background:rgba(239,68,68,.38) !important; }
     height: 24px !important;
     opacity: 0.8 !important;
   }
+}
+
+@media(min-width: 601px) {
+  .ld-desk-hide { display: none !important; }
 }

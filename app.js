@@ -166,12 +166,18 @@ window.reloadCurrentView = function() {
   const hash = window.location.hash || '#dashboard';
   const { s, e } = getPeriod();
 
+  if (hash === '#rapoarte') {
+    // Don't auto-load anything
+    return;
+  }
+
   if (hash.startsWith('#rapoarte/ore')) { loadKPI(s,e); loadHourlyReport(); }
   else if (hash.startsWith('#rapoarte/hh')) { loadKPI(s,e); loadHhReport(); }
   else if (hash.startsWith('#rapoarte/marketing')) { loadKPI(s,e); loadMarketingReport(); }
   else if (hash.startsWith('#rapoarte/clienti')) { loadKPI(s,e); loadClientiReport(); }
   else if (hash.startsWith('#rapoarte/retentie')) { loadKPI(s,e); loadRetentionReport(); }
   else if (hash.startsWith('#rapoarte/cashout')) { loadKPI(s,e); loadRapoarteCashout(); }
+  else if (hash.startsWith('#rapoarte/lunare')) { loadKPI(s,e); loadLunareReport(); }
   else if (hash.startsWith('#rapoarte/cheltuieli') || hash === '#cheltuieli' || hash.startsWith('#cheltuieli/')) {
     if (s && e) loadKPI(s, e).catch(console.error);
     window.loadExpensesReport();
@@ -220,7 +226,8 @@ const tableStates = {
   clienti: { page: 1, limit: dLimit, rows: [] },
   'rep-hourly': { page: 1, limit: dLimit, rows: [] },
   'rep-clienti': { page: 1, limit: dLimit, rows: [] },
-  'hh-players': { page: 1, limit: dLimit, rows: [] }
+  'hh-players': { page: 1, limit: dLimit, rows: [] },
+  'rep-lunare': { page: 1, limit: dLimit, rows: [] }
 };
 
 function renderTablePaginated(key) {
@@ -1085,7 +1092,7 @@ window.populateMobileLocSwitch = function() {
     // Daca nu avem date inca, ia din API
     container.innerHTML = '<div style="font-size:12px;color:var(--muted);text-align:center;padding:8px;">Se încarcă...</div>';
     const { s, e } = getPeriod();
-    fetch(`${API}/locatii?start=${s}&end=${e}`)
+    fetch(`${API}/locations?start=${s}&end=${e}`)
       .then(r => r.json())
       .then(data => {
         if (tableStates && tableStates.locatii) tableStates.locatii.rows = data;
@@ -1336,7 +1343,11 @@ function renderLocDetailMachinesPaginated() {
 
     tbody.innerHTML += `<tr>
       <td class="ld-mob-hide" style="text-align:center; color:var(--muted); font-size:11px">${i+1}</td>
-      <td><strong style="color:var(--accent)">${r.tip_slot||r.cabinet||'—'}</strong><div style="font-size:9px;color:var(--muted);line-height:1.4;margin-top:2px">${r.cabinet||''} · SN: ${r.serial_nr||'—'}</div></td>
+      <td>
+        <strong class="ld-desk-hide" style="color:var(--accent); display:block; margin-bottom:2px;">${r.tip_slot||r.cabinet||'—'}</strong>
+        <strong class="ld-mob-hide" style="color:var(--accent)">${r.cabinet||'—'}</strong>
+        <div style="font-size:9px;color:var(--muted);line-height:1.4;margin-top:2px"><span class="ld-desk-hide">${r.cabinet||''} · </span>SN: ${r.serial_nr||'—'}</div>
+      </td>
       <td class="ld-mob-hide">${r.provider||'—'}</td>
       <td class="ld-mob-hide">${r.tip_slot||'—'}</td>
       <td class="num">${fmt(r.total_in)}</td>
@@ -2652,7 +2663,7 @@ window.addEventListener('hashchange', () => {
         if(kpiExp)   kpiExp.style.display   = 'none';
         if(kpiGrid)  kpiGrid.style.gridTemplateColumns = '';
       }
-      
+
       if (subHash === 'ore') loadHourlyReport();
       else if (subHash === 'hh') loadHhReport();
       else if (subHash === 'marketing') loadMarketingReport();
@@ -2684,12 +2695,18 @@ window.addEventListener('hashchange', () => {
         if (btnExpSettings) btnExpSettings.style.display = (currentUser && currentUser.role === 'Super Admin') ? 'inline-flex' : 'none';
       } else if (subHash === 'retentie') {
         loadRetentionReport();
+      } else if (subHash === 'lunare') {
+        loadLunareReport();
       }
     } else {
-      window.location.hash = 'rapoarte/ore';
+      // No subhash: show landing
+      document.querySelectorAll('.rep-page').forEach(p => p.style.display = 'none');
+      const landing = document.getElementById('rep-landing');
+      if (landing) landing.style.display = 'block';
     }
   } else {
-    document.getElementById('subnav-rapoarte').style.display = 'none';
+    const subnav = document.getElementById('subnav-rapoarte');
+    if (subnav) subnav.style.display = 'none';
   }
   
   if(mainHash === 'analize') {
@@ -4667,7 +4684,7 @@ window._renderPlayerDetails = async function(pid) {
     
   } catch(e) {
     console.error(e);
-    document.getElementById('pd-history-body').innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--red);">Eroare la preluarea datelor jucătorului.</td></tr>';
+    document.getElementById('body-pd-history').innerHTML = '<tr><td colspan="8" style="text-align:center; color:var(--red);">Eroare la preluarea datelor jucătorului.</td></tr>';
   }
 };
 
@@ -5038,7 +5055,13 @@ async function apiAuth(url, options = {}) {
   }
   const res = await fetch(url, options);
   if (res.status === 401) {
-    logout(false);
+    console.warn('Unauthorized access to:', url);
+    // Only logout if we already had a token and it's definitely invalid
+    if (token) {
+       // Optional: only logout on specific endpoints or if this isn't the initial check
+       // For now, let's keep it but add logging
+       logout(false);
+    }
     throw new Error('Unauthorized');
   }
   return res.json();
@@ -5047,24 +5070,30 @@ async function apiAuth(url, options = {}) {
 async function checkAuth() {
   const token = localStorage.getItem('cp2_token');
   if (!token) {
+    console.log('No token found, redirecting to login');
     document.getElementById('view-login').style.display = 'flex';
-    document.getElementById('app-content').style.display = 'none';
+    const appEl = document.getElementById('app');
+    if (appEl) appEl.style.display = 'none';
     const globalHeader = document.getElementById('global-header');
     if (globalHeader) globalHeader.style.display = 'none';
     const appBody = document.getElementById('app-body');
     if (appBody) appBody.style.display = 'none';
-    document.querySelector('.sidebar').style.display = 'none';
+    const sb = document.querySelector('.sidebar');
+    if (sb) sb.style.display = 'none';
     return;
   }
   try {
     currentUser = await apiAuth('/api/me');
+    console.log('Auth check success:', currentUser.email);
     document.getElementById('view-login').style.display = 'none';
-    document.getElementById('app-content').style.display = 'flex';
+    const appEl = document.getElementById('app');
+    if (appEl) appEl.style.display = 'flex';
     const globalHeader = document.getElementById('global-header');
     if (globalHeader) globalHeader.style.display = 'flex';
     const appBody = document.getElementById('app-body');
     if (appBody) appBody.style.display = 'flex';
-    document.querySelector('.sidebar').style.display = 'flex';
+    const sb = document.querySelector('.sidebar');
+    if (sb) sb.style.display = 'flex';
     
     await loadFilters();
     
@@ -5217,17 +5246,19 @@ window.doLogin = async function(e) {
   }
 })();
 
-function logout(callApi = true) {
+window.logout = function(callApi = true) {
+  console.log('Logging out, callApi:', callApi);
   if (callApi) {
     apiAuth('/api/logout', {method: 'POST'}).catch(e=>e);
   }
   localStorage.removeItem('cp2_token');
   window.location.hash = '';
-  document.getElementById('app-container').style.display = 'none';
+  const appEl = document.getElementById('app');
+  if (appEl) appEl.style.display = 'none';
   document.getElementById('view-login').style.display = 'flex';
   document.getElementById('view-register').style.display = 'none';
   currentUser = null;
-}
+};
 
 // ─── ADMIN UTILIZATORI ────────────────────────────────────────────────────────
 async function loadAdminUtilizatori() {
@@ -7906,4 +7937,102 @@ function adjustMobileUI() {
 window.addEventListener('resize', adjustMobileUI);
 window.addEventListener('DOMContentLoaded', adjustMobileUI);
 adjustMobileUI();
+
+// ─── LUNARE REPORT ────────────────────────────────────────────────────────
+let _lunareData = [];
+let _lunareSort = { col: 'month', dir: 'desc' };
+
+window.loadLunareReport = async function() {
+  const serialsEl = document.getElementById('rep-lunare-serials');
+  const serials = serialsEl ? serialsEl.value : '';
+  const { s, e } = getPeriod();
+  showLoader(true);
+  try {
+    const data = await api(`/api/rapoarte/lunare?start=${s}&end=${e}&serials=${encodeURIComponent(serials)}${locParam()}`);
+    _lunareData = data || [];
+    renderLunareReport();
+  } catch (err) {
+    console.error('loadLunareReport error:', err);
+    showAlert('Eroare la încărcarea raportului lunar.');
+  } finally {
+    showLoader(false);
+  }
+};
+
+function renderLunareReport() {
+  const body = document.getElementById('body-rep-lunare');
+  const foot = document.getElementById('foot-rep-lunare');
+  if (!body) return;
+  
+  if (!_lunareData || _lunareData.length === 0) {
+    body.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:40px; color:var(--muted);">Nu există date pentru selecția curentă.</td></tr>';
+    if (foot) foot.innerHTML = '';
+    return;
+  }
+
+  // Pre-calculate totals for the full dataset
+  let tIn = 0, tOut = 0, tGgr = 0;
+  _lunareData.forEach(r => {
+    tIn += (+r.in_val || 0);
+    tOut += (+r.out_val || 0);
+    tGgr += (+r.ggr || 0);
+  });
+
+  // Prepare table state rows (formatted HTML strings)
+  tableStates['rep-lunare'].rows = _lunareData.map(r => {
+    const inVal = +r.in_val || 0;
+    const outVal = +r.out_val || 0;
+    const ggrVal = +r.ggr || 0;
+    return `<tr>
+      <td>${r.serial_nr || '—'}</td>
+      <td>${r.month || '—'}</td>
+      <td>${r.location_name || '—'}</td>
+      <td>${r.provider || '—'}</td>
+      <td>${r.cabinet || '—'}</td>
+      <td class="num">${fmt(inVal)}</td>
+      <td class="num">${fmt(outVal)}</td>
+      <td class="num" style="font-weight:700; color:${ggrVal >= 0 ? 'var(--green)' : 'var(--red)'}">${fmt(ggrVal)}</td>
+    </tr>`;
+  });
+
+  // Render using global paginator
+  renderTablePaginated('rep-lunare');
+
+  // Add the totals row to tfoot separately
+  if (foot) {
+    foot.innerHTML = `<tr style="background:var(--surface2); font-weight:800;">
+      <td colspan="5">TOTAL (Toate paginile)</td>
+      <td class="num">${fmt(tIn)}</td>
+      <td class="num">${fmt(tOut)}</td>
+      <td class="num" style="color:${tGgr >= 0 ? 'var(--green)' : 'var(--red)'}">${fmt(tGgr)}</td>
+    </tr>`;
+  }
+}
+
+window.sortLunare = function(colIdx, th) {
+  sortTable('rep-lunare', colIdx, th);
+};
+
+window.exportLunareExcel = function() {
+  if (!_lunareData || _lunareData.length === 0) {
+    alert('Nu există date pentru export.');
+    return;
+  }
+  
+  const data = _lunareData.map(r => ({
+    'Serie': r.serial_nr || '',
+    'Lună': r.month || '',
+    'Locație': r.location_name || '',
+    'Provider': r.provider || '',
+    'Cabinet': r.cabinet || '',
+    'IN (RON)': r.in_val || 0,
+    'OUT (RON)': r.out_val || 0,
+    'GGR (RON)': r.ggr || 0
+  }));
+
+  const worksheet = XLSX.utils.json_to_sheet(data);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Lunare");
+  XLSX.writeFile(workbook, `raport_lunare_${new Date().toISOString().slice(0,10)}.xlsx`);
+};
 

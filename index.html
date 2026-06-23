@@ -121,7 +121,7 @@
     <!-- Grid overlay -->
     <div style="position:absolute; inset:0; background-image: linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px); background-size: 40px 40px; pointer-events:none;"></div>
 
-    <div class="login-glass-card" style="position:relative; width:460px; padding:48px 40px; background: rgba(15, 15, 26, 0.7); backdrop-filter: blur(32px); border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; box-shadow: 0 24px 64px rgba(0,0,0,0.8); z-index:1;">
+    <div class="login-glass-card" style="position:relative; width:460px; padding:48px 40px; background: rgba(15, 15, 26, 0.7); backdrop-filter: blur(32px); -webkit-backdrop-filter: blur(32px); border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; box-shadow: 0 24px 64px rgba(0,0,0,0.8); z-index:1;">
       
       <div style="text-align:center; margin-bottom:32px;">
         <img src="logo_cashpot.png" alt="Cashpot" style="height:40px; object-fit:contain; margin-bottom:8px;">
@@ -177,24 +177,26 @@
         </button>
         <span class="badge" id="db-status" style="display:none; margin:0;">● Live</span>
       </div>
-      <div class="header-right" style="display:flex; align-items:center;">
+      <div class="header-right" style="display:flex; align-items:center; gap:8px;">
         <button id="theme-toggle" class="settings-btn" style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:50%; padding:0;" title="Schimbă tema">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
         </button>
         <button class="settings-btn" onclick="openSettings()" style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:50%; padding:0;" title="Setări">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
         </button>
         <button class="settings-btn" onclick="loadAll()" style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:50%; padding:0;" title="Actualizează">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
         </button>
-        <span id="last-updated" class="text-muted" style="margin-left:8px;"></span>
         
-        <div id="user-profile" style="display:none; align-items:center; gap:10px; cursor:pointer; padding-left:16px; border-left:1px solid var(--border); margin-left:8px;" onclick="logout()" title="Click pentru Logout">
-          <div style="text-align:right;">
-            <div id="user-name" style="font-size:12px; font-weight:700; color:var(--text); white-space:nowrap;"></div>
-            <div id="user-role" style="font-size:10px; color:var(--muted); white-space:nowrap;"></div>
+        <div id="user-profile" style="display:none; align-items:center; gap:10px; padding-left:12px; border-left:1px solid var(--border); margin-left:4px;">
+          <div id="user-avatar" style="width:32px; height:32px; border-radius:50%; background:var(--accent); color:#000; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:11px; flex-shrink:0; overflow:hidden; border:1px solid var(--border);"></div>
+          <div style="text-align:left;">
+            <div id="user-name" style="font-size:12px; font-weight:800; color:var(--text); white-space:nowrap; line-height:1.1;"></div>
+            <div id="user-role" style="font-size:10px; color:var(--muted); white-space:nowrap; line-height:1.1;"></div>
           </div>
-          <div id="user-avatar" style="width:32px; height:32px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:12px; flex-shrink:0; overflow:hidden;"></div>
+          <button onclick="window.logout()" class="btn-logout" style="display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:8px; background:#ef4444; color:#fff; border:none; cursor:pointer; flex-shrink:0; transition:all 0.2s; margin-left:4px;" title="Logout">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+          </button>
         </div>
       </div>
     </header>
@@ -250,6 +252,10 @@
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
             Cashout
           </a>
+          <a href="#rapoarte/lunare" class="nav-item sub-item" id="rep-nav-lunare">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+            Lunare
+          </a>
           <a href="#rapoarte/multigame" class="nav-item sub-item">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="16"/><line x1="10" y1="14" x2="14" y2="14"/></svg>
             Multigame
@@ -276,7 +282,7 @@
             Schimbă Temă
           </a>
           <a href="#" onclick="openSettings(); return false;" class="nav-item">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
             Setări
           </a>
         </div>
@@ -460,7 +466,7 @@
       </div>
       <div class="canvas-wrap" style="flex:1; min-height:200px;"><canvas id="trend-chart"></canvas></div>
     </div>
-    <!-- GGR per Locatie: ~quarter width -->
+    <!-- GGR per Locație: ~quarter width -->
     <div class="chart-card mobile-hide" style="grid-column: span 1; min-width:0; padding:10px 14px; display:flex; flex-direction:column;">
       <div class="chart-title" style="font-size:11px; padding:0; margin-bottom:6px; flex-shrink:0;">GGR per Locație</div>
       <div class="canvas-wrap" style="flex:1; min-height:0;"><canvas id="loc-pie"></canvas></div>
@@ -797,7 +803,7 @@
               </tr>
             </thead>
             <tbody id="body-pl">
-              <tr><td colspan="8" style="text-align:center; color:var(--muted)">Încărcare date P&L...</td></tr>
+              <tr><td colspan="8" style="text-align:center; color:var(--muted);">Încărcare date P&L...</td></tr>
             </tbody>
             <tfoot id="foot-pl">
             </tfoot>
@@ -821,6 +827,13 @@
 
   <div id="view-rapoarte" class="view-panel" style="overflow-y:auto;">
     <div style="padding:16px;">
+
+        <!-- ═══ PAGE: LANDING ═══ -->
+        <div id="rep-landing" class="rep-page" style="display:block; text-align:center; padding:100px 20px;">
+          <div style="font-size:48px; margin-bottom:24px; opacity:0.5;">📊</div>
+          <h2 style="font-size:24px; font-weight:800; color:var(--text); margin-bottom:12px;">Secțiunea Rapoarte</h2>
+          <p style="font-size:14px; color:var(--muted); max-width:400px; margin:0 auto;">Vă rugăm să selectați un raport din meniul lateral (sub „Rapoarte”) pentru a vizualiza datele.</p>
+        </div>
 
         <!-- ═══ PAGE: ORE ═══ -->
         <div id="rep-page-ore" class="rep-page">
@@ -1058,7 +1071,9 @@
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left:6px; color:var(--muted); cursor:help;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
               </span>
               <div style="position:relative; width:320px; margin: 0 16px;">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute; left:16px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute; left:16px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none;">
+                  <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
                 <input type="text" id="ret-search" class="glass-input" placeholder="Caută jucător sau locație..." style="width:100%; padding:6px 10px 6px 42px; font-size:12px; height:32px;" oninput="filterRetentionTable()">
               </div>
             </div>
@@ -1086,7 +1101,9 @@
             <!-- Floating Search Bar -->
             <div style="margin-bottom:16px;">
               <div style="position:relative; max-width:320px;">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute; left:16px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none;"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute; left:16px; top:50%; transform:translateY(-50%); color:var(--muted); pointer-events:none;">
+                  <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
                 <input type="text" id="clienti-search" class="glass-input" placeholder="Caută jucători (nume, telefon)..." style="width:100%; padding:10px 100px 10px 42px; font-size:13px;" oninput="filterClientiTable(this.value)">
                 <span id="clienti-search-counter" class="search-bubble"></span>
               </div>
@@ -1173,6 +1190,50 @@
           </section>
         </div>
 
+        <!-- ═══ PAGE: LUNARE ═══ -->
+        <div id="rep-page-lunare" class="rep-page" style="display:none;">
+          <div id="rep-tab-lunare" class="rep-tab-panel" style="display:block;">
+            <section class="card" style="margin-top:0; border-top-left-radius:0; padding:0;">
+              <div style="padding:16px 20px; border-bottom:1px solid var(--border);">
+                <div style="font-size:11px; font-weight:700; color:var(--text); text-transform:uppercase; letter-spacing:.05em; margin-bottom:12px;">Lunare</div>
+                <div style="display:flex; gap:12px; align-items:flex-start;">
+                  <textarea id="rep-lunare-serials" class="glass-input" placeholder="Introduceți seriile separate prin virgulă sau spațiu (ex: 1234, 5678)..." style="flex:1; height:60px; resize:vertical; font-family:monospace; font-size:12px;"></textarea>
+                  <div style="display:flex; flex-direction:column; gap:8px;">
+                    <button class="btn-primary" onclick="loadLunareReport()" style="height:32px; padding:0 24px; display:flex; align-items:center; gap:8px; font-size:12px;">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                      Aplică Filtru
+                    </button>
+                    <button class="btn-ghost" onclick="exportLunareExcel()" style="height:32px; padding:0 24px; display:flex; align-items:center; gap:8px; font-size:12px; border:1px solid var(--border);">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                      Export EXCEL
+                    </button>
+                  </div>
+                </div>
+                <div style="font-size:11px; color:var(--muted); margin-top:6px;">Dacă lăsați gol, se vor afișa rezultatele pentru toate aparatele.</div>
+              </div>
+              <div class="table-scroll" style="max-height:60vh; overflow-y:auto;">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th onclick="sortLunare(0, this)">Serie</th>
+                      <th onclick="sortLunare(1, this)">Lună</th>
+                      <th onclick="sortLunare(2, this)">Locație</th>
+                      <th onclick="sortLunare(3, this)">Provider</th>
+                      <th onclick="sortLunare(4, this)">Cabinet</th>
+                      <th class="num" onclick="sortLunare(5, this)">IN</th>
+                      <th class="num" onclick="sortLunare(6, this)">OUT</th>
+                      <th class="num" onclick="sortLunare(7, this)">GGR</th>
+                    </tr>
+                  </thead>
+                  <tbody id="body-rep-lunare"></tbody>
+                  <tfoot id="foot-rep-lunare"></tfoot>
+                </table>
+              </div>
+              <div id="pg-rep-lunare" class="pagination-wrapper" style="border-top:1px solid var(--border); padding:12px 20px; display:flex; justify-content:space-between; align-items:center; background:var(--surface2);"></div>
+            </section>
+          </div>
+        </div>
+
 
         <!-- ═══ PAGE: MULTIGAME ═══ -->
         <div id="rep-page-multigame" class="rep-page" style="display:none;">
@@ -1209,7 +1270,8 @@
         <div id="player-dashboard-view" class="rep-page" style="display:none; animation: fadeIn 0.3s ease;">
           <div style="display:flex; align-items:center; gap:16px; margin-bottom:32px;">
             <button class="premium-btn" onclick="closePlayerDashboard()" style="padding:10px 24px; background:var(--surface2); color:var(--text); border:1px solid var(--border); border-radius:99px; font-weight:700; display:flex; align-items:center; gap:8px;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> ÎNAPOI
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+              ÎNAPOI
             </button>
             <div id="pd-avatar" style="width:48px; height:48px; border-radius:50%; background:var(--accent); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:18px; flex-shrink:0; overflow:hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.3);"></div>
             <div style="flex:1;">
@@ -1301,7 +1363,8 @@
         <div id="view-game-details" class="rep-page" style="display:none; animation: fadeIn 0.3s ease;">
           <div style="display:flex; align-items:center; gap:16px; margin-bottom:24px;">
             <button class="premium-btn" onclick="closeGameDetails()" style="padding:10px 24px; background:var(--surface2); color:var(--text); border: 1px solid var(--border); border-radius:99px; font-weight:700; display:flex; align-items:center; gap:8px;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg> ÎNAPOI
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+              ÎNAPOI
             </button>
             <h1 id="gd-name" style="font-size:24px; font-weight:900; margin:0; color:var(--text);">Joc Detalii</h1>
           </div>
@@ -1373,7 +1436,7 @@
           <div style="position:relative; height:240px;"><canvas id="da-hourly-chart"></canvas></div>
         </div>
         <div style="background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px;">
-          <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:16px;">Distributie GGR pe Ore HH Active</div>
+          <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; margin-bottom:16px;">Distribuție GGR pe Ore HH Active</div>
           <div id="da-hh-pie-wrap" style="position:relative; height:240px;"><canvas id="da-hh-pie"></canvas></div>
         </div>
       </div>
@@ -1611,9 +1674,9 @@
                 <th>Serial / Nume</th>
                 <th>Locație</th>
                 <th>Mix / Provider</th>
-                <th class="num">TVA Exp.</th>
-                <th class="num">All-time IN</th>
-                <th class="num">All-time GGR</th>
+                <th class="num" style="text-align:center">TVA Exp.</th>
+                <th class="num" style="text-align:center">All-time IN</th>
+                <th class="num" style="text-align:center">All-time GGR</th>
                 <th class="num" style="padding-right:16px">Hold%</th>
               </tr>
             </thead>
@@ -1737,7 +1800,8 @@
       <h2 style="font-size:24px; margin-bottom:24px;">Gestiune Sloturi & Documente</h2>
       <div style="margin-bottom:20px; display:flex; gap:12px; align-items:center;">
         <div style="position:relative; display:flex; align-items:center;">
-          <div style="position:relative; display:inline-block;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--text-subtle);"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg><input type="text" id="slot-search" class="glass-input" placeholder="Caută serial, locație..." style="padding-left:32px; padding-top:10px; padding-bottom:10px; width:250px;" oninput="renderSloturi()"></div>
+          <div style="position:relative; display:inline-block;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--text-subtle);"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+          <input type="text" id="slot-search" class="glass-input" placeholder="Caută serial, locație..." style="padding-left:32px; padding-top:10px; padding-bottom:10px; width:250px;" oninput="renderSloturi()"></div>
           <span id="slot-search-counter" class="search-bubble"></span>
         </div>
       </div>
@@ -1754,7 +1818,7 @@
                 <th>Provider</th>
                 <th>Cabinet</th>
                 <th>Mix / Joc</th>
-                <th class="num">RTO / Hold%</th>
+                <th class="num" style="text-align:center">RTO / Hold%</th>
                 <th>Ultimul RAM Clear</th>
                 <th>Notițe / Fișiere</th>
                 <th style="text-align:right; padding-right:16px;">Acțiuni</th>
@@ -1890,7 +1954,7 @@
       <button class="settings-close" onclick="document.getElementById('user-modal').classList.remove('show')">×</button>
     </div>
     <div class="settings-body">
-      <p style="font-size:12px; color:var(--muted); margin-bottom:16px;">Generează un link unic de înregistrare. Utilizatorul își va seta singur numele, telefonul și parola.</p>
+      <p style="font-size:12px; color:var(--muted); margin-bottom:16px;">Generează un link unic de înregistrare. Utilizatorul își va sete singur numele, telefonul și parola.</p>
       
       <input type="email" id="nu-email" placeholder="Email" class="glass-select" style="width:100%; margin-bottom:12px; padding:10px;">
       
@@ -2188,7 +2252,7 @@
 <div class="settings-modal" id="modal-edit-expense" onclick="if(event.target===this) this.classList.remove('show')">
   <div class="settings-panel" style="width:500px; max-width:95%;">
     <div class="settings-header">
-      <div class="settings-title">Modifică Cheltuiala</div>
+      <div class="settings-title">Modifică Cheltuială</div>
       <button class="settings-close" onclick="document.getElementById('modal-edit-expense').classList.remove('show')">×</button>
     </div>
     <div class="settings-body" style="padding:20px;">
@@ -2327,7 +2391,7 @@
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
       <span>Filtru</span>
     </button>
-    <button class="bot-nav-btn bot-nav-home" onclick="window.location.hash='#dashboard'; window.scrollTo(0,0); reloadCurrentView();" title="Acasă">
+    <button class="bot-nav-home" onclick="window.location.hash='#dashboard'; window.scrollTo(0,0); reloadCurrentView();" title="Acasă">
       <div class="home-fab">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
       </div>

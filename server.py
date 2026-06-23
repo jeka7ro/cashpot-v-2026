@@ -1693,7 +1693,13 @@ def report_clients():
             s_dt = dt_mod.datetime.strptime(start, '%Y-%m-%d')
             e_dt = dt_mod.datetime.strptime(end,   '%Y-%m-%d')
         except ValueError:
-            return jsonify({'error': f'Invalid date: {start}/{end}'}), 400
+            try:
+                s_dt = dt_mod.datetime.strptime(start, '%d.%m.%Y')
+                e_dt = dt_mod.datetime.strptime(end,   '%d.%m.%Y')
+                start = s_dt.strftime('%Y-%m-%d')
+                end   = e_dt.strftime('%Y-%m-%d')
+            except ValueError:
+                return jsonify({'error': f'Invalid date: {start}/{end}'}), 400
 
         start_str = start + ' 08:00:00'
         end_dt_str = (e_dt + dt_mod.timedelta(days=1)).strftime('%Y-%m-%d') + ' 08:00:00'
@@ -2016,6 +2022,42 @@ def multigame_details():
     except Exception as ex:
         return jsonify({'error': str(ex)}), 500
 
+
+@app.route('/api/rapoarte/lunare')
+def rep_lunare():
+    lf, lp = loc_filter(request)
+    serials_raw = request.args.get('serials', '')
+    serial_filter = ""
+    serial_params = []
+    
+    if serials_raw:
+        serials = [s.strip() for s in serials_raw.replace(',', ' ').split() if s.strip()]
+        if serials:
+            placeholders = ','.join(['%s'] * len(serials))
+            serial_filter = f" AND m.slot_machine_id IN ({placeholders})"
+            serial_params = serials
+
+    query = f"""
+        SELECT 
+            m.slot_machine_id as serial_nr,
+            COALESCE(l.display_code, l.code) as location_name,
+            mt.manufacturer as provider,
+            mt.name as cabinet,
+            DATE_FORMAT(mas.date, '%%Y-%%m') as month,
+            SUM(mas.`in`) as in_val,
+            SUM(mas.`out`) as out_val,
+            SUM(mas.`in` - mas.`out`) as ggr
+        FROM machine_audit_summary_per_hours mas
+        JOIN locations l ON l.id = mas.location_id
+        JOIN machines m ON m.id = mas.machine_id
+        JOIN machine_types mt ON m.machine_type_id = mt.id
+        WHERE mas.date >= %s AND mas.date <= %s {lf} {serial_filter}
+        GROUP BY serial_nr, location_name, provider, cabinet, month
+        ORDER BY month DESC, location_name ASC, serial_nr ASC
+    """
+    start, end = period_params(request)
+    rows = qry(query, [start, end] + lp + serial_params)
+    return jsonify(rows)
 
 # ─── HH Advanced Analysis (from Prompt) ──────────────────────────────────────
 @app.route('/api/hh_advanced')
@@ -2343,7 +2385,7 @@ def api_player_details(pid):
     date_filter = ''
     date_params = [pid]
     if start and end:
-        date_filter = ' AND DATE(pcl.created_at - INTERVAL 8 HOUR) >= %s AND DATE(pcl.created_at - INTERVAL 8 HOUR) <= %s'
+        date_filter = ' AND DATE(pcl.created_at) >= %s AND DATE(pcl.created_at) <= %s'
         date_params = [pid, start, end]
         
     sessions = qry(f'''
@@ -2358,7 +2400,11 @@ def api_player_details(pid):
             mct.name as cabinet,
             (SELECT rg.name FROM machine_real_time_activities rta2
              LEFT JOIN machine_games rg ON rg.id = rta2.machine_game_id
-             WHERE rta2.machine_id = m.id ORDER BY rta2.updated_at DESC LIMIT 1) as joc
+             WHERE rta2.machine_id = m.id ORDER BY rta2.updated_at DESC LIMIT 1) as joc,
+            COALESCE((SELECT SUM(mas.`in`)  FROM machine_audit_summaries mas WHERE mas.machine_id = m.id AND mas.date = DATE(pcl.created_at)), 0) as `in`,
+            COALESCE((SELECT SUM(mas.`out`) FROM machine_audit_summaries mas WHERE mas.machine_id = m.id AND mas.date = DATE(pcl.created_at)), 0) as `out`,
+            COALESCE((SELECT SUM(mas.bet)   FROM machine_audit_summaries mas WHERE mas.machine_id = m.id AND mas.date = DATE(pcl.created_at)), 0) as bet,
+            COALESCE((SELECT SUM(mas.`in` - mas.`out`) FROM machine_audit_summaries mas WHERE mas.machine_id = m.id AND mas.date = DATE(pcl.created_at)), 0) as ggr
         FROM player_card_logs pcl
         JOIN machines m ON m.id = JSON_UNQUOTE(JSON_EXTRACT(pcl.params, '$.machine_id'))
         LEFT JOIN machine_types mt ON m.machine_type_id = mt.id
@@ -2478,7 +2524,7 @@ def api_players():
     lf, lp = loc_filter(request, alias='pcl')
     
     end_dt = end + ' 23:59:59'
-    rows = qry('''
+    rows = qry("""
         SELECT
             p.id,
             p.first_name,
@@ -2522,11 +2568,11 @@ def api_players():
         LEFT JOIN locations l ON pcl.location_id = l.id
         WHERE pcl.created_at >= %s AND pcl.created_at <= %s
           AND pcl.log_type = 2
-    ''' + lf + '''
+    """ + lf + """
         GROUP BY p.id, p.first_name, p.last_name, p.phone, p.points, p.total_bets, p.avg_bet, l.display_code, l.code
         ORDER BY total_interactiuni DESC
         LIMIT 500
-    ''', [start, end_dt, start, end, start, start, start, end_dt] + lp)
+    """, [start, end_dt, start, end, start, start, start, end_dt] + lp)
     
     for r in rows:
         if r.get('ultima_vizita'):
@@ -2729,8 +2775,7 @@ def create_user():
     conn = cp2_db.get_db()
     c = conn.cursor(cursor_factory=RealDictCursor)
     try:
-        c.execute('''INSERT INTO cp2_users (name, email, password_hash, role, phone, permissions)
-                     VALUES (%s, %s, %s, %s, %s, %s)''',
+        c.execute("INSERT INTO cp2_users (name, email, password_hash, role, phone, permissions) VALUES (%s, %s, %s, %s, %s, %s)",
                   (data.get('name'), data.get('email'), pwd_hash, data.get('role', 'Operational'),
                    data.get('phone', ''), json.dumps(data.get('permissions', {}))))
         conn.commit()
@@ -2798,12 +2843,11 @@ def slots_inventory():
     try:
         # Get machine RAM clears
         with conn.cursor() as c:
-            c.execute('''SELECT machine_id, MAX(datetime) as last_ram_clear 
-                         FROM machine_resets WHERE reset_type = 0 GROUP BY machine_id''')
+            c.execute("SELECT machine_id, MAX(datetime) as last_ram_clear FROM machine_resets WHERE reset_type = 0 GROUP BY machine_id")
             resets = {r['machine_id']: r['last_ram_clear'].strftime('%Y-%m-%d') for r in c.fetchall() if r['last_ram_clear']}
             
             # Get machines data
-            c.execute('''
+            c.execute("""
                 SELECT m.id, m.slot_machine_id, m.status, m.mechanical_status,
                        REPLACE(REPLACE(COALESCE(l.display_code, l.code), ' E.S', ''), 'E.S', '') as locatie,
                        l.id as location_id,
@@ -2816,14 +2860,11 @@ def slots_inventory():
                 LEFT JOIN machine_types mt ON mt.id = m.machine_type_id
                 LEFT JOIN machine_cabinet_types mct ON mct.id = m.cabinet_type_id
                 WHERE m.deleted_at IS NULL
-            ''')
+            """)
             machines = c.fetchall()
             
             # Calculate hold pct (all time)
-            c.execute('''
-                SELECT machine_id, SUM(`in`) as tot_in, SUM(`in` - `out`) as ggr 
-                FROM machine_audit_summaries GROUP BY machine_id
-            ''')
+            c.execute("SELECT machine_id, SUM(`in`) as tot_in, SUM(`in` - `out`) as ggr FROM machine_audit_summaries GROUP BY machine_id")
             hold_pcts = {}
             for r in c.fetchall():
                 if r['tot_in'] and r['tot_in'] > 0:
@@ -3308,17 +3349,7 @@ def sync_historical_incomes():
             return
             
         # Query MySQL for these dates
-        mysql_sql = '''
-            SELECT 
-                mas.date,
-                mas.location_id,
-                SUM(mas.`in`) as total_in,
-                SUM(mas.`out`) as total_out,
-                SUM(mas.`in` - mas.`out`) as total_ggr
-            FROM machine_audit_summaries mas
-            WHERE mas.date >= %s AND mas.date <= %s
-            GROUP BY mas.date, mas.location_id
-        '''
+        mysql_sql = "SELECT mas.date, mas.location_id, SUM(mas.`in`) as total_in, SUM(mas.`out`) as total_out, SUM(mas.`in` - mas.`out`) as total_ggr FROM machine_audit_summaries mas WHERE mas.date >= %s AND mas.date <= %s GROUP BY mas.date, mas.location_id"
         mysql_data = qry(mysql_sql, [start_sync.strftime('%Y-%m-%d'), yesterday.strftime('%Y-%m-%d')])
         
         if not mysql_data:
@@ -3328,11 +3359,7 @@ def sync_historical_incomes():
         c = conn.cursor()
         
         for row in mysql_data:
-            c.execute('''
-                INSERT INTO cp2_daily_incomes (date, location_id, total_in, total_out, total_ggr)
-                VALUES (%s, %s, %s, %s, %s)
-                ON CONFLICT (date, location_id) DO NOTHING
-            ''', (row['date'], str(row['location_id']), row['total_in'], row['total_out'], row['total_ggr']))
+            c.execute("INSERT INTO cp2_daily_incomes (date, location_id, total_in, total_out, total_ggr) VALUES (%s, %s, %s, %s, %s) ON CONFLICT (date, location_id) DO NOTHING", (row['date'], str(row['location_id']), row['total_in'], row['total_out'], row['total_ggr']))
             
         conn.commit()
         conn.close()
@@ -3429,9 +3456,9 @@ def api_pl_heatmap():
     pg_name_to_id = {normalize_loc_name(l['name']): str(l['id']) for l in pg_locs}
     mysql_to_pg_map = {}
     for ml in mysql_locs:
-        norm_name = normalize_loc_name(ml['code'])
-        if norm_name in pg_name_to_id:
-            mysql_to_pg_map[str(ml['id'])] = pg_name_to_id[norm_name]
+        norm = normalize_loc_name(ml['code'])
+        if norm in pg_name_to_id:
+            mysql_to_pg_map[str(ml['id'])] = pg_name_to_id[norm]
 
     ids_raw = request.args.get('loc_ids', '')
     pg_loc_ids = []
