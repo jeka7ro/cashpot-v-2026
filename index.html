@@ -4,10 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>CyberSlot Analytics</title>
+<link rel="icon" type="image/png" href="favicon.png">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="chart.umd.min.js"></script>
+<script src="chartjs-plugin-datalabels.min.js"></script>
+<script src="xlsx.full.min.js"></script>
 <link rel="stylesheet" href="style.css?v=147">
 <script>
   if (window.location.hash.startsWith('#invite')) {
@@ -53,7 +54,7 @@
 <body>
 
   <!-- ═══ VIEW: LOGIN ═══ -->
-  <div id="view-login" class="view" style="display:none; align-items:center; justify-content:center; height:100vh; width:100vw; position:fixed; top:0; left:0; z-index:9999; background: url('https://images.unsplash.com/photo-1579546929518-9e396f3cc809?q=80&w=2000&auto=format&fit=crop') center/cover no-repeat; overflow: hidden;">
+  <div id="view-login" class="view" style="display:none; align-items:center; justify-content:center; height:100vh; width:100vw; position:fixed; top:0; left:0; z-index:9999; background: linear-gradient(135deg, #0f0f1a, #1a1a2e); overflow: hidden;">
     
     <!-- Glassmorphism overlay for macOS look -->
     <div style="position:absolute; inset:0; background: rgba(0,0,0,0.4); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);"></div>
@@ -223,6 +224,10 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
             Profit & Loss
           </a>
+          <a href="#pos" class="nav-item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+            POS
+          </a>
         <a href="#rapoarte" class="nav-item" onclick="document.getElementById('subnav-rapoarte').style.display = document.getElementById('subnav-rapoarte').style.display === 'none' ? 'block' : 'none';">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
           Rapoarte
@@ -358,14 +363,7 @@
         <div class="kpi-sub" id="v-ggr-day">AVG/zi: —</div>
       </div>
     </div>
-    <div class="kpi-card" id="kpi-ngr" style="display:none;">
-      <div class="kpi-label">NGR</div>
-      <div style="display:flex; align-items:center; flex-wrap:wrap; gap:8px;">
-        <div class="kpi-value" id="v-ngr">—</div>
-        <div class="kpi-trend" id="t-ngr" style="display:none"></div>
-      </div>
-      <div class="kpi-sub" id="v-ngr-day">AVG/zi: —</div>
-    </div>
+
     <div class="kpi-card" id="kpi-profit">
       <div class="kpi-label">Profit Net</div>
       <div style="display:flex; align-items:center; flex-wrap:wrap; gap:8px;">
@@ -511,11 +509,10 @@
         <table class="data-table">
           <thead><tr>
             <th>Nr.</th><th>Locație</th>
-            <th class="mobile-show-cell num" style="display:none; color:var(--purple)">Total IN</th>
-            <th class="num">GGR</th><th class="num">GGR €</th><th>Buc</th><th>Zile</th><th class="num" style="width:50px; text-align:right">Clienți/zi</th>
-            <th class="mobile-hide num">Total IN</th>
+            <th class="mobile-show-cell num" style="display:none;">Total IN</th>
+            <th class="mobile-hide num">Total IN</th><th class="num">BET</th><th class="num">GGR</th><th>Buc</th><th>Zile</th><th class="num" style="width:50px; text-align:right">Clienți/zi</th>
             <th class="num">Jackpot</th><th class="num">HH</th><th class="num">Cashback</th><th class="num">Roata</th><th class="num">Tombole</th>
-            <th class="num">Games</th><th class="num">Hold%</th><th class="num">Bonus Cost</th>
+            <th class="num">Hold%</th><th class="num">Bonus Cost</th><th class="num">Games</th>
           </tr></thead>
           <tbody id="body-locatii"></tbody>
           <tfoot id="foot-locatii"></tfoot>
@@ -529,10 +526,10 @@
         <table class="data-table">
           <thead><tr>
             <th>Nr.</th><th>Provider</th><th>Buc</th><th>Zile</th>
-            <th class="mobile-show-cell num" style="display:none; color:var(--purple)">Total IN</th>
-            <th class="mobile-hide num">Total IN</th><th class="num">GGR</th><th class="num">GGR €</th>
+            <th class="mobile-show-cell num" style="display:none;">Total IN</th>
+            <th class="mobile-hide num">Total IN</th><th class="num">BET</th><th class="num">GGR</th>
             <th class="num">Jackpot</th><th class="num">Cashback</th><th class="num">Roata</th><th class="num">Tombole</th>
-            <th class="num">Games</th><th class="num">Hold%</th><th class="num">Bonus Cost</th>
+            <th class="num">Hold%</th><th class="num">Bonus Cost</th><th class="num">Games</th>
           </tr></thead>
           <tbody id="body-provideri"></tbody>
         </table>
@@ -545,9 +542,9 @@
         <table class="data-table">
           <thead><tr>
             <th>Nr.</th><th>Provider</th><th>Cabinet</th><th>Tip Slot</th><th>Buc</th>
-            <th class="mobile-show-cell num" style="display:none; color:var(--purple)">Total IN</th>
-            <th class="mobile-hide num">Total IN</th><th class="num">GGR</th><th class="num">GGR €</th>
-            <th class="num">Games</th><th class="num">Hold%</th><th class="num">Bonus Cost</th>
+            <th class="mobile-show-cell num" style="display:none;">Total IN</th>
+            <th class="mobile-hide num">Total IN</th><th class="num">BET</th><th class="num">GGR</th>
+            <th class="num">Hold%</th><th class="num">Bonus Cost</th><th class="num">Games</th>
           </tr></thead>
           <tbody id="body-tipuri"></tbody>
         </table>
@@ -560,9 +557,9 @@
         <table class="data-table">
           <thead><tr>
             <th>Nr.</th><th>Provider</th><th>Cabinet</th><th>Buc</th>
-            <th class="mobile-show-cell num" style="display:none; color:var(--purple)">Total IN</th>
-            <th class="mobile-hide num">Total IN</th><th class="num">GGR</th><th class="num">GGR €</th>
-            <th class="num">Games</th><th class="num">Hold%</th><th class="num">Bonus Cost</th>
+            <th class="mobile-show-cell num" style="display:none;">Total IN</th>
+            <th class="mobile-hide num">Total IN</th><th class="num">BET</th><th class="num">GGR</th>
+            <th class="num">Hold%</th><th class="num">Bonus Cost</th><th class="num">Games</th>
           </tr></thead>
           <tbody id="body-cabinete"></tbody>
         </table>
@@ -583,11 +580,11 @@
           <thead><tr>
             <th>Nr.</th><th>Serial</th><th>Provider</th><th>Cabinet</th><th>Mix</th><th>Locație</th>
             <th>Zile</th>
-            <th class="mobile-show-cell num" style="display:none; color:var(--purple)">Total IN</th>
+            <th class="mobile-show-cell num" style="display:none;">Total IN</th>
             <th class="mobile-hide num">Total IN</th><th class="num">IN/Zi</th>
-            <th class="num">GGR</th><th class="num">GGR €</th>
+            <th class="num">BET</th><th class="num">GGR</th>
             <th class="num">JP</th><th class="num">HH</th><th class="num">CB</th>
-            <th class="num">Games</th><th class="num">Hold%</th><th class="num">Bonus Cost</th>
+            <th class="num">Hold%</th><th class="num">Bonus Cost</th><th class="num">Games</th>
           </tr></thead>
           <tbody id="body-aparate"></tbody>
         </table>
@@ -672,6 +669,7 @@
             <div style="display:flex; border-bottom:1px solid var(--border); background:var(--surface);">
               <div id="exp-tab-btn-summary" onclick="switchExpTab('summary')" style="padding: 14px 24px; font-size: 12px; font-weight: 700; cursor: pointer; border-bottom: 2px solid var(--accent); color: var(--accent); text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s;">Centralizator</div>
               <div id="exp-tab-btn-details" onclick="switchExpTab('details')" style="padding: 14px 24px; font-size: 12px; font-weight: 700; cursor: pointer; border-bottom: 2px solid transparent; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s;">Lista Cheltuieli</div>
+              <div id="exp-tab-btn-fixed" onclick="switchExpTab('fixed')" style="padding: 14px 24px; font-size: 12px; font-weight: 700; cursor: pointer; border-bottom: 2px solid transparent; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s;">Cheltuieli Recurente</div>
             </div>
 
             <!-- TAB 1: CENTRALIZATOR -->
@@ -762,6 +760,48 @@
               </div>
             </div>
             </div> <!-- CLOSE EXP-TAB-DETAILS -->
+
+            <!-- TAB 3: CHELTUIELI RECURENTE (FIXE) -->
+            <div id="exp-tab-fixed" style="display:none; padding:16px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+                <div style="display:flex; align-items:center; gap:16px;">
+                  <span style="font-size:12px; font-weight:700; color:var(--text);">Alege Luna:</span>
+                  <input type="month" id="fixed-exp-month" class="glass-input" onchange="loadFixedExpenses()" style="width:150px;">
+                </div>
+                <div style="display:flex; gap:10px;">
+                  <button class="btn-primary" onclick="openFixedExpenseModal()" style="padding:6px 12px; font-size:12px; background:var(--accent);">➕ Adaugă Cheltuială</button>
+                </div>
+              </div>
+              <div class="table-scroll">
+                <table class="data-table w-full">
+                  <thead>
+                    <tr>
+                      <th style="width:50px;">Nr. Crt.</th>
+                      <th>Dată</th>
+                      <th>Departament</th>
+                      <th>Categorie</th>
+                      <th>Locație</th>
+                      <th class="num">Cantitate</th>
+                      <th class="num">Preț Unitar</th>
+                      <th>Monedă</th>
+                      <th class="num">Total (RON)</th>
+                      <th style="width:50px; text-align:center;">Acțiuni</th>
+                    </tr>
+                  </thead>
+                  <tbody id="body-fixed-expenses">
+                    <!-- Loaded dynamically via js -->
+                  </tbody>
+                  <tfoot>
+                    <tr style="background:var(--surface2); font-weight:800; border-top:2px solid var(--border);">
+                      <td colspan="8" style="text-align:right;">TOTAL GENERAL:</td>
+                      <td class="num" id="fixed-expenses-total" style="color:var(--accent);">0.00</td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+              <div id="pg-fixed-expenses"></div>
+            </div> <!-- CLOSE EXP-TAB-FIXED -->
           </section>
   </div>
 </div>
@@ -823,6 +863,49 @@
   </div>
 </div>
 
+<!-- POS DEPOSITS PAGE -->
+<div id="view-pos" class="view-panel" style="overflow-y:auto;">
+  <div style="padding:16px;">
+    <section class="card" style="margin-top:0; padding:0; overflow:hidden;">
+      <div class="card-header" style="display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border); padding:16px 20px;">
+        <div style="font-size: 16px; font-weight: 700; color: var(--text);">Depuneri POS pe Sală</div>
+        <button class="preset-btn" onclick="exportPosExcel()" style="flex:none;">↓ Excel</button>
+      </div>
+      <!-- KPI Cards -->
+      <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; padding:20px;">
+        <div class="kpi-card" style="padding:16px;">
+          <div class="kpi-label">Total POS</div>
+          <div class="kpi-value" id="pos-kpi-total">—</div>
+        </div>
+        <div class="kpi-card" style="padding:16px;">
+          <div class="kpi-label">Medie / Zi</div>
+          <div class="kpi-value" id="pos-kpi-avg">—</div>
+        </div>
+        <div class="kpi-card" style="padding:16px;">
+          <div class="kpi-label">Nr. Tranzacții</div>
+          <div class="kpi-value" id="pos-kpi-trx">—</div>
+        </div>
+        <div class="kpi-card" style="padding:16px;">
+          <div class="kpi-label">Zile cu POS</div>
+          <div class="kpi-value" id="pos-kpi-days">—</div>
+        </div>
+      </div>
+      <!-- Table -->
+      <div style="padding:0 20px 20px;">
+        <div class="table-scroll">
+          <table class="data-table w-full" id="pos-table">
+            <thead id="head-pos"></thead>
+            <tbody id="body-pos">
+              <tr><td colspan="10" style="text-align:center; color:var(--muted);">Selectează o perioadă...</td></tr>
+            </tbody>
+            <tfoot id="foot-pos"></tfoot>
+          </table>
+        </div>
+        <div id="pg-pos" class="pagination-wrapper"></div>
+      </div>
+    </section>
+  </div>
+</div>
 
 
   <div id="view-rapoarte" class="view-panel" style="overflow-y:auto;">
@@ -1372,7 +1455,7 @@
           <div style="display:grid; grid-template-columns: 320px 1fr; gap:24px;">
             <div style="display:flex; flex-direction:column; gap:24px;">
               <div class="glass-panel" style="padding:24px; text-align:center; border:1px solid var(--border); border-radius:12px;">
-                <img id="gd-thumb" src="" referrerpolicy="no-referrer" style="width:200px; height:200px; border-radius:24px; object-fit:contain; box-shadow: 0 16px 32px rgba(0,0,0,0.4); margin-bottom:20px; background:var(--surface2);" onerror="this.src='https://cdn.cashpot.ro/cashpot/t1/thumbnail_games/placeholder.png'; this.style.opacity='0.5'">
+                <img id="gd-thumb" src="slot_icon.png" referrerpolicy="no-referrer" style="width:200px; height:200px; border-radius:24px; object-fit:contain; box-shadow: 0 16px 32px rgba(0,0,0,0.4); margin-bottom:20px; background:var(--surface2);">
                 <div id="gd-stats-grid" style="display:grid; grid-template-columns:1fr 1fr; gap:12px;"></div>
               </div>
             </div>
@@ -2133,6 +2216,91 @@
   </div>
 </div>
 <!-- ADD EXPENSE MODAL -->
+<!-- MODAL CHELTUIELI FIXE -->
+<div class="settings-modal" id="modal-fixed-expense" onclick="if(event.target===this) this.classList.remove('show')">
+  <div class="settings-panel" style="width:500px; max-width:95%;">
+    <div class="settings-header">
+      <div class="settings-title">Adaugă Cheltuială Recurentă</div>
+      <button class="settings-close" onclick="document.getElementById('modal-fixed-expense').classList.remove('show')">×</button>
+    </div>
+    <div class="settings-body" style="padding:20px;">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+      <div>
+        <label style="display:block; font-size:10px; font-weight:700; color:var(--muted); margin-bottom:4px;">Dată Exactă</label>
+        <input type="date" id="fx-date" class="glass-input" style="width:100%;">
+      </div>
+    </div>
+    
+    <div style="margin-bottom: 16px;">
+      <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:6px;">
+        <label style="display:block; font-size:11px; font-weight:700; color:var(--muted);">Locații (Puncte de cheltuială)</label>
+        <label style="font-size:11px; color:var(--text); display:flex; align-items:center; gap:4px; cursor:pointer;"><input type="checkbox" id="fx-loc-all" onchange="toggleAllFxLocs(this)"> Selectează Tot</label>
+      </div>
+      <div id="fx-locs-container" style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; max-height:150px; overflow-y:auto; padding:10px; background:var(--surface2); border:1px solid var(--border); border-radius:8px;">
+        <!-- Injected via JS -->
+      </div>
+      <div style="font-size:9px; color:var(--muted); margin-top:4px;">*Lasă neselectat pentru a aplica pe TOATE locațiile (Distribuție Proporțională pe baza nr. de sloturi)</div>
+    </div>
+    
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+      <div>
+        <label style="display:block; font-size:10px; font-weight:700; color:var(--muted); margin-bottom:4px;">Departament</label>
+        <select id="fx-dep" class="glass-select" style="width:100%;" onchange="filterFixedExpenseTypes()"></select>
+      </div>
+      <div>
+        <label style="display:block; font-size:10px; font-weight:700; color:var(--muted); margin-bottom:4px;">Categorie / Tip</label>
+        <select id="fx-type" class="glass-select" style="width:100%;"></select>
+      </div>
+    </div>
+    
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+      <div>
+        <label style="display:block; font-size:10px; font-weight:700; color:var(--muted); margin-bottom:4px;">Cantitate</label>
+        <input type="number" id="fx-qty" class="glass-input" style="width:100%;" value="1" min="1" oninput="calcFixedTotal()">
+      </div>
+      <div>
+        <label style="display:block; font-size:10px; font-weight:700; color:var(--muted); margin-bottom:4px;">Valoare Unitară</label>
+        <input type="number" step="0.01" id="fx-val" class="glass-input" style="width:100%;" oninput="calcFixedTotal()">
+      </div>
+    </div>
+    
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px;">
+      <div>
+        <label style="display:block; font-size:10px; font-weight:700; color:var(--muted); margin-bottom:4px;">Monedă</label>
+        <select id="fx-currency" class="glass-select" style="width:100%;" onchange="toggleFxEur(); calcFixedTotal();">
+          <option value="RON">RON</option>
+          <option value="EUR">EUR</option>
+        </select>
+      </div>
+      <div id="fx-eur-container" style="display:none;">
+        <label style="display:block; font-size:10px; font-weight:700; color:var(--muted); margin-bottom:4px;">Curs Valutar (RON)</label>
+        <input type="number" step="0.0001" id="fx-eur" class="glass-input" style="width:100%;" oninput="calcFixedTotal()">
+      </div>
+    </div>
+    
+    <div style="margin-bottom:16px;">
+      <label style="display:block; font-size:10px; font-weight:700; color:var(--muted); margin-bottom:4px;">Detalii (opțional)</label>
+      <input type="text" id="fx-details" class="glass-input" style="width:100%;" placeholder="ex: Factură nr. 1234, Contract internet...">
+    </div>
+    
+    <div style="margin-bottom:16px;">
+      <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text); cursor:pointer;">
+        <input type="checkbox" id="fx-recurring" checked> 
+        Plată Recurentă (Se copiază automat în luna viitoare la apăsarea butonului de copiere)
+      </label>
+    </div>
+
+    <div style="background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:16px; margin-bottom:24px; text-align:center;">
+      <div style="font-size:11px; color:var(--muted); font-weight:700; text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px;">Total Calculat</div>
+      <div id="fx-total-display" style="font-size:24px; font-weight:800; color:var(--accent);">0.00 RON</div>
+    </div>
+    
+    <div style="display:flex; justify-content:flex-end;">
+      <button class="btn-primary" onclick="saveFixedExpense()" style="background:var(--accent);">Salvează Cheltuiala</button>
+    </div>
+    </div>
+  </div>
+</div>
 <div class="settings-modal" id="modal-add-expense" onclick="if(event.target===this) this.classList.remove('show')">
   <div class="settings-panel" style="width:600px; max-width:95%;">
     <div class="settings-header">
@@ -2323,7 +2491,7 @@
 </div>
 
 <script src="game_uuids.js?v=1"></script>
-<script src="app.js?v=20260531_v3"></script>
+<script src="app.js?v=20260723_v18"></script>
 <!-- CUSTOM PROMPT MODAL -->
 <div class="settings-modal" id="modal-custom-prompt" onclick="if(event.target===this) { if(window.customPromptCancel) window.customPromptCancel(); }">
   <div class="settings-panel" style="width:400px; max-width:90%; background:var(--surface);">

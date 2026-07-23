@@ -175,8 +175,8 @@ select.glass-select { padding-right: 30px; background-image: url("data:image/svg
 .glass-input:focus { border-color:var(--accent); }
 .glass-panel { background:rgba(17,24,39,0.7); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border:1px solid var(--border); border-radius:var(--radius); box-shadow:0 8px 32px rgba(0,0,0,0.1); }
 .data-table { width:100%; border-collapse:collapse; font-size:12px; }
-.data-table thead th { background:var(--surface2); color:var(--text-subtle); padding:9px 12px; text-align:left; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; font-size:10px; white-space:nowrap; position:sticky; top:0; z-index:2; box-shadow: 0 1px 0 var(--border); }
-.data-table thead th.num { text-align:right; }
+.data-table thead th { background:var(--surface2); color:var(--text-subtle); padding:9px 12px; text-align:center; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; font-size:10px; white-space:nowrap; position:sticky; top:0; z-index:2; box-shadow: 0 1px 0 var(--border); }
+.data-table thead th.num { text-align:center; }
 .data-table tbody tr { border-bottom:1px solid var(--border); transition:background .15s; }
 .data-table tbody tr:hover { background:var(--surface2); cursor:pointer; }
 .data-table td { padding:8px 12px; white-space:nowrap; }

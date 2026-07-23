@@ -376,7 +376,45 @@ def kpi():
           AND (is_deleted = false OR is_deleted IS NULL)
           AND date >= %s AND date <= %s {pg_loc_where} {pg_excl_where}
     """, pg_params)
-    expenses = float(exp_res[0]['s'] or 0) if exp_res else 0.0
+    var_expenses = float(exp_res[0]['s'] or 0) if exp_res else 0.0
+
+    # Calculate Fixed Expenses
+    fixed_expenses = 0.0
+    fixed_rows = pg_qry("""
+        SELECT f.id, f.expense_date as date, f.location_ids, f.total_ron as amount
+        FROM cp2_monthly_fixed_expenses f
+        WHERE f.expense_date >= %s AND f.expense_date <= %s
+    """, (start, end))
+    
+    if fixed_rows:
+        for r in fixed_rows:
+            target_locs = r['location_ids']
+            if target_locs and isinstance(target_locs, list):
+                target_locs = [str(lid) for lid in target_locs]
+            else:
+                target_locs = None
+                
+            d_str = r['date'].strftime('%Y-%m-%d')
+            active_m = qry("SELECT location_id, COUNT(DISTINCT machine_id) as c FROM machine_daily_meters WHERE date=%s GROUP BY location_id", (d_str,))
+            if not active_m:
+                active_m = qry("SELECT location_id, COUNT(DISTINCT machine_id) as c FROM machine_daily_meters WHERE date = (SELECT MAX(date) FROM machine_daily_meters) GROUP BY location_id")
+                
+            mysql_counts = {str(m['location_id']): m['c'] for m in active_m}
+            pg_slots = {}
+            for mid, c in mysql_counts.items():
+                if mid in mysql_to_pg_map:
+                    pid = mysql_to_pg_map[mid]
+                    if target_locs is None or pid in target_locs:
+                        pg_slots[pid] = pg_slots.get(pid, 0) + c
+                        
+            total_slots = sum(pg_slots.values())
+            if total_slots > 0:
+                for lid, slots in pg_slots.items():
+                    if lid in pg_loc_ids:
+                        fraction = slots / total_slots
+                        fixed_expenses += float(r['amount']) * fraction
+
+    expenses = var_expenses + fixed_expenses
 
     resp_data = {
         "data_start": str(row.get('data_start','') or ''),
@@ -1007,6 +1045,18 @@ def serve_app_js():
 def serve_game_uuids_js():
     return send_from_directory(BASE_DIR, 'game_uuids.js')
 
+@app.route('/chart.umd.min.js')
+def serve_chart():
+    return send_from_directory(BASE_DIR, 'chart.umd.min.js')
+
+@app.route('/chartjs-plugin-datalabels.min.js')
+def serve_chart_plugin():
+    return send_from_directory(BASE_DIR, 'chartjs-plugin-datalabels.min.js')
+
+@app.route('/xlsx.full.min.js')
+def serve_xlsx():
+    return send_from_directory(BASE_DIR, 'xlsx.full.min.js')
+
 @app.route('/slot_icon.png')
 def serve_img():
     return send_from_directory(BASE_DIR, 'slot_icon.png')
@@ -1018,6 +1068,10 @@ def serve_logo():
 @app.route('/favicon.ico')
 def serve_favicon():
     return send_from_directory(BASE_DIR, 'favicon.ico')
+
+@app.route('/favicon.png')
+def serve_favicon_png():
+    return send_from_directory(BASE_DIR, 'favicon.png')
 
 # ─── Raport pe Ore ────────────────────────────────────────────────────────────
 def sync_hourly_incomes():
@@ -3055,15 +3109,11 @@ def expense_form_data():
     pg_name_to_id = {normalize_loc_name(l['name']): str(l['id']) for l in pg_locs}
     
     # Check historical slots
-    today = datetime.now().strftime('%Y-%m-%d')
-    if date_param < today:
-        active_m = qry("SELECT location_id, COUNT(DISTINCT machine_id) as c FROM machine_daily_meters WHERE date=%s GROUP BY location_id", (date_param,))
-    else:
-        active_m = qry("SELECT location_id, COUNT(*) as c FROM machines WHERE deleted_at IS NULL GROUP BY location_id")
-        
-    if not active_m and date_param < today:
-        # Fallback if no meters for that day
-        active_m = qry("SELECT location_id, COUNT(*) as c FROM machines WHERE deleted_at IS NULL GROUP BY location_id")
+    active_m = qry("SELECT location_id, COUNT(DISTINCT machine_id) as c FROM machine_daily_meters WHERE date=%s GROUP BY location_id", (date_param,))
+    
+    if not active_m:
+        # Fallback to the most recent date with actual meters
+        active_m = qry("SELECT location_id, COUNT(DISTINCT machine_id) as c FROM machine_daily_meters WHERE date = (SELECT MAX(date) FROM machine_daily_meters) GROUP BY location_id")
         
     mysql_slot_counts = {str(r['location_id']): r['c'] for r in active_m}
     
@@ -3617,7 +3667,365 @@ def api_expenses():
             'is_manual': not bool(r['other_info'])
         })
         
+    # FETCH AND APPEND FIXED EXPENSES
+    fixed_rows = pg_qry("""
+        SELECT
+            f.id,
+            f.expense_date as date,
+            f.location_ids,
+            f.department_id,
+            f.type_id,
+            f.total_ron as amount,
+            cd.name AS department_name,
+            et.name AS expenditure_type_name
+        FROM cp2_monthly_fixed_expenses f
+        JOIN casino_departments cd ON f.department_id = cd.id
+        JOIN casino_expenditure_types et ON f.type_id = et.id
+        WHERE f.expense_date >= %s AND f.expense_date <= %s
+    """, (start, end))
+
+    for r in fixed_rows:
+        target_locs = r['location_ids']
+        if target_locs and isinstance(target_locs, list):
+            target_locs = [str(lid) for lid in target_locs]
+        else:
+            target_locs = None # implies ALL
+
+        # Proportional Split based on slot counts
+        d_str = r['date'].strftime('%Y-%m-%d')
+        active_m = qry("SELECT location_id, COUNT(DISTINCT machine_id) as c FROM machine_daily_meters WHERE date=%s GROUP BY location_id", (d_str,))
+        if not active_m:
+            active_m = qry("SELECT location_id, COUNT(DISTINCT machine_id) as c FROM machine_daily_meters WHERE date = (SELECT MAX(date) FROM machine_daily_meters) GROUP BY location_id")
+        
+        mysql_counts = {str(m['location_id']): m['c'] for m in active_m}
+        
+        pg_slots = {}
+        for mid, c in mysql_counts.items():
+            if mid in mysql_to_pg_map:
+                pid = mysql_to_pg_map[mid]
+                if target_locs is None or pid in target_locs:
+                    pg_slots[pid] = pg_slots.get(pid, 0) + c
+                
+        total_slots = sum(pg_slots.values())
+        if total_slots > 0:
+            for lid, slots in pg_slots.items():
+                if lid in pg_loc_ids: # only include in report if lid is requested by user filters
+                    fraction = slots / total_slots
+                    amt = float(r['amount']) * fraction
+                    loc_name = next((l['name'] for l in pg_locs if str(l['id']) == lid), '-')
+                    
+                    data.append({
+                        'id': f"fixed_{r['id']}_{lid}",
+                        'date': str(r['date'])[:10],
+                        'explanation': 'Taxă Recurentă (Repartizată)' if target_locs is None else 'Taxă Recurentă (Selecție)',
+                        'amount': round(amt, 2),
+                        'location_name': loc_name,
+                        'department_name': r['department_name'],
+                        'type_name': '-',
+                        'expenditure_type_name': r['expenditure_type_name'],
+                        'vendor_name': '-',
+                        'added_by': 'Sistem (Automat)',
+                        'is_manual': True
+                    })
+
+    data.sort(key=lambda x: x['date'], reverse=True)
     return jsonify(data)
+
+@app.route('/api/reports/pos')
+def api_reports_pos():
+    start, end = period_params(request)
+    
+    mysql_locs = qry("SELECT id, code FROM locations")
+    pg_locs = pg_qry("SELECT id, name FROM casino_locations")
+    pg_name_to_id = {normalize_loc_name(l['name']): str(l['id']) for l in pg_locs}
+    
+    mysql_to_pg_map = {}
+    for ml in mysql_locs:
+        norm = normalize_loc_name(ml['code'])
+        if norm in pg_name_to_id:
+            mysql_to_pg_map[str(ml['id'])] = pg_name_to_id[norm]
+
+    pg_loc_ids = []
+    ids_raw = request.args.get('loc_ids', '')
+    if ids_raw:
+        try:
+            ids = [x.strip() for x in ids_raw.split(',') if x.strip()]
+            for i in ids:
+                if i in mysql_to_pg_map:
+                    pg_loc_ids.append(mysql_to_pg_map[i])
+        except ValueError:
+            pass
+    else:
+        pg_loc_ids = list(mysql_to_pg_map.values())
+
+    pg_loc_where = ""
+    pg_params = [start, end]
+    if pg_loc_ids:
+        ph = ','.join(['%s']*len(pg_loc_ids))
+        pg_loc_where = f" AND p.location_id IN ({ph})"
+        pg_params.extend(pg_loc_ids)
+    else:
+        pg_loc_where = " AND 1=0"
+
+    sql = f"""
+        SELECT 
+            cl.name AS location_name,
+            p.operational_date AS op_date,
+            SUM(p.amount) AS total_amount,
+            COUNT(p.id) AS trx_count
+        FROM casino_payments p
+        JOIN casino_locations cl ON p.location_id = cl.id
+        LEFT JOIN casino_payment_types pt ON p.type_id = pt.id
+        LEFT JOIN casino_departments cd ON p.department_id = cd.id
+        WHERE p.operational_date >= %s::date AND p.operational_date <= %s::date
+          AND (p.is_deleted = false OR p.is_deleted IS NULL)
+          AND (pt.name ILIKE '%%pos%%' OR cd.name ILIKE '%%pos%%')
+          {pg_loc_where}
+        GROUP BY cl.name, p.operational_date
+        ORDER BY p.operational_date ASC
+    """
+    
+    rows = pg_qry(sql, pg_params)
+    
+    in_sql = f"""
+        SELECT 
+            cl.name AS location_name,
+            cp.date AS op_date,
+            SUM(cp.total_in) AS total_in
+        FROM cp2_daily_incomes cp
+        JOIN casino_locations cl ON cp.location_id::text = cl.id::text
+        WHERE cp.date >= %s::date AND cp.date <= %s::date
+    """
+    in_params = [start, end]
+    if pg_loc_ids:
+        in_sql += f" AND cp.location_id::text IN ({pg_loc_where.replace(' AND p.location_id IN (', '').replace(')','')})"
+        in_params.extend([str(x) for x in pg_loc_ids])
+    in_sql += " GROUP BY cl.name, cp.date"
+    
+    in_rows = pg_qry(in_sql, in_params)
+    in_map = {}
+    for r in in_rows:
+        d_val = r['op_date']
+        d = d_val.strftime('%d.%m.%Y') if hasattr(d_val, 'strftime') else str(d_val)[:10]
+        # try format if it's string
+        if isinstance(d_val, str) and '-' in d_val:
+            try: d = datetime.strptime(d_val[:10], '%Y-%m-%d').strftime('%d.%m.%Y')
+            except: pass
+        if d not in in_map: in_map[d] = {}
+        in_map[d][r['location_name']] = float(r['total_in'] or 0)
+    
+    days_map = {}
+    all_locs = set()
+    for r in rows:
+        d_val = r['op_date']
+        # d_val could be datetime.date or string
+        if hasattr(d_val, 'strftime'):
+            d = d_val.strftime('%d.%m.%Y')
+        else:
+            try:
+                # If it comes as '2026-07-01'
+                d = datetime.strptime(str(d_val)[:10], '%Y-%m-%d').strftime('%d.%m.%Y')
+            except:
+                d = str(d_val)
+        loc = r['location_name']
+        amt = float(r['total_amount'] or 0)
+        cnt = int(r['trx_count'] or 0)
+        
+        all_locs.add(loc)
+        if d not in days_map:
+            days_map[d] = {}
+        if loc not in days_map[d]:
+            days_map[d][loc] = {'amount': 0, 'count': 0, 'total_in': in_map.get(d, {}).get(loc, 0)}
+            
+        days_map[d][loc]['amount'] += amt
+        days_map[d][loc]['count'] += cnt
+        
+    days_list = []
+    def parse_d(ds):
+        try:
+            return datetime.strptime(ds, '%d.%m.%Y')
+        except:
+            return datetime.min
+    
+    sorted_days = sorted(list(days_map.keys()), key=parse_d)
+    
+    for d in sorted_days:
+        days_list.append({
+            'date': d,
+            'locations': days_map[d]
+        })
+        
+    return jsonify({
+        'days': days_list,
+        'locations': sorted(list(all_locs))
+    })
+
+def sync_recurring_expenses(target_month_str):
+    import datetime, calendar, json
+    
+    synced = pg_qry("SELECT id FROM cp2_recurring_sync_log WHERE sync_month = %s", (target_month_str,))
+    if synced: return
+        
+    try:
+        y, m = map(int, target_month_str.split('-'))
+        if m == 1:
+            prev_y, prev_m = y - 1, 12
+        else:
+            prev_y, prev_m = y, m - 1
+            
+        last_day_prev = calendar.monthrange(prev_y, prev_m)[1]
+        start_prev = f"{prev_y}-{prev_m:02d}-01"
+        end_prev = f"{prev_y}-{prev_m:02d}-{last_day_prev}"
+        
+        recurrences = pg_qry("""
+            SELECT location_ids, department_id, type_id, quantity, unit_value, currency, eur_rate, total_ron, is_recurring
+            FROM cp2_monthly_fixed_expenses
+            WHERE expense_date >= %s AND expense_date <= %s AND is_recurring = True
+        """, (start_prev, end_prev))
+        
+        target_date = f"{y}-{m:02d}-01"
+        
+        for r in recurrences:
+            locs_json = json.dumps(r['location_ids']) if r['location_ids'] else None
+            pg_qry("""
+                INSERT INTO cp2_monthly_fixed_expenses 
+                (expense_date, location_ids, department_id, type_id, quantity, unit_value, currency, eur_rate, total_ron, is_recurring)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (target_date, locs_json, r['department_id'], r['type_id'], r['quantity'], r['unit_value'], r['currency'], r['eur_rate'], r['total_ron'], True))
+            
+        pg_qry("INSERT INTO cp2_recurring_sync_log (sync_month) VALUES (%s)", (target_month_str,))
+    except Exception as e:
+        print(f"Failed to sync recurring expenses for {target_month_str}: {e}")
+
+@app.route('/api/expenses/fixed', methods=['GET', 'POST'])
+def api_fixed_expenses():
+    if request.method == 'GET':
+        month = request.args.get('month', '') # Format: YYYY-MM
+        if not month:
+            return jsonify({'error': 'Month parameter required (YYYY-MM)'}), 400
+            
+        sync_recurring_expenses(month)
+            
+        import calendar
+        year, m = map(int, month.split('-'))
+        last_day = calendar.monthrange(year, m)[1]
+        start_date = f"{year}-{m:02d}-01"
+        end_date = f"{year}-{m:02d}-{last_day}"
+            
+        rows = pg_qry("""
+            SELECT f.id, f.expense_date, f.location_ids, f.department_id, f.type_id,
+                   f.quantity, f.unit_value, f.currency, f.eur_rate, f.total_ron, f.is_recurring, f.details,
+                   d.name as department_name, t.name as type_name
+            FROM cp2_monthly_fixed_expenses f
+            LEFT JOIN casino_departments d ON f.department_id::text = d.id::text
+            LEFT JOIN casino_expenditure_types t ON f.type_id::text = t.id::text
+            WHERE f.expense_date >= %s AND f.expense_date <= %s
+            ORDER BY f.expense_date DESC, f.created_at DESC
+        """, (start_date, end_date))
+        
+        pg_locs = pg_qry("SELECT id, name FROM casino_locations")
+        pg_loc_map = {str(l['id']): l['name'] for l in pg_locs}
+        
+        cfg = get_exp_config()
+        local_deps = {str(d['id']): d['name'] for d in cfg.get('local_departments', [])}
+        local_types = {str(t['id']): t['name'] for t in cfg.get('local_types', [])}
+        
+        for r in rows:
+            r['id'] = str(r['id'])
+            r['department_id'] = str(r['department_id'])
+            r['type_id'] = str(r['type_id'])
+            
+            if not r['department_name']:
+                r['department_name'] = local_deps.get(r['department_id'], '-')
+            if not r['type_name']:
+                r['type_name'] = local_types.get(r['type_id'], '-')
+            
+            loc_names = []
+            if r['location_ids'] and isinstance(r['location_ids'], list):
+                for lid in r['location_ids']:
+                    if str(lid) in pg_loc_map:
+                        loc_names.append(pg_loc_map[str(lid)])
+            
+            r['location_name'] = ', '.join(loc_names) if loc_names else 'Toate (Proporțional)'
+            
+            r['expense_date'] = r['expense_date'].strftime('%Y-%m-%d')
+            r['unit_value'] = float(r['unit_value'])
+            r['eur_rate'] = float(r['eur_rate']) if r['eur_rate'] else None
+            r['total_ron'] = float(r['total_ron'])
+            r['is_recurring'] = bool(r['is_recurring'])
+            
+        return jsonify(rows)
+        
+    elif request.method == 'POST':
+        data = request.json
+        if not data: return jsonify({'error': 'No data'}), 400
+        
+        expense_date = data.get('expense_date')
+        department_id = data.get('department_id')
+        type_id = data.get('type_id')
+        location_ids = data.get('location_ids')
+        quantity = int(data.get('quantity', 1))
+        unit_value = float(data.get('unit_value', 0))
+        currency = data.get('currency', 'RON')
+        eur_rate = float(data.get('eur_rate')) if data.get('eur_rate') else None
+        is_recurring = bool(data.get('is_recurring', True))
+        details = data.get('details')
+        
+        if currency == 'EUR' and not eur_rate:
+            return jsonify({'error': 'EUR rate required for EUR currency'}), 400
+            
+        rate = eur_rate if currency == 'EUR' else 1.0
+        total_ron = quantity * unit_value * rate
+        
+        import json
+        loc_json = json.dumps(location_ids) if location_ids else None
+        
+        pg_qry("""
+            INSERT INTO cp2_monthly_fixed_expenses 
+            (expense_date, location_ids, department_id, type_id, quantity, unit_value, currency, eur_rate, total_ron, is_recurring, details)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (expense_date, loc_json, department_id, type_id, quantity, unit_value, currency, eur_rate, total_ron, is_recurring, details))
+        
+        return jsonify({'status': 'ok'})
+
+@app.route('/api/expenses/fixed/<expense_id>', methods=['DELETE', 'PUT'])
+def api_fixed_expenses_single(expense_id):
+    if request.method == 'DELETE':
+        pg_qry("DELETE FROM cp2_monthly_fixed_expenses WHERE id = %s", (expense_id,))
+        return jsonify({'status': 'ok'})
+    elif request.method == 'PUT':
+        data = request.json
+        if not data: return jsonify({'error': 'No data'}), 400
+        
+        expense_date = data.get('expense_date')
+        department_id = data.get('department_id')
+        type_id = data.get('type_id')
+        location_ids = data.get('location_ids')
+        quantity = int(data.get('quantity', 1))
+        unit_value = float(data.get('unit_value', 0))
+        currency = data.get('currency', 'RON')
+        eur_rate = float(data.get('eur_rate')) if data.get('eur_rate') else None
+        is_recurring = bool(data.get('is_recurring', True))
+        details = data.get('details')
+        
+        if currency == 'EUR' and not eur_rate:
+            return jsonify({'error': 'EUR rate required for EUR currency'}), 400
+            
+        rate = eur_rate if currency == 'EUR' else 1.0
+        total_ron = quantity * unit_value * rate
+        
+        import json
+        loc_json = json.dumps(location_ids) if location_ids else None
+        
+        pg_qry("""
+            UPDATE cp2_monthly_fixed_expenses 
+            SET expense_date = %s, location_ids = %s, department_id = %s, type_id = %s, 
+                quantity = %s, unit_value = %s, currency = %s, eur_rate = %s, total_ron = %s, is_recurring = %s,
+                details = %s, updated_at = current_timestamp()
+            WHERE id = %s
+        """, (expense_date, loc_json, department_id, type_id, quantity, unit_value, currency, eur_rate, total_ron, is_recurring, details, expense_id))
+        
+        return jsonify({'status': 'ok'})
 
 if __name__ == '__main__':
     import os

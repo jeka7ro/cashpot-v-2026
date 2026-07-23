@@ -46,36 +46,12 @@ function getProviderLogo(name) {
 }
 function bar(v,max){const w=Math.min(100,max?(Math.abs(v)/max)*100:0);const bg=v<0?'var(--red)':'var(--accent)';return`<div class="pct-bar" style="justify-content:flex-end"><div class="bar-track"><div class="bar-fill" style="width:${w}%;background:${bg}"></div></div></div>`;}
 
-function gameThumbUrl(name, id) {
-  if (id && String(id).length > 20) {
-    // Standard UUID based image path from CDN
-    return `https://cdn.cashpot.ro/cashpot/t1/thumbnail_games/${id}.png`;
-  }
-  
-  // Try to lookup UUID by name
-  if (name && typeof GAME_UUIDS !== 'undefined') {
-    if (GAME_UUIDS[name]) return `https://cdn.cashpot.ro/cashpot/t1/thumbnail_games/${GAME_UUIDS[name]}.png`;
-    
-    // Fallback: the database sometimes returns duplicated/corrupted names like "20 Super Hot20 Super Hot" or "100 Burning Ho100 Burning Hot".
-    // Find the longest official game name that is contained within the corrupted text.
-    let longestMatch = null;
-    for (let key in GAME_UUIDS) {
-      if (name.includes(key) || key.includes(name)) {
-        if (!longestMatch || key.length > longestMatch.length) longestMatch = key;
-      }
-    }
-    if (longestMatch && GAME_UUIDS[longestMatch]) {
-      return `https://cdn.cashpot.ro/cashpot/t1/thumbnail_games/${GAME_UUIDS[longestMatch]}.png`;
-    }
-  }
+function getGameThumbnail(name, id) {
+  return 'slot_icon.png';
+}
 
-  if (!name) return 'https://cdn.cashpot.ro/cashpot/t1/thumbnail_games/placeholder.png';
-  
-  let slug = name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
-  return `https://cdn.cashpot.ro/cashpot/t1/thumbnail_games/${slug}.png`;
+function gameThumbUrl(name, id) {
+  return 'slot_icon.png';
 }
 
 // Top 10 Games card loader for dashboard
@@ -98,7 +74,7 @@ async function loadTop10Games() {
           <div style="position:relative; height:100px; width:100px; flex-shrink:0;">
             <img src="${thumb}" referrerpolicy="no-referrer" alt="" loading="lazy"
               style="width:100%; height:100%; object-fit:contain; border-radius:8px; background:var(--surface); border:1px solid rgba(255,255,255,0.1);"
-              onerror="this.src='https://cdn.cashpot.ro/cashpot/t1/thumbnail_games/placeholder.png'; this.style.opacity='0.3'">
+              onerror="this.src='slot_icon.png'; this.style.opacity='0.3'">
           </div>
           <div style="flex:1; min-width:0; display:flex; flex-direction:column; justify-content:space-between; height:100%; padding:2px 0;">
             <div style="font-size:10px; color:var(--muted); font-weight:600; display:flex; justify-content:space-between;">
@@ -152,7 +128,12 @@ function cleanGameName(name) {
   }
   return name;
 }
-function showLoader(v){document.getElementById('loader').classList.toggle('show',v);}
+let _loaderTimeout = null;
+function showLoader(v){
+  document.getElementById('loader').classList.toggle('show', v);
+  clearTimeout(_loaderTimeout);
+  if (v) _loaderTimeout = setTimeout(() => { document.getElementById('loader').classList.remove('show'); }, 10000);
+}
 function round2(v){return Math.round(v*100)/100;}
 function getExcluded(){try{return JSON.parse(localStorage.getItem('excluded_locs')||'[]');}catch{return[];}}
 function locParam() {
@@ -198,10 +179,11 @@ window.reloadCurrentView = function() {
   }
   else if (hash.startsWith('#admin/sloturi')) loadAdminSloturi();
   else if (hash.startsWith('#live')) { /* live se gestioneaza prin hashchange */ }
+  else if (hash === '#pos') loadPosReport();
   else loadAll();
 };
-async function api(path) {
-  const r = await fetch(API + path);
+async function api(path, options = {}) {
+  const r = await fetch(API + path, options);
   if (!r.ok) {
     let msg = `HTTP ${r.status}`;
     try { const t = await r.text(); if(t) msg += ': ' + t.substring(0, 200); } catch(_){}
@@ -227,7 +209,9 @@ const tableStates = {
   'rep-hourly': { page: 1, limit: dLimit, rows: [] },
   'rep-clienti': { page: 1, limit: dLimit, rows: [] },
   'hh-players': { page: 1, limit: dLimit, rows: [] },
-  'rep-lunare': { page: 1, limit: dLimit, rows: [] }
+  'rep-lunare': { page: 1, limit: dLimit, rows: [] },
+  pos: { page: 1, limit: 50, rows: [] },
+  'fixed-expenses': { page: 1, limit: dLimit, rows: [] }
 };
 
 function renderTablePaginated(key) {
@@ -251,38 +235,33 @@ function renderTablePaginated(key) {
     });
     thead.dataset.sortAttached = 'true';
   }
-
-  // Attach Excel button to card header if not already done
-  if (thead && !thead.dataset.excelAttached) {
-    let card = tbody.closest('.card') || tbody.closest('.table-card');
-    if (card && !card.classList.contains('tables-section')) {
-      let headerDiv = card.querySelector('div'); // The first div is the header
-      if (headerDiv && headerDiv.querySelector('span')) {
-        let btnWrap = headerDiv.querySelector('.excel-btn-wrap');
-        if (!btnWrap) {
-          headerDiv.style.display = 'flex';
-          headerDiv.style.justifyContent = 'space-between';
-          headerDiv.style.alignItems = 'center';
-          btnWrap = document.createElement('div');
-          btnWrap.className = 'excel-btn-wrap';
-          headerDiv.appendChild(btnWrap);
-        }
-        // Only append if empty
-        if (btnWrap.children.length === 0) {
-          let btn = document.createElement('button');
-          btn.style.cssText = 'padding:4px 12px; font-size:11px; height:24px; border:1px solid rgba(30, 215, 96, 0.3); border-radius:12px; background:rgba(30, 215, 96, 0.1); color:var(--green); display:flex; align-items:center; cursor:pointer; font-weight:600; transition:all 0.2s; margin-left: auto;';
-          btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Export Excel`;
-          btn.onmouseover = () => btn.style.background = 'rgba(30, 215, 96, 0.2)';
-          btn.onmouseout = () => btn.style.background = 'rgba(30, 215, 96, 0.1)';
-          btn.onclick = () => exportToExcel(key);
-          btnWrap.appendChild(btn);
-        }
+  
+  // Restore visual arrows on initial load if sorting is applied from localStorage
+  if (thead && st.sortCol === undefined) {
+      const savedCol = localStorage.getItem(`sort_${key}_col`);
+      const savedDir = localStorage.getItem(`sort_${key}_dir`);
+      if (savedCol !== null) {
+          const ths = thead.querySelectorAll('th');
+          if (ths[parseInt(savedCol, 10)]) {
+             ths.forEach(t => t.textContent = t.textContent.replace(/ [▼▲]$/, ''));
+             ths[parseInt(savedCol, 10)].textContent += savedDir === 'desc' ? ' ▼' : ' ▲';
+          }
       }
-    }
-    thead.dataset.excelAttached = 'true';
   }
+
+
   
   let rowsToRender = st.filteredRows || st.rows;
+  
+  if (st.sortCol === undefined) {
+      const savedCol = localStorage.getItem(`sort_${key}_col`);
+      const savedDir = localStorage.getItem(`sort_${key}_dir`);
+      if (savedCol !== null) {
+          st.sortCol = parseInt(savedCol, 10);
+          st.sortDir = savedDir || 'desc';
+      }
+  }
+
   if (st.sortCol !== undefined) {
     if (!st.parsedRows || st._parsedRowsRef !== rowsToRender) {
       st.parsedRows = rowsToRender.map(html => {
@@ -380,6 +359,9 @@ window.sortTable = function(key, colIndex, th) {
     st.sortCol = colIndex;
     st.sortDir = 'desc'; // Default to desc since most are metrics
   }
+  
+  localStorage.setItem(`sort_${key}_col`, st.sortCol);
+  localStorage.setItem(`sort_${key}_dir`, st.sortDir);
   
   // Update visual indicators
   const tbody = document.getElementById('body-' + key);
@@ -919,6 +901,224 @@ function drillTo(field,val,label){
 let _locDetailChart = null;
 
 let _prevActiveView = 'view-dashboard';
+
+// ==================== CHELTUIELI FIXE ====================
+window.loadFixedExpenses = async function() {
+  const monthInput = document.getElementById('fixed-exp-month');
+  if (!monthInput.value) {
+    const now = new Date();
+    monthInput.value = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2, '0');
+  }
+  const month = monthInput.value;
+  try {
+    const data = await api('/api/expenses/fixed?month=' + month);
+    window._fixedExpenses = data;
+    renderFixedExpenses();
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+window.renderFixedExpenses = function() {
+  const tbody = document.getElementById('body-fixed-expenses');
+  if(!tbody) return;
+  
+  if(!window._fixedExpenses || window._fixedExpenses.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:var(--muted); padding:24px;">Nu există cheltuieli recurente pentru această lună.</td></tr>`;
+    document.getElementById('fixed-expenses-total').innerText = '0.00';
+    document.getElementById('pg-fixed-expenses').innerHTML = '';
+    return;
+  }
+  
+  let rowsHtml = [];
+  let totalRon = 0;
+  
+  window._fixedExpenses.forEach((r, idx) => {
+    totalRon += (r.total_ron || 0);
+    rowsHtml.push(`<tr>
+      <td style="color:var(--muted); font-weight:600;">${idx + 1}</td>
+      <td>${r.expense_date}</td>
+      <td>${r.department_name || '-'}</td>
+      <td>
+        ${r.type_name || '-'}
+        ${r.details ? `<div style="font-size:10px; color:var(--muted); margin-top:2px;">${r.details}</div>` : ''}
+      </td>
+      <td>${r.location_name || 'Toate (Proporțional)'}</td>
+      <td class="num">${fmt(r.quantity)}</td>
+      <td class="num">${fmt(r.unit_value, 2)}</td>
+      <td>${r.currency}</td>
+      <td class="num" style="font-weight:700; color:var(--accent);">${fmt(r.total_ron || 0, 2)}</td>
+      <td style="text-align:center;">
+        <button class="btn-ghost" style="color:var(--accent); padding:4px;" onclick="editFixedExpense('${r.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg></button>
+        <button class="btn-ghost" style="color:var(--red); padding:4px;" onclick="deleteFixedExpense('${r.id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
+      </td>
+    </tr>`);
+  });
+  
+  tableStates['fixed-expenses'].rows = rowsHtml;
+  document.getElementById('fixed-expenses-total').innerText = fmt(totalRon, 2);
+  
+  // Refresh pagination & display
+  renderTablePaginated('fixed-expenses');
+}
+
+window.deleteFixedExpense = async function(id) {
+  if(!confirm('Sigur ștergi această cheltuială?')) return;
+  try {
+    await api(`/api/expenses/fixed/${id}`, { method: 'DELETE' });
+    loadFixedExpenses();
+    showAlert('Cheltuiala a fost ștearsă', 'Succes');
+  } catch(e) {
+    showAlert('Eroare la ștergere: ' + (e.message || ''), 'Eroare');
+  }
+}
+
+window.editFixedExpense = function(id) {
+  const r = window._fixedExpenses.find(x => x.id === id);
+  if (r) {
+    openFixedExpenseModal(r);
+  }
+}
+
+window.openFixedExpenseModal = async function(editData = null) {
+  document.getElementById('modal-fixed-expense').classList.add('show');
+  
+  if (editData && editData.id) {
+    window.editingFixedExpenseId = editData.id;
+    document.getElementById('fx-date').value = editData.expense_date;
+    document.getElementById('fx-qty').value = editData.quantity;
+    document.getElementById('fx-val').value = editData.unit_value;
+    document.getElementById('fx-currency').value = editData.currency;
+    document.getElementById('fx-eur').value = editData.eur_rate || '';
+    if (document.getElementById('fx-details')) document.getElementById('fx-details').value = editData.details || '';
+    if (document.getElementById('fx-recurring')) {
+      document.getElementById('fx-recurring').checked = editData.is_recurring;
+    }
+  } else {
+    window.editingFixedExpenseId = null;
+    document.getElementById('fx-date').value = new Date().toISOString().split('T')[0];
+    document.getElementById('fx-qty').value = 1;
+    document.getElementById('fx-val').value = '';
+    document.getElementById('fx-currency').value = 'RON';
+    document.getElementById('fx-eur').value = '';
+    if (document.getElementById('fx-details')) document.getElementById('fx-details').value = '';
+    if (document.getElementById('fx-recurring')) {
+      document.getElementById('fx-recurring').checked = true;
+    }
+  }
+  
+  toggleFxEur();
+  calcFixedTotal();
+  
+  // Load deps and types from expense_form_data
+  try {
+    const data = await api('/api/admin/expense_form_data?date=' + document.getElementById('fx-date').value);
+    window._expenseTypes = data.types || [];
+    
+    let depHtml = '<option value="">Alege Departament...</option>';
+    data.departments.forEach(d => {
+       depHtml += `<option value="${d.id}" ${editData && editData.department_id === d.id ? 'selected' : ''}>${d.name}</option>`;
+    });
+    document.getElementById('fx-dep').innerHTML = depHtml;
+    
+    let locHtml = '';
+    const hiddenLocs = ['Depozit', 'Ploiesti (centru)', 'Focsani'];
+    data.locations.forEach(l => {
+        if (hiddenLocs.includes(l.name)) return;
+        let slotsHtml = l.slots > 0 ? `<span style="color:var(--accent); font-weight:700;">(${l.slots} sloturi)</span>` : '';
+        const isChecked = editData && editData.location_ids && editData.location_ids.includes(l.id) ? 'checked' : '';
+        locHtml += `<label style="display:flex; align-items:center; gap:6px; font-size:12px;">
+                      <input type="checkbox" name="fx-loc-checkbox" value="${l.id}" ${isChecked}> 
+                      ${l.name} ${slotsHtml}
+                    </label>`;
+    });
+    document.getElementById('fx-locs-container').innerHTML = locHtml;
+    document.getElementById('fx-loc-all').checked = false;
+    
+    filterFixedExpenseTypes();
+    if (editData && editData.id) {
+      setTimeout(() => {
+        document.getElementById('fx-type').value = editData.type_id;
+      }, 50);
+    }
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+window.toggleAllFxLocs = function(cb) {
+  const cbs = document.querySelectorAll('input[name="fx-loc-checkbox"]');
+  cbs.forEach(c => c.checked = cb.checked);
+}
+
+window.filterFixedExpenseTypes = function() {
+  const depId = document.getElementById('fx-dep').value;
+  let typeHtml = '<option value="">Alege Categorie...</option>';
+  if(window._expenseTypes) {
+    const filtered = window._expenseTypes.filter(t => t.department_id === depId);
+    filtered.forEach(t => typeHtml += `<option value="${t.id}">${t.name}</option>`);
+  }
+  document.getElementById('fx-type').innerHTML = typeHtml;
+}
+
+window.toggleFxEur = function() {
+  const curr = document.getElementById('fx-currency').value;
+  document.getElementById('fx-eur-container').style.display = (curr === 'EUR') ? 'block' : 'none';
+}
+
+window.calcFixedTotal = function() {
+  const qty = parseFloat(document.getElementById('fx-qty').value) || 0;
+  const val = parseFloat(document.getElementById('fx-val').value) || 0;
+  const curr = document.getElementById('fx-currency').value;
+  const rate = (curr === 'EUR') ? (parseFloat(document.getElementById('fx-eur').value) || 0) : 1;
+  const tot = qty * val * rate;
+  document.getElementById('fx-total-display').innerText = fmt(tot, 2) + ' RON';
+}
+
+window.saveFixedExpense = async function() {
+    const selectedLocs = Array.from(document.querySelectorAll('input[name="fx-loc-checkbox"]:checked')).map(cb => cb.value);
+    
+    const payload = {
+      expense_date: document.getElementById('fx-date').value,
+      location_ids: selectedLocs.length > 0 ? selectedLocs : null,
+    department_id: document.getElementById('fx-dep').value,
+    type_id: document.getElementById('fx-type').value,
+    quantity: parseFloat(document.getElementById('fx-qty').value),
+    unit_value: parseFloat(document.getElementById('fx-val').value),
+    currency: document.getElementById('fx-currency').value,
+    eur_rate: parseFloat(document.getElementById('fx-eur').value) || null,
+    is_recurring: document.getElementById('fx-recurring') ? document.getElementById('fx-recurring').checked : true,
+    details: document.getElementById('fx-details') ? document.getElementById('fx-details').value : null
+  };
+  
+  if(!payload.expense_date || !payload.department_id || !payload.type_id || !payload.quantity || !payload.unit_value) {
+    return showAlert('Completează toate câmpurile obligatorii!', 'Eroare');
+  }
+  if(payload.currency === 'EUR' && !payload.eur_rate) {
+    return showAlert('Cursul EUR este obligatoriu!', 'Eroare');
+  }
+  
+  const isEdit = !!window.editingFixedExpenseId;
+  const method = isEdit ? 'PUT' : 'POST';
+  const url = isEdit ? `/api/expenses/fixed/${window.editingFixedExpenseId}` : `/api/expenses/fixed`;
+  
+  try {
+    await api(url, {
+      method: method,
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    document.getElementById('modal-fixed-expense').classList.remove('show');
+    showAlert('Cheltuială salvată cu succes!', 'Succes');
+    loadFixedExpenses();
+    
+    // De asemenea, dacă suntem pe vreun tab de expenses, dăm reload ca să prindă datele din server
+    if (window.fetchExpenses) window.fetchExpenses();
+  } catch(e) {
+    showAlert('Eroare la salvare: ' + (e.message || ''), 'Eroare');
+  }
+}
+
 
 async function loadLocationDetails(locId, locName) {
   // Save current view and show loc detail
@@ -1530,7 +1730,7 @@ function tBadge(curr, prev) {
   const pct = ((curr - prev) / prev) * 100;
   const c = pct >= 0 ? 'up' : 'down';
   const a = pct >= 0 ? '↑' : '↓';
-  return `<div style="margin-top:4px; text-align:right;"><span class="kpi-trend ${c}" style="font-size:9px; padding:2px 4px;">${a}${Math.abs(pct).toFixed(1)}%</span></div>`;
+  return `<span style="margin-left:6px; display:inline-block; vertical-align:middle;"><span class="kpi-trend ${c}" style="font-size:9px; padding:2px 4px;">${a}${Math.abs(pct).toFixed(1)}%</span></span>`;
 }
 // ─── API Loaders ──────────────────────────────────────────────────────────────
 async function loadFilters(){
@@ -1628,7 +1828,7 @@ async function loadKPI(s,e){
   if(ggrDayEl) ggrDayEl.textContent = 'AVG/zi: ' + fmt(d.avg_ggr_zi) + ' RON';
 
   const marketingCost = d.marketing || ((d.jackpot || 0) + (d.hh || 0) + (d.cashback || 0));
-  const ngrCalculated = (d.ggr || 0) + marketingCost;
+  const ngrCalculated = (d.ggr || 0) - marketingCost;
 
   const ngrEl = document.getElementById('v-ngr');
   if (ngrEl) ngrEl.textContent = fmt(ngrCalculated) + ' RON';
@@ -1642,8 +1842,7 @@ async function loadKPI(s,e){
   }
   const expEl = document.getElementById('v-expenses');
   if (expEl) {
-    const isExpensesPage = window.location.hash === '#cheltuieli' || window.location.hash.startsWith('#cheltuieli/') || window.location.hash.startsWith('#rapoarte/cheltuieli');
-    expEl.textContent = isExpensesPage ? 'AVG/zi: ' + fmt(d.nr_zile ? d.net_profit/d.nr_zile : 0) + ' RON' : 'Cheltuieli: ' + fmt(d.expenses) + ' RON';
+    expEl.textContent = 'Cheltuieli: ' + fmt(d.expenses) + ' RON';
   }
   const vMkt = document.getElementById('v-marketing');
   if (vMkt) {
@@ -1669,6 +1868,13 @@ async function loadKPI(s,e){
   
   const vOnlyExp = document.getElementById('v-only-expenses');
   if(vOnlyExp) vOnlyExp.textContent = fmt(d.expenses) + ' RON';
+  
+  const vExpMonth = document.getElementById('v-expenses-month');
+  if(vExpMonth && s && e) {
+    const diffDays = Math.max(0, (new Date(e) - new Date(s)) / (1000 * 60 * 60 * 24));
+    const days = Math.max(1, diffDays + 1);
+    vExpMonth.textContent = 'AVG/zi: ' + fmt(d.expenses / days) + ' RON';
+  }
   const vOnlyProf = document.getElementById('v-only-profit');
   if(vOnlyProf) {
     vOnlyProf.textContent = 'Profit Net: ' + fmt(d.net_profit) + ' RON';
@@ -1877,22 +2083,23 @@ async function loadLocations(s,e){
       clientiVal = avg > 0 ? String(Math.round(avg)) : '—';
     }
 
+    const betB = c ? tBadge(currE?.bet, prev?.bet) : '';
     return`<tr>
       <td style="text-align:center; color:var(--muted); font-size:11px">${i+1}</td>
       <td><span class="drill-link" onclick="drillTo('location',${r.id},'${(r.locatie||'').replace(/'/g,"\\'")}')">${r.locatie||'—'}</span></td>
-      <td class="mobile-show-cell num" style="display:none; color:var(--purple)">${fmt(r.total_in)}${inB}</td>
+      <td class="mobile-show-cell num" style="display:none;">${fmt(r.total_in)}${inB}</td>
+      <td class="mobile-hide num" style="font-weight:bold;">${fmt(r.total_in)}${inB}</td>
+      <td class="num">${fmt(r.bet)}${betB}</td>
       <td class="num ${cc}">${fmt(r.ggr)}${ggrB}</td>
-      <td class="num">${fmtE(r.ggr)}</td>
       <td style="text-align:center">${r.buc}</td><td style="text-align:center">${r.zile}</td><td class="num">${clientiVal}</td>
-      <td class="mobile-hide num">${fmt(r.total_in)}${inB}</td>
       <td class="num">${fmt(r.jackpot)}</td><td class="num">${fmt(r.hh)}</td><td class="num">${fmt(r.cashback)}</td><td class="num">${fmt(r.roata||0)}</td><td class="num" style="color:var(--blue)">${fmt(r.raffles||0)}</td>
-      <td class="num">${fmt(r.games)}</td><td class="num">${pill(r.hold_pct)}</td><td class="num">${bonusCost(r.bonus_cost_pct||0)}</td>
+      <td class="num">${pill(r.hold_pct)}</td><td class="num">${bonusCost(r.bonus_cost_pct||0)}</td><td class="num">${fmt(r.games)}</td>
     </tr>`;
   });
   renderTablePaginated('locatii');
 
   // Actualizează header Clienți/zi dinamic (coloana 5)
-  const clientiHeader = document.querySelector('#tab-locatii thead th:nth-child(5)');
+  const clientiHeader = document.querySelector('#tab-locatii thead th:nth-child(9)');
   if (clientiHeader) {
     const anyOneDayH = data.every(r => +r.zile === 1);
     clientiHeader.textContent = anyOneDayH ? 'Clienți' : 'Clienți/zi';
@@ -1926,21 +2133,21 @@ async function loadLocations(s,e){
   }
   document.getElementById('foot-locatii').innerHTML=`<tr style="font-weight:700">
     <td colspan="2">TOTAL / MEDIE</td>
-    <td class="mobile-show-cell num" style="display:none; color:var(--purple)">${fmt(tIn)}${totalInBadge}</td>
+    <td class="mobile-show-cell num" style="display:none;">${fmt(tIn)}${totalInBadge}</td>
+    <td class="mobile-hide num" style="font-weight:bold;">${fmt(tIn)}${totalInBadge}</td>
+    <td class="num">${fmt(tBet)}${c ? tBadge(currExclData.reduce((s,x)=>s+(x.bet||0),0), prevData.reduce((s,x)=>s+(x.bet||0),0)) : ''}</td>
     <td class="num">${fmt(tGgr)}${totalGgrBadge}</td>
-    <td class="num">${fmtE(tGgr)}</td>
     <td style="text-align:center">${totalBuc}</td>
     <td style="text-align:center">—</td>
     <td class="num">${footerClienti}</td>
-    <td class="mobile-hide num">${fmt(tIn)}${totalInBadge}</td>
     <td class="num">${fmt(tJp)}</td>
     <td class="num">${fmt(tHh)}</td>
     <td class="num">${fmt(tCb)}</td>
     <td class="num">${fmt(tRoata)}</td>
     <td class="num" style="color:var(--blue)">${fmt(tRaffles)}</td>
-    <td class="num">${fmt(tGm)}</td>
     <td class="num">${pill(avgHold)}</td>
     <td class="num">${bonusCost(avgBonusCost)}</td>
+    <td class="num">${fmt(tGm)}</td>
   </tr>`;
 
   if(pieChart)pieChart.destroy();
@@ -1994,16 +2201,17 @@ async function loadProviders(s,e){
     const currE = currExclData.find(x => x.id === r.id);
     const inB = c ? tBadge(currE?.total_in, prev?.total_in) : '';
     const ggrB = c ? tBadge(currE?.ggr, prev?.ggr) : '';
+    const betB = c ? tBadge(currE?.bet, prev?.bet) : '';
     return`<tr>
       <td>${i+1}</td>
       <td><span class="drill-link" onclick="drillTo('provider',${r.id},'${(r.provider||'').replace(/'/g,"\\'")}')"><img src="${getProviderLogo(r.provider)}" onerror="this.onerror=null; this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(r.provider||'P')}&background=random&color=fff&rounded=true'" class="prov-logo" alt="icon"> ${r.provider||'—'}</span></td>
       <td>${r.buc}</td><td>${r.zile}</td>
-      <td class="mobile-show-cell num" style="display:none; color:var(--purple)">${fmt(r.total_in)}${inB}</td>
-      <td class="mobile-hide num">${fmt(r.total_in)}${inB}</td>
+      <td class="mobile-show-cell num" style="display:none;">${fmt(r.total_in)}${inB}</td>
+      <td class="mobile-hide num" style="font-weight:bold;">${fmt(r.total_in)}${inB}</td>
+      <td class="num">${fmt(r.bet)}${betB}</td>
       <td class="num ${cc}">${fmt(r.ggr)}${ggrB}</td>
-      <td class="num">${fmtE(r.ggr)}</td>
       <td class="num">${fmt(r.jackpot)}</td><td class="num">${fmt(r.cashback)}</td><td class="num">${fmt(r.roata||0)}</td><td class="num" style="color:var(--blue)">${fmt(r.raffles||0)}</td>
-      <td class="num">${fmt(r.games)}</td><td class="num">${pill(r.hold_pct)}</td><td class="num">${bonusCost(r.bonus_cost_pct||0)}</td>
+      <td class="num">${pill(r.hold_pct)}</td><td class="num">${bonusCost(r.bonus_cost_pct||0)}</td><td class="num">${fmt(r.games)}</td>
     </tr>`;
   });
   renderTablePaginated('provideri');
@@ -2055,14 +2263,15 @@ async function loadTypes(s,e){
     const currE = currExclData.find(x => x.tip_slot === r.tip_slot && x.cabinet === r.cabinet);
     const inB = c ? tBadge(currE?.total_in, prev?.total_in) : '';
     const ggrB = c ? tBadge(currE?.ggr, prev?.ggr) : '';
+    const betB = c ? tBadge(currE?.bet, prev?.bet) : '';
     return`<tr>
       <td>${i+1}</td>
       <td><strong>${r.provider||'—'}</strong></td><td>${r.cabinet||'—'}</td><td><img src="/slot_icon.png" class="slot-icon" alt="icon"> ${r.tip_slot||'—'}</td><td>${r.buc}</td>
-      <td class="mobile-show-cell num" style="display:none; color:var(--purple)">${fmt(r.total_in)}${inB}</td>
-      <td class="mobile-hide num">${fmt(r.total_in)}${inB}</td>
+      <td class="mobile-show-cell num" style="display:none;">${fmt(r.total_in)}${inB}</td>
+      <td class="mobile-hide num" style="font-weight:bold;">${fmt(r.total_in)}${inB}</td>
+      <td class="num">${fmt(r.bet)}${betB}</td>
       <td class="num ${cc}">${fmt(r.ggr)}${ggrB}</td>
-      <td class="num">${fmtE(r.ggr)}</td>
-      <td class="num">${fmt(r.games)}</td><td class="num">${pill(r.hold_pct)}</td><td class="num">${bonusCost(r.bonus_cost_pct||0)}</td>
+      <td class="num">${pill(r.hold_pct)}</td><td class="num">${bonusCost(r.bonus_cost_pct||0)}</td><td class="num">${fmt(r.games)}</td>
     </tr>`;
   });
   renderTablePaginated('tipuri');
@@ -2083,15 +2292,16 @@ async function loadCabinets(s,e){
     const currE = currExclData.find(x => x.cabinet === r.cabinet);
     const inB = c ? tBadge(currE?.total_in, prev?.total_in) : '';
     const ggrB = c ? tBadge(currE?.ggr, prev?.ggr) : '';
+    const betB = c ? tBadge(currE?.bet, prev?.bet) : '';
     return`<tr>
       <td>${i+1}</td>
       <td><strong>${r.provider||'Necunoscut'}</strong></td><td><span class="drill-link" onclick="drillTo('cabinet',0,'${(r.cabinet||'').replace(/'/g,"\\'")}')"><img src="/slot_icon.png" class="slot-icon" alt="icon"> ${r.cabinet||'—'}</span></td>
       <td>${r.buc}</td>
-      <td class="mobile-show-cell num" style="display:none; color:var(--purple)">${fmt(r.total_in)}${inB}</td>
-      <td class="mobile-hide num">${fmt(r.total_in)}${inB}</td>
+      <td class="mobile-show-cell num" style="display:none;">${fmt(r.total_in)}${inB}</td>
+      <td class="mobile-hide num" style="font-weight:bold;">${fmt(r.total_in)}${inB}</td>
+      <td class="num">${fmt(r.bet)}${betB}</td>
       <td class="num ${cc}">${fmt(r.ggr)}${ggrB}</td>
-      <td class="num">${fmtE(r.ggr)}</td>
-      <td class="num">${fmt(r.games)}</td><td class="num">${pill(r.hold_pct)}</td><td class="num">${bonusCost(r.bonus_cost_pct||0)}</td>
+      <td class="num">${pill(r.hold_pct)}</td><td class="num">${bonusCost(r.bonus_cost_pct||0)}</td><td class="num">${fmt(r.games)}</td>
     </tr>`;
   });
   renderTablePaginated('cabinete');
@@ -2122,6 +2332,7 @@ async function loadMachines(){
       const inB = c ? tBadge(currE?.total_in, prev?.total_in) : '';
       const ggrB = c ? tBadge(currE?.ggr, prev?.ggr) : '';
       const thumb = gameThumbUrl(r.last_game_name || r.game_name, r.game_id);
+      const betB = c ? tBadge(currE?.bet, prev?.bet) : '';
       return`<tr>
         <td>${i+1}</td>
         <td>
@@ -2133,12 +2344,12 @@ async function loadMachines(){
         <td><strong>${r.provider||'—'}</strong></td><td>${r.cabinet||'—'}</td>
         <td><span class="drill-link" onclick="goToMultigame('${(r.mix||'').replace(/'/g,"\\'")}')">${r.mix||'—'}</span></td>
         <td>${r.locatie||'—'}</td><td>${r.zile}</td>
-        <td class="mobile-show-cell num" style="display:none; color:var(--purple)">${fmt(r.total_in)}${inB}</td>
-        <td class="mobile-hide num">${fmt(r.total_in)}${inB}</td><td class="num">${fmt(r.in_zi)}</td>
+        <td class="mobile-show-cell num" style="display:none;">${fmt(r.total_in)}${inB}</td>
+        <td class="mobile-hide num" style="font-weight:bold;">${fmt(r.total_in)}${inB}</td><td class="num">${fmt(r.in_zi)}</td>
+        <td class="num">${fmt(r.bet)}${betB}</td>
         <td class="num ${cc}">${fmt(r.ggr)}${ggrB}</td>
-        <td class="num">${fmtE(r.ggr)}</td>
         <td class="num">${fmt(r.jackpot)}</td><td class="num">${fmt(r.hh)}</td><td class="num">${fmt(r.cashback)}</td>
-        <td class="num">${fmt(r.games)}</td><td class="num">${pill(r.hold_pct)}</td><td class="num">${bonusCost(r.bonus_cost_pct||0)}</td>
+        <td class="num">${pill(r.hold_pct)}</td><td class="num">${bonusCost(r.bonus_cost_pct||0)}</td><td class="num">${fmt(r.games)}</td>
       </tr>`;
     });
     renderTablePaginated('aparate');
@@ -2306,11 +2517,14 @@ window.sortDashClienti = function(field) {
 };
 
 async function loadAll(){
+  const hash = window.location.hash || '#dashboard';
+  if (hash !== '#dashboard' && hash !== '' && hash !== '#') return;
   const{s,e}=getPeriod();
   if(!s||!e){ return; }
   showLoader(true);
   try{
-    await Promise.allSettled([loadKPI(s,e),loadTrend(s,e),loadLocations(s,e),loadProviders(s,e),loadTypes(s,e),loadCabinets(s,e),loadCalendars(s,e),loadMachines(),loadDashClienti(s,e)]);
+    // loadDashClienti(s,e); // DISABLED: Postgres query takes 1-2 mins and blocks the Flask server, freezing the UI.
+    await Promise.allSettled([loadKPI(s,e),loadTrend(s,e),loadLocations(s,e),loadProviders(s,e),loadTypes(s,e),loadCabinets(s,e),loadCalendars(s,e),loadMachines()]);
     if (typeof filterDashTables === 'function') filterDashTables();
     if (document.getElementById('view-rapoarte') && document.getElementById('view-rapoarte').classList.contains('active')) {
       const hh  = document.getElementById('rep-page-hh');
@@ -2567,7 +2781,7 @@ window.addEventListener('hashchange', () => {
   
   const kpiSection = document.getElementById('kpi-section');
   if (kpiSection) {
-    if (mainHash === 'live' || (mainHash === 'rapoarte' && subHash === 'retentie') || mainHash === 'admin') {
+    if (mainHash === 'live' || (mainHash === 'rapoarte' && subHash === 'retentie') || mainHash === 'admin' || mainHash === 'pos') {
       kpiSection.style.display = 'none';
     } else {
       kpiSection.style.display = 'grid';
@@ -2728,6 +2942,7 @@ window.addEventListener('hashchange', () => {
   }
   if(mainHash === 'live') loadLive();
   if(mainHash === 'dashboard') loadAll();
+  if(mainHash === 'pos') { showLoader(false); loadPosReport(); }
 
   // Show/Hide kpi-profit (Expenses & Net Profit) based on context
   const kpiProfit = document.getElementById('kpi-profit');
@@ -4268,7 +4483,7 @@ window.loadMultigameReport = window.loadMultigame = async function() {
               <td style="${td}width:52px">
                 <img src="${thumb}" referrerpolicy="no-referrer" alt="" loading="lazy"
                   style="width:40px;height:40px;object-fit:cover;border-radius:8px;background:var(--surface2);border:1px solid rgba(255,255,255,0.1);"
-                  onerror="this.src='https://cdn.cashpot.ro/cashpot/t1/thumbnail_games/placeholder.png'; this.style.opacity='0.3'">
+                  onerror="this.src='slot_icon.png'; this.style.opacity='0.3'">
               </td>
               <td style="${td}min-width:160px">
                 <div style="font-weight:700;color:var(--text);cursor:pointer;text-decoration:underline;text-decoration-style:dotted;" onclick="openGameDetails('${(cleanGameName(r.game)||'').replace(/'/g,"\\'")}', '${r.game_id||''}')">${cleanGameName(r.game)}</div>
@@ -5039,6 +5254,203 @@ window.exportCashoutExcel = window.exportCashoutCSV = function() {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 
+// ─── POS DEPOSITS REPORT ──────────────────────────────────────────────────────
+let _posData = null;
+
+window.loadPosReport = async function() {
+  const { s, e } = getPeriod();
+  if (!s || !e) return;
+  
+  const tbody = document.getElementById('body-pos');
+  const thead = document.getElementById('head-pos');
+  const tfoot = document.getElementById('foot-pos');
+  if (!tbody) return;
+  
+  tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; color:var(--muted); padding:30px;">Se încarcă...</td></tr>';
+  
+  try {
+    const data = await api(`/api/reports/pos?start=${s}&end=${e}${locParam()}`);
+    _posData = data;
+    
+    const locs = data.locations || [];
+    const days = data.days || [];
+    
+    // KPI
+    let grandTotal = 0, totalTrx = 0;
+    days.forEach(d => {
+      locs.forEach(loc => {
+        const cell = d.locations[loc] || {};
+        grandTotal += cell.amount || 0;
+        totalTrx += cell.count || 0;
+      });
+    });
+    
+    const numDays = days.length;
+    const avgPerDay = numDays > 0 ? grandTotal / numDays : 0;
+    
+    const el = id => document.getElementById(id);
+    if (el('pos-kpi-total')) el('pos-kpi-total').textContent = fmt(grandTotal);
+    if (el('pos-kpi-avg')) el('pos-kpi-avg').textContent = fmt(avgPerDay);
+    if (el('pos-kpi-trx')) el('pos-kpi-trx').textContent = totalTrx.toLocaleString('ro-RO');
+    if (el('pos-kpi-days')) el('pos-kpi-days').textContent = numDays;
+    
+    // Footer - totals per location (unchanged logic, just keep it here before sort)
+    if (tfoot) {
+      let footHtml = '<tr style="font-weight:700;"><td colspan="2">TOTAL</td>';
+      let footGrand = 0;
+      locs.forEach(loc => {
+        let locTotal = 0;
+        days.forEach(d => { locTotal += (d.locations[loc] || {}).amount || 0; });
+        footGrand += locTotal;
+        footHtml += `<td class="num">${fmt(locTotal)}</td>`;
+      });
+      footHtml += `<td class="num" style="font-weight:800;">${fmt(footGrand)}</td></tr>`;
+      tfoot.innerHTML = footHtml;
+    }
+
+    // Keep existing sort from variables, just render
+    renderPosBody();
+    
+  } catch(err) {
+    console.error('Eroare loadPosReport:', err);
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; color:var(--danger);">Eroare la încărcarea datelor POS: ' + (err.message || err) + '</td></tr>';
+  }
+};
+
+let _posSortCol = localStorage.getItem('posSortCol') || 'date';
+let _posSortAsc = localStorage.getItem('posSortAsc') === null ? false : localStorage.getItem('posSortAsc') === 'true';
+
+window.sortPos = function(col) {
+  if (_posSortCol === col) {
+    _posSortAsc = !_posSortAsc;
+  } else {
+    _posSortCol = col;
+    _posSortAsc = false; // Default to descending for dates and metrics
+  }
+  localStorage.setItem('posSortCol', _posSortCol);
+  localStorage.setItem('posSortAsc', _posSortAsc);
+  renderPosBody();
+};
+
+function renderPosBody() {
+  if (!_posData) return;
+  const tbody = document.getElementById('body-pos');
+  const thead = document.getElementById('head-pos');
+  
+  const locs = _posData.locations || [];
+  let days = [...(_posData.days || [])];
+  
+  // Sort days
+  days.sort((a, b) => {
+    let valA, valB;
+    if (_posSortCol === 'date') {
+      const partsA = a.date.split('.');
+      const partsB = b.date.split('.');
+      valA = new Date(`${partsA[2]}-${partsA[1]}-${partsA[0]}`).getTime();
+      valB = new Date(`${partsB[2]}-${partsB[1]}-${partsB[0]}`).getTime();
+    } else if (_posSortCol === 'total') {
+      valA = 0; locs.forEach(l => valA += (a.locations[l] || {}).amount || 0);
+      valB = 0; locs.forEach(l => valB += (b.locations[l] || {}).amount || 0);
+    } else {
+      valA = (a.locations[_posSortCol] || {}).amount || 0;
+      valB = (b.locations[_posSortCol] || {}).amount || 0;
+    }
+    
+    if (valA < valB) return _posSortAsc ? -1 : 1;
+    if (valA > valB) return _posSortAsc ? 1 : -1;
+    return 0;
+  });
+
+  // Rebuild header
+  if (thead) {
+    const arr = _posSortAsc ? '↑' : '↓';
+    let thHtml = '<tr><th style="text-align:center; width:40px;">Nr.</th>';
+    thHtml += `<th style="cursor:pointer;" onclick="sortPos('date')">Data ${_posSortCol === 'date' ? arr : '↕'}</th>`;
+    locs.forEach(loc => { 
+      thHtml += `<th class="num" style="cursor:pointer;" onclick="sortPos('${loc}')">${loc} ${_posSortCol === loc ? arr : '↕'}</th>`; 
+    });
+    thHtml += `<th class="num" style="font-weight:800; cursor:pointer;" onclick="sortPos('total')">TOTAL ${_posSortCol === 'total' ? arr : '↕'}</th></tr>`;
+    thead.innerHTML = thHtml;
+  }
+
+  let bodyHtml = '';
+  if (days.length === 0) {
+    bodyHtml = `<tr><td colspan="${locs.length + 3}" style="text-align:center; color:var(--muted); padding:30px;">Nu sunt date POS pentru perioada selectată.</td></tr>`;
+  } else {
+    days.forEach((d, idx) => {
+      let rowTotal = 0;
+      let cells = '';
+      locs.forEach(loc => {
+        const cell = d.locations[loc] || {};
+        const amt = cell.amount || 0;
+        const totalIn = cell.total_in || 0;
+        rowTotal += amt;
+        
+        let pctStr = '';
+        if (totalIn > 0 && amt > 0) {
+            const pct = (amt / totalIn) * 100;
+            pctStr = `<div style="font-size:10px; color:var(--muted); margin-top:2px;">${pct.toFixed(2)}%</div>`;
+        }
+        
+        cells += `<td class="num">${amt > 0 ? fmt(amt) + pctStr : '<span style="color:var(--muted)">—</span>'}</td>`;
+      });
+      bodyHtml += `<tr>
+        <td style="text-align:center; color:var(--muted); font-size:11px;">${idx + 1}</td>
+        <td style="white-space:nowrap;">${d.date}</td>
+        ${cells}
+        <td class="num" style="font-weight:700;">${fmt(rowTotal)}</td>
+      </tr>`;
+    });
+  }
+  if (tbody) tbody.innerHTML = bodyHtml;
+}
+
+window.exportPosExcel = function() {
+  if (!_posData || !_posData.days || _posData.days.length === 0) return;
+  const locs = _posData.locations || [];
+  const days = _posData.days || [];
+  
+  const aoa = [];
+  aoa.push(['Nr.', 'Data', ...locs, 'TOTAL']);
+
+  days.forEach((d, idx) => {
+    let rowTotal = 0;
+    let vals = [];
+    locs.forEach(loc => {
+      const amt = (d.locations[loc] || {}).amount || 0;
+      rowTotal += amt;
+      vals.push(amt);
+    });
+    aoa.push([idx+1, d.date, ...vals, rowTotal]);
+  });
+  
+  let footVals = [];
+  let footGrand = 0;
+  locs.forEach(loc => {
+    let t = 0;
+    days.forEach(d => { t += (d.locations[loc] || {}).amount || 0; });
+    footGrand += t;
+    footVals.push(t);
+  });
+  aoa.push(['', 'TOTAL', ...footVals, footGrand]);
+  
+  if (typeof XLSX !== 'undefined') {
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Depuneri POS");
+    XLSX.writeFile(wb, `POS_Depuneri_${_posData.days[0]?.date || 'export'}.xlsx`);
+  } else {
+    // Fallback in case XLSX failed to load
+    let csv = 'Nr.,Data,' + locs.join(',') + ',TOTAL\n';
+    for (let i = 1; i < aoa.length; i++) {
+      csv += aoa[i].join(',') + '\n';
+    }
+    const blob = new Blob(['\uFEFF' + csv], {type: 'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `POS_Depuneri_${_posData.days[0]?.date || 'export'}.csv`; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+};
 
 
 // ─── AUTHENTICATION & ADMIN ───────────────────────────────────────────────────
@@ -5934,18 +6346,7 @@ window.loadPLData = async function() {
     const expRes = await api(`/api/reports/expenses?${p}`);
     const expData = expRes || [];
 
-    // Update KPI cards for PL page
-    const totalExp = expData.reduce((sum, r) => sum + (r.amount || 0), 0);
-    const vOnlyExp = document.getElementById('v-only-expenses');
-    if (vOnlyExp) vOnlyExp.textContent = fmt(totalExp) + ' RON';
-    
-    let months = 1;
-    if (s && e) {
-      const diffDays = (new Date(e) - new Date(s)) / (1000 * 60 * 60 * 24);
-      months = Math.max(1, diffDays / 30.44);
-    }
-    const vExpMonth = document.getElementById('v-expenses-month');
-    if (vExpMonth) vExpMonth.textContent = 'AVG/lună: ' + fmt(totalExp / months) + ' RON';
+    // KPI updates are now handled exclusively by loadKPI() to avoid race conditions.
     
     // Marketing is now handled in loadKPI
 
@@ -6242,19 +6643,7 @@ window.loadExpensesReport = async function() {
     window.renderExpCharts();
     window.renderExpSummary();
     
-    // Update Total Cheltuieli KPI directly from data (no extra API call needed)
-    const totalExp = _expensesData.reduce((sum, r) => sum + (r.amount || 0), 0);
-    const vOnlyExp = document.getElementById('v-only-expenses');
-    if (vOnlyExp) vOnlyExp.textContent = fmt(totalExp) + ' RON';
-    
-    // Calculate months for average
-    let months = 1;
-    if (s && e) {
-      const diffDays = (new Date(e) - new Date(s)) / (1000 * 60 * 60 * 24);
-      months = Math.max(1, diffDays / 30.44);
-    }
-    const vExpMonth = document.getElementById('v-expenses-month');
-    if (vExpMonth) vExpMonth.textContent = 'AVG/lună: ' + fmt(totalExp / months) + ' RON';
+    // KPI updates are now handled exclusively by loadKPI() to avoid race conditions.
     
     // Marketing is now handled in loadKPI
     
@@ -6278,6 +6667,12 @@ window.switchExpTab = function(tab) {
   document.getElementById('exp-tab-btn-details').style.borderBottomColor = (tab === 'details') ? 'var(--accent)' : 'transparent';
   document.getElementById('exp-tab-btn-details').style.color = (tab === 'details') ? 'var(--accent)' : 'var(--muted)';
   
+  const fixedBtn = document.getElementById('exp-tab-btn-fixed');
+  if(fixedBtn) {
+    fixedBtn.style.borderBottomColor = (tab === 'fixed') ? 'var(--accent)' : 'transparent';
+    fixedBtn.style.color = (tab === 'fixed') ? 'var(--accent)' : 'var(--muted)';
+  }
+  
   const plBtn = document.getElementById('exp-tab-btn-pl');
   if(plBtn) {
     plBtn.style.borderBottomColor = (tab === 'pl') ? 'var(--accent)' : 'transparent';
@@ -6286,6 +6681,12 @@ window.switchExpTab = function(tab) {
   
   document.getElementById('exp-tab-summary').style.display = (tab === 'summary') ? 'block' : 'none';
   document.getElementById('exp-tab-details').style.display = (tab === 'details') ? 'block' : 'none';
+  
+  const fixedTab = document.getElementById('exp-tab-fixed');
+  if(fixedTab) {
+    fixedTab.style.display = (tab === 'fixed') ? 'block' : 'none';
+    if(tab === 'fixed') loadFixedExpenses();
+  }
   
   const plTab = document.getElementById('exp-tab-pl');
   if(plTab) {
