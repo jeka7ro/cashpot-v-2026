@@ -2716,15 +2716,21 @@ setTimeout(async () => {
 
 const savedTheme = localStorage.getItem('theme') || 'dark';
 document.documentElement.setAttribute('data-theme', savedTheme);
-Chart.defaults.color = savedTheme === 'light' ? '#64748b' : '#94a3b8';
-Chart.defaults.borderColor = savedTheme === 'light' ? '#e2e8f0' : 'rgba(255,255,255,0.06)';
+if (typeof Chart !== 'undefined') {
+  Chart.defaults.color = savedTheme === 'light' ? '#64748b' : '#94a3b8';
+  Chart.defaults.borderColor = savedTheme === 'light' ? '#e2e8f0' : 'rgba(255,255,255,0.06)';
+}
+
 window.toggleTheme = function() {
   const current = document.documentElement.getAttribute('data-theme');
   const next = current === 'light' ? 'dark' : 'light';
   document.documentElement.setAttribute('data-theme', next);
   localStorage.setItem('theme', next);
-  Chart.defaults.color = next === 'light' ? '#64748b' : '#94a3b8';
-  Chart.defaults.borderColor = next === 'light' ? '#e2e8f0' : 'rgba(255,255,255,0.06)';
+  
+  if (typeof Chart !== 'undefined') {
+    Chart.defaults.color = next === 'light' ? '#64748b' : '#94a3b8';
+    Chart.defaults.borderColor = next === 'light' ? '#e2e8f0' : 'rgba(255,255,255,0.06)';
+  }
   
   if (localStorage.getItem('cp2_token')) {
     apiAuth('/api/me/theme', {
