@@ -2075,37 +2075,22 @@ async function loadLocations(s,e){
     const inB = c ? tBadge(currE?.total_in, prev?.total_in) : '';
     const ggrB = c ? tBadge(currE?.ggr, prev?.ggr) : '';
     
-    const isOneDay = (+r.zile === 1);
-    let clientiVal;
-    if (isOneDay) {
-      clientiVal = r.clienti_total > 0 ? String(Math.round(r.clienti_total)) : '—';
-    } else {
-      const avg = r.zile > 0 ? (r.clienti_total||0) / r.zile : 0;
-      clientiVal = avg > 0 ? String(Math.round(avg)) : '—';
-    }
-
     const betB = c ? tBadge(currE?.bet, prev?.bet) : '';
     return`<tr>
       <td style="text-align:center; color:var(--muted); font-size:11px">${i+1}</td>
+      <td style="text-align:center">${r.buc}</td>
       <td><span class="drill-link" onclick="drillTo('location',${r.id},'${(r.locatie||'').replace(/'/g,"\\'")}')">${r.locatie||'—'}</span></td>
       <td class="mobile-show-cell num" style="display:none;">${fmt(r.total_in)}${inB}</td>
       <td class="mobile-hide num" style="font-weight:bold;">${fmt(r.total_in)}${inB}</td>
       <td class="num">${fmt(r.bet)}${betB}</td>
       <td class="num ${cc}">${fmt(r.ggr)}${ggrB}</td>
       <td class="num" style="color:var(--red)">${fmt(r.cheltuieli||0)}</td>
-      <td style="text-align:center">${r.buc}</td><td style="text-align:center">${r.zile}</td><td class="num">${clientiVal}</td>
+      <td style="text-align:center">${r.zile}</td>
       <td class="num">${fmt(r.jackpot)}</td><td class="num">${fmt(r.hh)}</td><td class="num">${fmt(r.cashback)}</td><td class="num">${fmt(r.roata||0)}</td><td class="num" style="color:var(--blue)">${fmt(r.raffles||0)}</td>
       <td class="num">${pill(r.hold_pct)}</td><td class="num">${bonusCost(r.bonus_cost_pct||0)}</td><td class="num">${fmt(r.games)}</td>
     </tr>`;
   });
   renderTablePaginated('locatii');
-
-  // Actualizează header Clienți/zi dinamic (coloana 10)
-  const clientiHeader = document.querySelector('#tab-locatii thead th:nth-child(10)');
-  if (clientiHeader) {
-    const anyOneDayH = data.every(r => +r.zile === 1);
-    clientiHeader.textContent = anyOneDayH ? 'Clienți' : 'Clienți/zi';
-  }
 
   let prevTIn=0, prevTGgr=0, currETIn=0, currETGgr=0;
   prevData.forEach(r => { prevTIn += +r.total_in||0; prevTGgr += +r.ggr||0; });
@@ -2124,25 +2109,16 @@ async function loadLocations(s,e){
   if (elCard) elCard.textContent = tClientiCard;
   if (elTot) elTot.textContent = tClientiTotal;
   
-  const anyOneDay2 = data.every(r => +r.zile === 1);
-  let footerClienti;
-  if (anyOneDay2) {
-    footerClienti = tClientiTotal > 0 ? `<strong>${Math.round(tClientiTotal)}</strong>` : '—';
-  } else {
-    const totalZile = data.reduce((s,r) => s + (+r.zile||0), 0.01);
-    const avgCl = tClientiTotal / totalZile;
-    footerClienti = avgCl > 0 ? `<strong>${Math.round(avgCl)}</strong>` : '—';
-  }
   document.getElementById('foot-locatii').innerHTML=`<tr style="font-weight:700">
-    <td colspan="2">TOTAL / MEDIE</td>
+    <td style="text-align:center; color:var(--muted)">—</td>
+    <td style="text-align:center">${totalBuc}</td>
+    <td>TOTAL / MEDIE</td>
     <td class="mobile-show-cell num" style="display:none;">${fmt(tIn)}${totalInBadge}</td>
     <td class="mobile-hide num" style="font-weight:bold;">${fmt(tIn)}${totalInBadge}</td>
     <td class="num">${fmt(tBet)}${c ? tBadge(currExclData.reduce((s,x)=>s+(x.bet||0),0), prevData.reduce((s,x)=>s+(x.bet||0),0)) : ''}</td>
     <td class="num">${fmt(tGgr)}${totalGgrBadge}</td>
     <td class="num" style="color:var(--red)">${fmt(tChelt)}</td>
-    <td style="text-align:center">${totalBuc}</td>
     <td style="text-align:center">—</td>
-    <td class="num">${footerClienti}</td>
     <td class="num">${fmt(tJp)}</td>
     <td class="num">${fmt(tHh)}</td>
     <td class="num">${fmt(tCb)}</td>
