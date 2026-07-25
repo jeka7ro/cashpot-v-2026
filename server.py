@@ -508,14 +508,82 @@ def locations():
     """, [start, end])
     cp_map = {r['location_id']: r['card_players'] for r in card_players}
 
-    # Get distinct card players per location
-    card_players = qry("""
-        SELECT location_id, COUNT(DISTINCT player_id) as card_players
-        FROM player_card_logs
-        WHERE created_at >= %s AND created_at <= %s + INTERVAL 1 DAY
+    # Expenses Logic
+    pg_locs = pg_qry("SELECT id, name FROM casino_locations")
+    pg_name_to_id = {normalize_loc_name(l['name']): str(l['id']) for l in pg_locs}
+    
+    mysql_locs = qry("SELECT id, code FROM locations")
+    mysql_to_pg_map = {}
+    for ml in mysql_locs:
+        norm = normalize_loc_name(ml['code'])
+        if norm in pg_name_to_id:
+            mysql_to_pg_map[str(ml['id'])] = pg_name_to_id[norm]
+
+    cfg = get_exp_config()
+    excl_deps = cfg.get('excluded_departments', [])
+    excl_types = cfg.get('excluded_types', [])
+    
+    pg_excl_where = ""
+    if excl_deps:
+        ph_d = ','.join([f"'{d}'" for d in excl_deps])
+        pg_excl_where += f" AND (department_id IS NULL OR department_id::text NOT IN ({ph_d}))"
+    if excl_types:
+        ph_t = ','.join([f"'{t}'" for t in excl_types])
+        pg_excl_where += f" AND (expenditure_type_id IS NULL OR expenditure_type_id::text NOT IN ({ph_t}))"
+
+    # Var expenses
+    exp_res = pg_qry(f"""
+        SELECT location_id, SUM(amount) as s 
+        FROM casino_payments 
+        WHERE direction = 1
+          AND (is_deleted = false OR is_deleted IS NULL)
+          AND date >= %s AND date <= %s {pg_excl_where}
         GROUP BY location_id
-    """, [start, end])
-    cp_map = {r['location_id']: r['card_players'] for r in card_players}
+    """, [start + ' 00:00:00', end + ' 23:59:59'])
+    pg_exp_map = {str(r['location_id']): float(r['s'] or 0) for r in exp_res} if exp_res else {}
+
+    # Fixed expenses
+    fixed_rows = pg_qry("""
+        SELECT f.id, f.expense_date as date, f.location_ids, f.total_ron as amount
+        FROM cp2_monthly_fixed_expenses f
+        WHERE f.expense_date >= %s AND f.expense_date <= %s
+    """, (start, end))
+    
+    pg_fixed_exp = {}
+    if fixed_rows:
+        for r in fixed_rows:
+            target_locs = r['location_ids']
+            if target_locs and isinstance(target_locs, list):
+                target_locs = [str(lid) for lid in target_locs]
+            else:
+                target_locs = None
+                
+            d_str = r['date'].strftime('%Y-%m-%d')
+            active_m = qry("SELECT location_id, COUNT(DISTINCT machine_id) as c FROM machine_daily_meters WHERE date=%s GROUP BY location_id", (d_str,))
+            if not active_m:
+                active_m = qry("SELECT location_id, COUNT(DISTINCT machine_id) as c FROM machine_daily_meters WHERE date = (SELECT MAX(date) FROM machine_daily_meters) GROUP BY location_id")
+                
+            mysql_counts = {str(m['location_id']): m['c'] for m in active_m}
+            pg_slots = {}
+            for mid, c in mysql_counts.items():
+                if mid in mysql_to_pg_map:
+                    pid = mysql_to_pg_map[mid]
+                    if target_locs is None or pid in target_locs:
+                        pg_slots[pid] = pg_slots.get(pid, 0) + c
+                        
+            total_slots = sum(pg_slots.values())
+            if total_slots > 0:
+                for lid, slots in pg_slots.items():
+                    fraction = slots / total_slots
+                    pg_fixed_exp[lid] = pg_fixed_exp.get(lid, 0) + float(r['amount']) * fraction
+                    
+    # Map back to mysql locations
+    loc_expenses = {}
+    for ml in mysql_locs:
+        mid = str(ml['id'])
+        if mid in mysql_to_pg_map:
+            pid = mysql_to_pg_map[mid]
+            loc_expenses[mid] = pg_exp_map.get(pid, 0) + pg_fixed_exp.get(pid, 0)
 
     rows = qry("""
         SELECT
@@ -577,6 +645,7 @@ def locations():
         result.append({**r,
             'clienti_card': cc,
             'clienti_total': cc + est_fara,
+            'cheltuieli': loc_expenses.get(str(r['id']), 0),
             'ggr_eur': round(ggr/EUR_RATE,2), 'ngr_eur': round(ngr/EUR_RATE,2),
             'hold_pct': round(ggr/tin*100,2) if tin else 0,
             'ngr_pct':  round(ngr/tin*100,2) if tin else 0,
