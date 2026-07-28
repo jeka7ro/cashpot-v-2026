@@ -245,7 +245,15 @@ def loc_filter(req, alias='mas'):
 def filters():
     # Only return canonical (parent) locations — E.S. are merged
     canonical_ids = [lid for lid in [1,3,4,5,6,7] ]  # parent IDs + Depozit
-    locs_raw = qry("SELECT id, COALESCE(display_code, code) AS name, city FROM locations WHERE deleted_at IS NULL ORDER BY city, id")
+    locs_raw = qry("""
+        SELECT DISTINCT l.id, COALESCE(l.display_code, l.code) AS name, l.city 
+        FROM locations l
+        JOIN machines m ON m.location_id = l.id
+        WHERE l.deleted_at IS NULL AND m.deleted_at IS NULL
+          AND m.slot_machine_id IS NOT NULL AND TRIM(m.slot_machine_id) != ''
+          AND l.id != 3
+        ORDER BY l.city, l.id
+    """)
     # Build canonical list: skip child E.S. locations
     seen = set()
     locs = []
@@ -493,6 +501,98 @@ def trend():
     
     set_cached_response(c_key, rows)
     return jsonify(rows)
+
+# ─── Floorplan API ────────────────────────────────────────────────────────────
+import werkzeug.utils
+import psycopg2.extras
+
+@app.route('/api/floorplan/upload', methods=['POST'])
+def floorplan_upload():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+    if file:
+        loc_id = request.form.get('location_id')
+        if not loc_id:
+            return jsonify({'error': 'Missing location_id'}), 400
+        
+        filename = werkzeug.utils.secure_filename(file.filename)
+        filename = f"{loc_id}_{filename}"
+        save_dir = os.path.join(os.path.dirname(__file__), 'static', 'floorplans')
+        os.makedirs(save_dir, exist_ok=True)
+        file.save(os.path.join(save_dir, filename))
+        
+        bg_url = f"/static/floorplans/{filename}"
+        conn = cp2_db.get_db()
+        c = conn.cursor()
+        c.execute("""
+            INSERT INTO cp2_floorplan_settings (location_id, floorplan_bg)
+            VALUES (%s, %s)
+            ON CONFLICT (location_id) DO UPDATE SET floorplan_bg = EXCLUDED.floorplan_bg
+        """, (loc_id, bg_url))
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'success': True, 'url': bg_url})
+
+@app.route('/api/floorplan/settings', methods=['GET'])
+def floorplan_settings():
+    loc_id = request.args.get('location_id')
+    conn = cp2_db.get_db()
+    c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    c.execute("SELECT floorplan_bg FROM cp2_floorplan_settings WHERE location_id = %s", (loc_id,))
+    row = c.fetchone()
+    conn.close()
+    return jsonify(row if row else {'floorplan_bg': None})
+
+@app.route('/api/floorplan/machines', methods=['GET', 'POST'])
+def floorplan_machines():
+    if request.method == 'POST':
+        data = request.json
+        loc_id = data.get('location_id')
+        machines = data.get('machines', [])
+        
+        conn = cp2_db.get_db()
+        c = conn.cursor()
+        c.execute("DELETE FROM cp2_floorplan_machines WHERE location_id = %s", (loc_id,))
+        for m in machines:
+            c.execute("""
+                INSERT INTO cp2_floorplan_machines (location_id, machine_id, serial_nr, pos_x, pos_y, angle)
+                VALUES (%s, %s, %s, %s, %s, %s)
+            """, (loc_id, m.get('machine_id'), m.get('serial_nr'), m.get('pos_x'), m.get('pos_y'), m.get('angle', 0)))
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True})
+    else:
+        loc_id = request.args.get('location_id')
+        conn = cp2_db.get_db()
+        c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        c.execute("SELECT * FROM cp2_floorplan_machines WHERE location_id = %s", (loc_id,))
+        rows = c.fetchall()
+        conn.close()
+        return jsonify(rows)
+
+@app.route('/api/settings/floorplan', methods=['GET', 'POST'])
+def global_floorplan_settings():
+    conn = cp2_db.get_db()
+    c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    if request.method == 'POST':
+        data = request.json
+        c.execute("""
+            INSERT INTO cp2_global_settings (key, value)
+            VALUES ('floorplan_thresholds', %s)
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
+        """, (json.dumps(data),))
+        conn.commit()
+        conn.close()
+        return jsonify({'success': True})
+    else:
+        c.execute("SELECT value FROM cp2_global_settings WHERE key = 'floorplan_thresholds'")
+        row = c.fetchone()
+        conn.close()
+        return jsonify(row['value'] if row and row['value'] else {})
 
 # ─── Per Locație ─────────────────────────────────────────────────────────────
 @app.route('/api/locations')
@@ -796,8 +896,7 @@ def machines():
     loc_id  = request.args.get('location_id','')
     prov_id = request.args.get('provider_id','')
     cab_id  = request.args.get('cabinet_id','')
-
-    filters = ["mas.date >= %s AND mas.date <= %s AND mas.`in` > 0"]
+    filters = ["mas.date >= %s AND mas.date <= %s"]
     params  = [start, end]
     if loc_id and loc_id != 'all':
         try:
@@ -833,6 +932,7 @@ def machines():
     rows = qry(f"""
         SELECT
             m.slot_machine_id              AS serial_nr,
+            m.`order`                      AS position,
             mt.name                        AS mix,
             COALESCE(mct.name,'—')         AS cabinet,
             mas.machine_id                 AS id,

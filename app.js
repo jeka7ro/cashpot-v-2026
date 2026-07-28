@@ -178,6 +178,8 @@ window.reloadCurrentView = function() {
     loadLocationDetails(locId, locName);
   }
   else if (hash.startsWith('#admin/sloturi')) loadAdminSloturi();
+  else if (hash === '#admin-floorplan') loadAdminFloorplan();
+  else if (hash === '#floorplan') loadGlobalFloorplan();
   else if (hash.startsWith('#live')) { /* live se gestioneaza prin hashchange */ }
   else if (hash === '#pos') loadPosReport();
   else loadAll();
@@ -1217,6 +1219,7 @@ async function loadLocationDetails(locId, locName) {
 
     // 2. Trend Chart & Calendar
     renderLocDetailChart(dailyData);
+    renderLocDetailFloorplan(locId, machData);
     renderLocDetailCalendar(locId, e);
     renderLocDetailMachines(machData);
     updateLocDetailPeriodLabel();
@@ -2763,23 +2766,43 @@ window.addEventListener('hashchange', () => {
   document.querySelectorAll('.sidebar .nav-item').forEach(i => i.classList.remove('active'));
   
   const kpiSection = document.getElementById('kpi-section');
-  if (kpiSection) {
-    if (mainHash === 'live' || (mainHash === 'rapoarte' && subHash === 'retentie') || mainHash === 'admin' || mainHash === 'pos') {
-      kpiSection.style.display = 'none';
-    } else {
-      kpiSection.style.display = 'grid';
-    }
+  const timelineSection = document.querySelector('.timeline-section');
+  const headerFilters = document.querySelector('.header-filters');
+  
+  if (mainHash === 'live' || (mainHash === 'rapoarte' && subHash === 'retentie') || mainHash === 'admin' || mainHash === 'pos' || mainHash === 'floorplan' || mainHash === 'admin-floorplan') {
+    if (kpiSection) kpiSection.style.display = 'none';
+    if (timelineSection && mainHash === 'admin-floorplan') timelineSection.style.display = 'none';
+    else if (timelineSection) timelineSection.style.display = 'flex';
+    if (headerFilters && mainHash === 'admin-floorplan') headerFilters.style.display = 'none';
+    else if (headerFilters) headerFilters.style.display = 'flex';
+  } else {
+    if (kpiSection) kpiSection.style.display = 'grid';
+    if (timelineSection) timelineSection.style.display = 'flex';
+    if (headerFilters) headerFilters.style.display = 'flex';
   }
 
   const targetView = document.getElementById('view-' + mainHash);
   if(targetView) targetView.classList.add('active');
+
+  if (mainHash === 'floorplan') {
+    initGlobalFloorplan();
+  }
+  if (mainHash === 'admin-floorplan') {
+    initAdminFloorplan();
+  }
   
   const targetBtn = document.querySelector(`.sidebar .nav-item[href="#${mainHash}"]`) || document.querySelector('.sidebar .nav-item');
   if(targetBtn) targetBtn.classList.add('active');
 
-  // Hide period selector on Live (irrelevant for real-time data)
+  // Hide period selector on Live and Admin-Floorplan
   const tlSection = document.querySelector('.timeline-section');
-  if(tlSection) tlSection.style.display = mainHash === 'live' ? 'none' : '';
+  if(tlSection) {
+    if (mainHash === 'live' || mainHash === 'admin-floorplan') {
+      tlSection.style.display = 'none';
+    } else {
+      tlSection.style.display = 'flex';
+    }
+  }
 
   if(mainHash === 'cheltuieli' || mainHash === 'pl') {
     // Hide KPI cards that are irrelevant for expenses/PL page
@@ -5542,7 +5565,8 @@ async function checkAuth() {
         // Auto-redirect if current hash is not allowed
         const currentHash = window.location.hash.replace('#', '') || 'dashboard';
         const mainHash = currentHash.split('/')[0];
-        if (!perms.pages.includes(mainHash) && perms.pages.length > 0) {
+        const isManagerFloorplan = (mainHash === 'admin-floorplan' && currentUser.role === 'Manager');
+        if (!perms.pages.includes(mainHash) && perms.pages.length > 0 && !isManagerFloorplan) {
           window.location.hash = '#' + perms.pages[0];
         }
       }
@@ -8276,7 +8300,6 @@ window.showGlobalHpTooltip = function(el) {
     tt.style.backdropFilter = 'blur(10px)';
     document.body.appendChild(tt);
   }
-  
   const parts = hpStr.split(';');
   const maxHps = parts.map(p => {
     const [d, sum] = p.split('|');
@@ -8419,4 +8442,1646 @@ window.exportLunareExcel = function() {
   XLSX.utils.book_append_sheet(workbook, worksheet, "Lunare");
   XLSX.writeFile(workbook, `raport_lunare_${new Date().toISOString().slice(0,10)}.xlsx`);
 };
+
+// ─── FLOORPLAN EDITOR & VIEWER LOGIC ───────────────────────────────────────
+
+let floorplanState = {
+  locationId: null,
+  machines: [], // list of machines from API
+  positions: {}, // map of machine_id -> {x, y}
+  background: null
+};
+
+async function loadAdminFloorplan() {
+  const select = document.getElementById('fp-location-select');
+  const locId = select.value;
+  if (!locId) return;
+
+  floorplanState.locationId = locId;
+  
+  // Fetch background settings
+  try {
+    const data = await apiAuth(`/api/floorplan/settings?location_id=${locId}`);
+    const dropzone = document.getElementById('fp-dropzone');
+    if (data.floorplan_bg) {
+      floorplanState.background = data.floorplan_bg;
+      const img = new Image();
+      img.onload = function() {
+        dropzone.style.aspectRatio = `${this.width} / ${this.height}`;
+        dropzone.style.height = 'auto';
+        dropzone.style.backgroundSize = '100% 100%';
+        dropzone.style.backgroundImage = `url('${API}${data.floorplan_bg}')`;
+        applyFpZoom();
+      };
+      img.src = `${API}${data.floorplan_bg}`;
+    } else {
+      floorplanState.background = null;
+      dropzone.style.backgroundImage = 'none';
+      dropzone.style.aspectRatio = '';
+    }
+  } catch(e) { console.error('Error loading floorplan settings', e); }
+
+  // Fetch machines for this location
+  try {
+    const { s, e } = getPeriod();
+    const machinesData = await api(`/api/machines?start=${s}&end=${e}&loc_ids=${locId}`);
+    floorplanState.machines = machinesData;
+  } catch(e) { console.error('Error loading machines', e); }
+
+  // Fetch saved positions
+  try {
+    const positionsData = await apiAuth(`/api/floorplan/machines?location_id=${locId}`);
+    floorplanState.positions = {};
+    positionsData.forEach(p => {
+      floorplanState.positions[p.machine_id] = { x: p.pos_x, y: p.pos_y };
+    });
+  } catch(e) { console.error('Error loading positions', e); }
+
+  renderAdminFloorplan();
+}
+
+// === ZOOM & GRID ===
+let fpZoomLevel = 1;
+
+function fpZoom(delta) {
+  fpZoomLevel = Math.max(0.5, Math.min(5, fpZoomLevel + delta));
+  applyFpZoom();
+}
+
+function fpZoomReset() {
+  fpZoomLevel = 1;
+  applyFpZoom();
+}
+
+function applyFpZoom() {
+  const dz = document.getElementById('fp-dropzone');
+  const wrapper = document.getElementById('fp-dropzone-wrapper');
+  if (!dz || !wrapper) return;
+  
+  // Măresc dimensiunile reale ale containerului
+  // La zoom 1x = 100% width/height (se potrivește în wrapper)
+  // La zoom 2x = 200% width/height (scroll apare)
+  // Pătratele rămân 28px, doar planul crește
+  if (dz.style.aspectRatio) {
+    const [w, h] = dz.style.aspectRatio.split('/').map(Number);
+    const imgAspect = w / h;
+    const wrapperAspect = wrapper.clientWidth / wrapper.clientHeight;
+    
+    if (imgAspect > wrapperAspect) {
+      dz.style.width = (100 * fpZoomLevel) + '%';
+      dz.style.height = 'auto';
+    } else {
+      dz.style.height = (100 * fpZoomLevel) + '%';
+      dz.style.width = 'auto';
+    }
+    dz.style.minHeight = 'auto';
+    dz.style.margin = fpZoomLevel > 1 ? '0' : '0 auto';
+  } else {
+    dz.style.width = (100 * fpZoomLevel) + '%';
+    dz.style.height = (100 * fpZoomLevel) + '%';
+    dz.style.minHeight = (500 * fpZoomLevel) + 'px';
+    dz.style.margin = fpZoomLevel > 1 ? '0' : '0 auto';
+  }
+  dz.style.backgroundSize = '100% 100%'; 
+  dz.style.transform = 'none';
+  
+  wrapper.style.overflow = fpZoomLevel > 1 ? 'auto' : 'hidden';
+  
+  const label = document.getElementById('fp-zoom-label');
+  if (label) label.textContent = Math.round(fpZoomLevel * 100) + '%';
+}
+
+function fpToggleGrid() {
+  const dz = document.getElementById('fp-dropzone');
+  const checked = document.getElementById('fp-grid-toggle')?.checked;
+  if (!dz) return;
+  if (checked) {
+    // Grid de 5% (20 celule pe fiecare axă)
+    dz.style.backgroundImage = (dz.style.backgroundImage.includes('url(') ? dz.style.backgroundImage + ',' : '') + 
+      'linear-gradient(rgba(0,0,0,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.08) 1px, transparent 1px)';
+    dz.style.backgroundSize = (dz.style.backgroundSize ? dz.style.backgroundSize + ',' : 'contain,') + ' 5% 5%, 5% 5%';
+  } else {
+    // Păstrăm doar imaginea de fundal
+    const bgImg = dz.style.backgroundImage;
+    if (bgImg.includes('url(')) {
+      const urlPart = bgImg.match(/url\([^)]+\)/);
+      dz.style.backgroundImage = urlPart ? urlPart[0] : 'none';
+      dz.style.backgroundSize = 'contain';
+    } else {
+      dz.style.backgroundImage = 'none';
+      dz.style.backgroundSize = 'contain';
+    }
+  }
+}
+
+// Scroll wheel zoom pe dropzone
+document.addEventListener('wheel', function(e) {
+  const wrapper = document.getElementById('fp-dropzone-wrapper');
+  if (!wrapper || !wrapper.contains(e.target)) return;
+  if (e.ctrlKey || e.metaKey) {
+    e.preventDefault();
+    fpZoom(e.deltaY < 0 ? 0.15 : -0.15);
+  }
+}, { passive: false });
+function renderAdminFloorplan() {
+  const listEl = document.getElementById('fp-machine-list');
+  const dropzone = document.getElementById('fp-dropzone');
+  
+  listEl.innerHTML = '';
+  dropzone.innerHTML = '';
+
+  let total = floorplanState.machines.length;
+  let placed = 0;
+
+  // Default aranjare după poziție (numerică, altfel alfabetică, altfel după serie)
+  floorplanState.machines.sort((a, b) => {
+    const posA = String(a.position || a.serial_nr).toLowerCase();
+    const posB = String(b.position || b.serial_nr).toLowerCase();
+    
+    const numA = parseInt(posA, 10);
+    const numB = parseInt(posB, 10);
+    
+    if (!isNaN(numA) && !isNaN(numB)) {
+      if (numA === numB) return posA.localeCompare(posB);
+      return numA - numB;
+    }
+    return posA.localeCompare(posB);
+  });
+
+  floorplanState.machines.forEach(m => {
+    const pos = floorplanState.positions[m.id];
+    const posLabel = m.position || m.serial_nr;
+    const isPlaced = (pos && pos.x != null && pos.y != null);
+    if (isPlaced) placed++;
+
+    const game = m.tip_slot || m.game_name || '-';
+    const platform = m.cabinet || m.platform || '-';
+
+    // 1. Elementul pentru lista laterală (Aparate) - îl creăm mereu
+    const listCard = document.createElement('div');
+    listCard.dataset.id = m.id;
+    listCard.innerHTML = `
+      <div style="font-size:11px; font-weight:800; color:var(--text); margin-bottom:2px; display:flex; justify-content:space-between;">
+        <span>Pos: ${posLabel}</span>
+        <span>${m.serial_nr}</span>
+      </div>
+      <div style="font-size:9px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+        ${platform} &bull; ${game}
+      </div>
+    `;
+    listCard.style.position = 'relative';
+    listCard.style.padding = '8px';
+    listCard.style.backgroundColor = 'var(--surface)';
+    listCard.style.border = '1px solid var(--border)';
+    listCard.style.borderRadius = '8px';
+    listCard.title = `Seria: ${m.serial_nr}\nJoc: ${game}`;
+    
+    if (isPlaced) {
+      listCard.className = 'fp-list-card'; // nu are clasa fp-machine ptr a nu fi dragged direct
+      listCard.style.opacity = '0.5';
+      listCard.style.cursor = 'pointer';
+      // Marcaj vizual
+      listCard.innerHTML += `<div style="position:absolute; top:6px; right:6px; background:var(--green); width:6px; height:6px; border-radius:50%;" title="Plasat pe plan"></div>`;
+      
+      // Dacă listCard e apăsat, selectăm/deselectăm aparatul pe plan
+      listCard.onclick = () => {
+        const mIdStr = String(m.id);
+        if (fpSelectedIds.has(mIdStr) && fpSelectedIds.size === 1) {
+          // Deselect if it's the only one selected
+          fpSelectedIds.delete(mIdStr);
+        } else {
+          // Select only this one
+          fpSelectedIds.clear();
+          fpSelectedIds.add(mIdStr);
+        }
+        renderAdminFloorplan();
+      };
+      
+      // Highlighting in list if currently selected
+      if (fpSelectedIds.has(String(m.id))) {
+        listCard.style.border = '2px solid var(--accent)';
+        listCard.style.opacity = '1';
+      }
+    } else {
+      listCard.className = 'fp-machine';
+      listCard.dataset.serial = m.serial_nr;
+      listCard.dataset.position = posLabel;
+      listCard.style.cursor = 'grab';
+      listCard.onmousedown = startDrag;
+    }
+    listEl.appendChild(listCard);
+
+    // 2. Elementul pentru hartă (doar dacă e plasat)
+    if (isPlaced) {
+      const el = document.createElement('div');
+      el.className = 'fp-machine fp-placed';
+      el.dataset.id = m.id;
+      el.dataset.serial = m.serial_nr;
+      el.dataset.position = posLabel;
+      el.onmousedown = startDrag;
+
+      if (fpSelectedIds.has(String(m.id))) {
+        el.classList.add('fp-selected');
+      }
+
+      el.style.position = 'absolute';
+      el.style.left = pos.x + '%';
+      el.style.top = pos.y + '%';
+      el.style.transform = `translate(-50%, -50%) rotate(${pos.angle || 0}deg)`;
+      el.textContent = posLabel;
+      
+      const rotHandle = document.createElement('div');
+      rotHandle.className = 'fp-rotate-handle';
+      rotHandle.style.position = 'absolute';
+      rotHandle.style.top = '-10px';
+      rotHandle.style.left = '50%';
+      rotHandle.style.transform = 'translateX(-50%)';
+      rotHandle.style.width = '12px';
+      rotHandle.style.height = '12px';
+      rotHandle.style.backgroundColor = 'var(--accent)';
+      rotHandle.style.borderRadius = '50%';
+      rotHandle.style.cursor = 'crosshair';
+      rotHandle.style.display = 'none';
+      el.appendChild(rotHandle);
+      
+      const ggr = m.tot_ggr || m.ggr || 0;
+      const tIn = m.in_zi || m.tin || 0; 
+      const tBet = m.tot_bet || m.bet || 0;
+      el.title = `Seria: ${m.serial_nr}\nPlatforma: ${platform}\nJoc: ${game}\nGGR: ${fmt(ggr)}\nIN: ${fmt(tIn)}\nBET: ${fmt(tBet)}`;
+      
+      dropzone.appendChild(el);
+    }
+  });
+  
+  // Update countere
+  const cTotal = document.getElementById('fp-counter-total');
+  const cPlaced = document.getElementById('fp-counter-placed');
+  const cUn = document.getElementById('fp-counter-unassigned');
+  if (cTotal) cTotal.textContent = total;
+  if (cPlaced) cPlaced.textContent = placed;
+  if (cUn) {
+    cUn.textContent = (total - placed);
+    cUn.style.color = (total - placed) > 0 ? 'var(--red)' : 'var(--muted)';
+  }
+  
+  // Afișăm labelurile grupurilor
+  fpRenderGroupLabels();
+}
+
+let draggedElement = null;
+let isDragging = false;
+let fpSelectedIds = new Set();
+let fpUndoStack = [];
+
+function fpSaveUndo() {
+  // Snapshot curent al tuturor pozițiilor
+  fpUndoStack.push(JSON.parse(JSON.stringify(floorplanState.positions)));
+  if (fpUndoStack.length > 50) fpUndoStack.shift(); // max 50 undo-uri
+}
+
+function fpUndo() {
+  if (fpUndoStack.length === 0) return;
+  floorplanState.positions = fpUndoStack.pop();
+  renderAdminFloorplan();
+}
+
+// Ctrl+Z listener
+document.addEventListener('keydown', function(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+    const fp = document.getElementById('fp-dropzone');
+    if (fp && fp.offsetParent !== null) {
+      e.preventDefault();
+      fpUndo();
+    }
+  }
+});
+
+function startDrag(e) {
+  e.preventDefault();
+  const el = e.currentTarget;
+  const dropzone = document.getElementById('fp-dropzone');
+  
+  const wasInList = (el.parentElement !== dropzone);
+  
+  // Dacă e în lista stângă, mutăm pe plan pt drag
+  if (wasInList) {
+    const posLabel = el.dataset.position || el.dataset.serial;
+    el.classList.add('fp-placed');
+    el.textContent = posLabel;
+    el.style.position = 'absolute';
+    
+    const dzRect = dropzone.getBoundingClientRect();
+    const cx = ((e.clientX - dzRect.left) / dzRect.width) * 100;
+    const cy = ((e.clientY - dzRect.top) / dzRect.height) * 100;
+    el.style.left = cx + '%';
+    el.style.top = cy + '%';
+    dropzone.appendChild(el);
+  }
+  
+  draggedElement = el;
+  isDragging = false;
+  
+  const startMouseX = e.clientX;
+  const startMouseY = e.clientY;
+  const mainId = el.dataset.id;
+  const isPartOfSelection = fpSelectedIds.has(mainId) && fpSelectedIds.size > 1;
+  
+  // Salvăm pozițiile inițiale ale tuturor elementelor selectate
+  const startPositions = {};
+  if (isPartOfSelection) {
+    fpSelectedIds.forEach(id => {
+      const sel = dropzone.querySelector(`[data-id="${id}"]`);
+      if (sel) {
+        startPositions[id] = { x: parseFloat(sel.style.left), y: parseFloat(sel.style.top) };
+      }
+    });
+  }
+  const mainStartX = parseFloat(el.style.left);
+  const mainStartY = parseFloat(el.style.top);
+  
+  function onMove(ev) {
+    const dx = ev.clientX - startMouseX;
+    const dy = ev.clientY - startMouseY;
+    if (!isDragging && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+      isDragging = true;
+      fpSaveUndo(); // salvăm starea înainte de mutare
+    }
+    if (!isDragging) return;
+    
+    const dzRect = dropzone.getBoundingClientRect();
+    // Delta în procente
+    const dpx = (dx / dzRect.width) * 100;
+    const dpy = (dy / dzRect.height) * 100;
+    
+    // Mută elementul principal (fără clamp, pentru a permite trecerea din listă)
+    const newX = mainStartX + dpx;
+    const newY = mainStartY + dpy;
+    draggedElement.style.left = newX + '%';
+    draggedElement.style.top = newY + '%';
+    
+    // Mută toate celelalte selectate cu același delta
+    if (isPartOfSelection) {
+      fpSelectedIds.forEach(id => {
+        if (id === mainId) return;
+        const sel = dropzone.querySelector(`[data-id="${id}"]`);
+        if (sel && startPositions[id]) {
+          sel.style.left = Math.max(0, Math.min(100, startPositions[id].x + dpx)) + '%';
+          sel.style.top = Math.max(0, Math.min(100, startPositions[id].y + dpy)) + '%';
+        }
+      });
+    }
+  }
+  
+  function onUp(ev) {
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    
+    if (draggedElement) {
+      if (isDragging) {
+        // Salvează pozițiile finale
+        const mId = draggedElement.dataset.id;
+        const oldPos = floorplanState.positions[mId] || {};
+        floorplanState.positions[mId] = {
+          x: parseFloat(draggedElement.style.left),
+          y: parseFloat(draggedElement.style.top),
+          angle: oldPos.angle || 0
+        };
+        // Salvează toate selectate
+        if (isPartOfSelection) {
+          fpSelectedIds.forEach(id => {
+            if (id === mId) return;
+            const sel = dropzone.querySelector(`[data-id="${id}"]`);
+            if (sel) {
+              const oldSelPos = floorplanState.positions[id] || {};
+              floorplanState.positions[id] = {
+                x: parseFloat(sel.style.left),
+                y: parseFloat(sel.style.top),
+                angle: oldSelPos.angle || 0
+              };
+            }
+          });
+        }
+        renderAdminFloorplan(); // ca să updatăm și counterele
+      } else {
+        // Dacă nu s-a tras deloc, dar a fost din listă -> anulează și repune în listă
+        if (wasInList) {
+          delete floorplanState.positions[draggedElement.dataset.id];
+          renderAdminFloorplan();
+        } else {
+          // Click fără drag pe plan → toggle selecție
+          if (ev.shiftKey) {
+            draggedElement.classList.toggle('fp-selected');
+            const mId = draggedElement.dataset.id;
+            if (draggedElement.classList.contains('fp-selected')) {
+              fpSelectedIds.add(mId);
+            } else {
+              fpSelectedIds.delete(mId);
+            }
+          } else {
+            // Click normal: selectăm aparatul + tot grupul lui
+            document.querySelectorAll('.fp-selected').forEach(s => s.classList.remove('fp-selected'));
+            fpSelectedIds.clear();
+            draggedElement.classList.add('fp-selected');
+            fpSelectedIds.add(draggedElement.dataset.id);
+            fpSelectGroup(draggedElement.dataset.id);
+          }
+        }
+      }
+    }
+    draggedElement = null;
+    isDragging = false;
+  }
+  
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('mouseup', onUp);
+}
+
+function fpAlignH() {
+  if (fpSelectedIds.size < 2) { showAlert('Selecteaza minim 2 aparate (click + Shift+click) apoi aliniaza.'); return; }
+  fpSaveUndo();
+  const dropzone = document.getElementById('fp-dropzone');
+  const dzW = dropzone.offsetWidth || 800;
+  const gap = (32 / dzW) * 100; // 32px gap în procente
+  
+  // Colectăm elementele sortate după X curent
+  const items = [];
+  fpSelectedIds.forEach(id => {
+    const el = dropzone.querySelector(`[data-id="${id}"]`);
+    if (el) items.push({ id, el, x: parseFloat(el.style.left), y: parseFloat(el.style.top) });
+  });
+  items.sort((a, b) => a.x - b.x);
+  
+  // Y = media, X = distribuit uniform de la primul
+  const avgY = items.reduce((s, i) => s + i.y, 0) / items.length;
+  const startX = items[0].x;
+  
+  items.forEach((item, i) => {
+    const newX = Math.min(100, startX + i * gap);
+    item.el.style.left = newX + '%';
+    item.el.style.top = avgY + '%';
+    floorplanState.positions[item.id] = { x: newX, y: avgY };
+  });
+}
+
+function fpAlignV() {
+  if (fpSelectedIds.size < 2) { showAlert('Selecteaza minim 2 aparate (click + Shift+click) apoi aliniaza.'); return; }
+  fpSaveUndo();
+  const dropzone = document.getElementById('fp-dropzone');
+  const dzH = dropzone.offsetHeight || 600;
+  const gap = (32 / dzH) * 100; // 32px gap în procente
+  
+  // Colectăm elementele sortate după Y curent
+  const items = [];
+  fpSelectedIds.forEach(id => {
+    const el = dropzone.querySelector(`[data-id="${id}"]`);
+    if (el) items.push({ id, el, x: parseFloat(el.style.left), y: parseFloat(el.style.top) });
+  });
+  items.sort((a, b) => a.y - b.y);
+  
+  // X = media, Y = distribuit uniform de la primul
+  const avgX = items.reduce((s, i) => s + i.x, 0) / items.length;
+  const startY = items[0].y;
+  
+  items.forEach((item, i) => {
+    const newY = Math.min(100, startY + i * gap);
+    item.el.style.left = avgX + '%';
+    item.el.style.top = newY + '%';
+    floorplanState.positions[item.id] = { x: avgX, y: newY };
+  });
+}
+
+function fpDeselectAll() {
+  document.querySelectorAll('.fp-selected').forEach(s => s.classList.remove('fp-selected'));
+  fpSelectedIds.clear();
+}
+
+// === GRUPURI ===
+function fpGetGroups() {
+  if (!floorplanState.locationId) return [];
+  const key = 'fp_groups_' + floorplanState.locationId;
+  try { return JSON.parse(localStorage.getItem(key) || '[]'); } catch(e) { return []; }
+}
+
+function fpSaveGroups(groups) {
+  if (!floorplanState.locationId) return;
+  const key = 'fp_groups_' + floorplanState.locationId;
+  localStorage.setItem(key, JSON.stringify(groups));
+}
+
+async function fpCreateGroup() {
+  if (fpSelectedIds.size < 2) { showAlert('Selecteaza minim 2 aparate apoi creaza grupul.'); return; }
+  
+  const name = await customPrompt('Numele grupului (ex: Bell Link, P42 Curve, Cabinet A):');
+  if (!name || !name.trim()) return;
+  
+  fpSaveUndo();
+  const groups = fpGetGroups();
+  
+  // Scoatem aparatele din alte grupuri
+  const selectedArr = Array.from(fpSelectedIds);
+  groups.forEach(g => {
+    g.machineIds = g.machineIds.filter(id => !selectedArr.includes(id));
+  });
+  // Curățăm grupuri goale
+  const cleaned = groups.filter(g => g.machineIds.length > 0);
+  
+  cleaned.push({ name: name.trim(), machineIds: selectedArr });
+  fpSaveGroups(cleaned);
+  renderAdminFloorplan();
+  showAlert('Grup "' + name.trim() + '" creat cu ' + selectedArr.length + ' aparate.');
+}
+
+function fpDeleteGroup() {
+  if (fpSelectedIds.size === 0) { showAlert('Selecteaza un aparat din grup pentru a sterge grupul.'); return; }
+  const groups = fpGetGroups();
+  const firstId = Array.from(fpSelectedIds)[0];
+  const grp = groups.find(g => g.machineIds.includes(firstId));
+  if (!grp) { showAlert('Aparatul selectat nu apartine unui grup.'); return; }
+  
+  fpSaveUndo();
+  const filtered = groups.filter(g => g !== grp);
+  fpSaveGroups(filtered);
+  renderAdminFloorplan();
+  showAlert('Grupul "' + grp.name + '" a fost sters.');
+}
+
+function fpClearAllGroups() {
+  if (confirm("Ești sigur că vrei să ștergi TOATE grupurile salvate pe acest dispozitiv pentru locația curentă?")) {
+    fpSaveUndo();
+    fpSaveGroups([]);
+    renderAdminFloorplan();
+    showAlert("Toate grupurile au fost șterse.");
+  }
+}
+
+function fpGetGroupForMachine(machineId) {
+  const groups = fpGetGroups();
+  return groups.find(g => g.machineIds.includes(String(machineId)));
+}
+
+function fpSelectGroup(machineId) {
+  const grp = fpGetGroupForMachine(String(machineId));
+  if (!grp) return false;
+  const dropzone = document.getElementById('fp-dropzone');
+  grp.machineIds.forEach(id => {
+    const el = dropzone.querySelector(`[data-id="${id}"]`);
+    if (el) {
+      el.classList.add('fp-selected');
+      fpSelectedIds.add(id);
+    }
+  });
+  return true;
+}
+
+function fpRenderGroupLabels() {
+  const dropzone = document.getElementById('fp-dropzone');
+  // Ștergem labelurile vechi
+  dropzone.querySelectorAll('.fp-group-label').forEach(l => l.remove());
+  
+  const groups = fpGetGroups();
+  groups.forEach(grp => {
+    if (grp.machineIds.length === 0) return;
+    // Calculăm centrul grupului
+    let sumX = 0, sumY = 0, count = 0;
+    grp.machineIds.forEach(id => {
+      const pos = floorplanState.positions[id];
+      if (pos) { sumX += pos.x; sumY += pos.y; count++; }
+    });
+    if (count === 0) return;
+    
+    const label = document.createElement('div');
+    label.className = 'fp-group-label';
+    label.style.position = 'absolute';
+    label.style.left = (sumX / count) + '%';
+    label.style.top = (sumY / count - 3) + '%';
+    label.style.transform = 'translate(-50%, -100%)';
+    label.style.background = 'rgba(99, 102, 241, 0.85)';
+    label.style.color = 'white';
+    label.style.padding = '2px 8px';
+    label.style.borderRadius = '4px';
+    label.style.fontSize = '9px';
+    label.style.fontWeight = '600';
+    label.style.whiteSpace = 'nowrap';
+    label.style.pointerEvents = 'none';
+    label.style.zIndex = '5';
+    label.textContent = grp.name;
+    dropzone.appendChild(label);
+  });
+}
+
+async function saveFloorplanPositions() {
+  if (!floorplanState.locationId) {
+    showAlert("Alege locația mai întâi.");
+    return;
+  }
+  const payload = {
+    location_id: floorplanState.locationId,
+    machines: []
+  };
+  for (const [mId, pos] of Object.entries(floorplanState.positions)) {
+    const m = floorplanState.machines.find(x => x.id == mId);
+    if (m) {
+      payload.machines.push({
+        machine_id: mId,
+        serial_nr: m.serial_nr,
+        pos_x: pos.x,
+        pos_y: pos.y
+      });
+    }
+  }
+  try {
+    const result = await apiAuth('/api/floorplan/machines', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (result && result.success) showAlert("Pozițiile au fost salvate!", "Succes");
+  } catch(e) {
+    showAlert("Eroare la salvarea pozițiilor.");
+    console.error(e);
+  }
+}
+
+async function uploadFloorplanBg(input) {
+  if (!floorplanState.locationId) {
+    showAlert("Alege locația mai întâi.");
+    input.value = "";
+    return;
+  }
+  const file = input.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('location_id', floorplanState.locationId);
+
+  try {
+    const res = await fetch(API + '/api/floorplan/upload', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + localStorage.getItem('cp2_token') },
+      body: formData
+    });
+    const data = await res.json();
+    if (data.success) {
+      floorplanState.background = data.url;
+      document.getElementById('fp-dropzone').style.backgroundImage = `url('${API}${data.url}')`;
+      showAlert("Schița a fost încărcată!", "Succes");
+    } else {
+      showAlert(data.error || "Eroare la încărcare.");
+    }
+  } catch(e) {
+    showAlert("Eroare upload.");
+    console.error(e);
+  }
+  input.value = "";
+}
+
+function initAdminFloorplan() {
+  const select = document.getElementById('fp-location-select');
+  if (!select) return;
+  const locs = (filtersData && filtersData.locations) || [];
+  if (locs.length > 0 && select.options.length <= 1) {
+    select.innerHTML = '<option value="">Alege locația...</option>';
+    locs.forEach(loc => {
+      const opt = document.createElement('option');
+      opt.value = loc.id;
+      opt.textContent = loc.name;
+      select.appendChild(opt);
+    });
+    // Auto-select first location to prevent empty screen on refresh
+    select.value = locs[0].id;
+    loadAdminFloorplan();
+  }
+}
+
+window.addEventListener('hashchange', () => {
+  if (window.location.hash === '#admin-floorplan') {
+    initAdminFloorplan();
+  } else if (window.location.hash === '#floorplan') {
+    initGlobalFloorplan();
+  }
+});
+
+// Populare dropdown pentru Harta Globală (meniul normal)
+function initGlobalFloorplan() {
+  const select = document.getElementById('global-fp-location-select');
+  if (!select) return;
+  const locs = (filtersData && filtersData.locations) || [];
+  if (locs.length > 0 && select.options.length <= 1) {
+    select.innerHTML = '<option value="">Alege locația...</option>';
+    locs.forEach(loc => {
+      const opt = document.createElement('option');
+      opt.value = loc.id;
+      opt.textContent = loc.name;
+      select.appendChild(opt);
+    });
+    select.value = locs[0].id;
+    loadGlobalFloorplan();
+  }
+}
+
+// Încărcare efectivă a Hărții Globale
+async function loadGlobalFloorplan() {
+  const select = document.getElementById('global-fp-location-select');
+  const locId = select ? select.value : null;
+  const wrapper = document.getElementById('global-fp-wrapper');
+  const container = document.getElementById('global-fp-container');
+  const emptyState = document.getElementById('global-fp-empty');
+  const tableWrapper = document.getElementById('global-fp-table-wrapper');
+  const leftTableWrapper = document.getElementById('global-fp-left-table-wrapper');
+
+  if (!locId) {
+    if (wrapper) wrapper.style.display = 'none';
+    if (tableWrapper) tableWrapper.style.display = 'none';
+    if (emptyState) emptyState.style.display = 'block';
+    return;
+  }
+
+  showLoader(true);
+  try {
+    const dateS = document.getElementById('date-start') ? document.getElementById('date-start').value : new Date().toISOString().split('T')[0];
+    const dateE = document.getElementById('date-end') ? document.getElementById('date-end').value : new Date().toISOString().split('T')[0];
+    const [machData, dataBg, posData] = await Promise.all([
+      apiAuth(`/api/machines?start=${dateS}&end=${dateE}&loc_ids=${locId}`),
+      apiAuth(`/api/floorplan/settings?location_id=${locId}`),
+      apiAuth(`/api/floorplan/machines?location_id=${locId}`)
+    ]);
+
+    window._fpCurrentData = { machData, dataBg, posData };
+    
+    // Populate filters
+    const cabSelect = document.getElementById('global-fp-cabinet-select');
+    const prodSelect = document.getElementById('global-fp-producator-select');
+    if (cabSelect && prodSelect) {
+      const cabinets = [...new Set(machData.map(m => m.cabinet).filter(Boolean))].sort();
+      const producers = [...new Set(machData.map(m => m.producator).filter(Boolean))].sort();
+      
+      cabSelect.innerHTML = '<option value="">Toate Cabinetele</option>' + cabinets.map(c => `<option value="${c}">${c}</option>`).join('');
+      prodSelect.innerHTML = '<option value="">Toți Producătorii</option>' + producers.map(p => `<option value="${p}">${p}</option>`).join('');
+      
+      cabSelect.style.display = 'inline-block';
+      prodSelect.style.display = 'inline-block';
+    }
+
+    renderGlobalFloorplanLocal();
+  } catch(e) {
+    console.error('Error rendering global floorplan', e);
+    const wrapper = document.getElementById('global-fp-wrapper');
+    const emptyState = document.getElementById('global-fp-empty');
+    if(wrapper) wrapper.style.display = 'none';
+    if(emptyState) emptyState.style.display = 'block';
+  } finally {
+    showLoader(false);
+  }
+}
+
+function renderGlobalFloorplanLocal() {
+  const wrapper = document.getElementById('global-fp-wrapper');
+  const container = document.getElementById('global-fp-container');
+  const emptyState = document.getElementById('global-fp-empty');
+  const tableWrapper = document.getElementById('global-fp-table-wrapper');
+  
+  if (!window._fpCurrentData) return;
+  let { machData, dataBg, posData } = window._fpCurrentData;
+  const cabSelect = document.getElementById('global-fp-cabinet-select');
+  const prodSelect = document.getElementById('global-fp-producator-select');
+  const selCab = cabSelect ? cabSelect.value : '';
+  const selProd = prodSelect ? prodSelect.value : '';
+
+  if (!dataBg || !dataBg.floorplan_bg) {
+    if (wrapper) wrapper.style.display = 'none';
+    if (tableWrapper) tableWrapper.style.display = 'none';
+    if (emptyState) emptyState.style.display = 'block';
+    return;
+  }
+  
+  if (emptyState) emptyState.style.display = 'none';
+  if (wrapper) wrapper.style.display = 'block';
+  if (tableWrapper) tableWrapper.style.display = 'flex';
+  const img = new Image();
+  img.onload = function() {
+    container.style.aspectRatio = `${this.width} / ${this.height}`;
+    container.style.backgroundSize = '100% 100%';
+    applyGlobalFpZoom();
+  };
+  img.src = `${API}${dataBg.floorplan_bg}`;
+  container.style.backgroundImage = `url('${API}${dataBg.floorplan_bg}')`;
+  container.innerHTML = '';
+  container.onclick = (e) => {
+    if (e.target === container) {
+      clearFpMachineHighlights();
+    }
+  };
+  const tableBody = document.getElementById('global-fp-table-body');
+  if (tableBody) tableBody.innerHTML = '';
+  const leftTableBody = document.getElementById('global-fp-left-table-body');
+  if (leftTableBody) leftTableBody.innerHTML = '';
+  
+  let cabinetStats = {};
+  let jocuriStats = {};
+  let totalStats = { ggr: 0, tIn: 0, tTotalIn: 0 };
+
+  const metric = globalFpSettings.metric || 'in_zi';
+  const rules = globalFpSettings.rules || [];
+
+  // Sort posData numerically by position or serial
+  posData.sort((a,b) => {
+    const mdA = machData.find(x => x.id == a.machine_id);
+    const mdB = machData.find(x => x.id == b.machine_id);
+    const posA = String(mdA ? (mdA.position || mdA.serial_nr) : a.serial_nr).toLowerCase();
+    const posB = String(mdB ? (mdB.position || mdB.serial_nr) : b.serial_nr).toLowerCase();
+    const numA = parseInt(posA, 10);
+    const numB = parseInt(posB, 10);
+    if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
+    return posA.localeCompare(posB);
+  });
+
+  posData.forEach(p => {
+    const md = machData.find(x => x.id == p.machine_id);
+    if (selCab && (!md || md.cabinet !== selCab)) return;
+    if (selProd && (!md || md.producator !== selProd)) return;
+
+    const posLabel = md ? (md.position || md.serial_nr) : p.serial_nr;
+    const el = document.createElement('div');
+    el.id = `fp-machine-${p.machine_id}`;
+    el.style.position = 'absolute';
+    el.style.left = p.pos_x + '%';
+    el.style.top = p.pos_y + '%';
+    el.style.transform = `translate(-50%, -50%) rotate(${p.angle || 0}deg)`;
+    
+    let val = md ? (md[metric] || 0) : 0;
+    let bg = 'var(--surface2)';
+    let col = 'var(--text)';
+    
+    if (md && rules.length > 0) {
+      for (let r of rules) {
+        if (val >= (r.min || 0) && val <= r.max) {
+          bg = r.color;
+          col = 'white'; 
+          if (bg.toLowerCase() === '#fbbf24' || bg.toLowerCase() === 'yellow' || bg.toLowerCase() === '#ffffff') col = 'black';
+          break;
+        }
+      }
+    }
+
+    const ggr = md ? (md.tot_ggr || md.ggr || 0) : 0;
+    const tIn = md ? (md.in_zi || 0) : 0; // IN mediu
+    const tTotalIn = md ? (md.tin || md.total_in || 0) : 0; // Total IN
+    const tBet = md ? (md.tot_bet || md.bet || 0) : 0;
+    const games = md ? (md.games || 0) : 0;
+    const tBetMediu = games > 0 ? (tBet / games) : 0;
+    const joc = md ? (md.tip_slot || '-') : '-';
+    const cabinet = md ? (md.cabinet || '-') : '-';
+    const serie = md ? md.serial_nr : p.serial_nr;
+
+    el.innerHTML = `
+      <div class="fp-machine-card" style="background:${bg}; color:${col}; width:2cqw; aspect-ratio:1/1; padding:0; border-radius:0.2cqw; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.5); cursor:pointer; transition: transform 0.2s, box-shadow 0.2s;" 
+           onmouseenter="showFpTooltip(this, event, '${serie}', '${joc}', ${ggr}, ${tIn}, ${tTotalIn}, ${tBet}, '${cabinet}', ${tBetMediu})"
+           onmousemove="moveFpTooltip(event)"
+           onmouseleave="hideFpTooltip()">
+        <div style="font-size:0.35cqw; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; text-align:center;">${posLabel}</div>
+        <div style="font-size:0.5cqw; font-weight:800; margin-top:1px;">${fmt(tIn)}</div>
+        <div style="font-size:0.35cqw; font-weight:700; margin-top:1px; opacity:0.9;">G: ${fmt(ggr)}</div>
+      </div>
+    `;
+    container.appendChild(el);
+    
+    if (tableBody) {
+      const tr = document.createElement('tr');
+      tr.style.cursor = 'pointer';
+      tr.onclick = () => highlightFpMachine(p.machine_id);
+      tr.innerHTML = `
+        <td style="padding:8px; border-bottom:1px solid var(--border); font-weight:bold;">${posLabel}</td>
+        <td style="padding:8px; border-bottom:1px solid var(--border); color:var(--muted);">${serie}</td>
+        <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right; color:${ggr < 0 ? 'var(--red)' : 'var(--text)'}; font-weight:bold;">${fmt(ggr)}</td>
+        <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right;">${fmt(tIn)}</td>
+        <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right;">${fmt(tTotalIn)}</td>
+      `;
+      tableBody.appendChild(tr);
+    }
+    
+    const realCab = md ? (md.cabinet || 'Necunoscut') : 'Necunoscut';
+    const realJoc = md ? (md.tip_slot || '-') : '-';
+    
+    // Cabinet stats
+    if (!cabinetStats[realCab]) cabinetStats[realCab] = { cab: realCab, ggr: 0, tIn: 0, tTotalIn: 0, ids: [] };
+    cabinetStats[realCab].ggr += ggr;
+    cabinetStats[realCab].tIn += tIn;
+    cabinetStats[realCab].tTotalIn += tTotalIn;
+    cabinetStats[realCab].ids.push(p.machine_id);
+
+    // Jocuri stats
+    if (!jocuriStats[realJoc]) jocuriStats[realJoc] = { joc: realJoc, ggr: 0, tIn: 0, tTotalIn: 0, ids: [] };
+    jocuriStats[realJoc].ggr += ggr;
+    jocuriStats[realJoc].tIn += tIn;
+    jocuriStats[realJoc].tTotalIn += tTotalIn;
+    jocuriStats[realJoc].ids.push(p.machine_id);
+    
+    // Totals
+    totalStats.ggr += ggr;
+    totalStats.tIn += tIn;
+    totalStats.tTotalIn += tTotalIn;
+  });
+  
+  // Add total row to Aparate
+  if (tableBody) {
+     const tr = document.createElement('tr');
+     tr.innerHTML = `
+       <td colspan="2" style="padding:8px; border-bottom:1px solid var(--border); font-weight:900; background:var(--surface2);">TOTAL</td>
+       <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right; font-weight:900; background:var(--surface2); color:${totalStats.ggr < 0 ? 'var(--red)' : 'var(--text)'};">${fmt(totalStats.ggr)}</td>
+       <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right; font-weight:900; background:var(--surface2);">${fmt(totalStats.tIn)}</td>
+       <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right; font-weight:900; background:var(--surface2);">${fmt(totalStats.tTotalIn)}</td>
+     `;
+     tableBody.appendChild(tr);
+  }
+
+  if (leftTableBody) {
+    const cabs = Object.keys(cabinetStats).sort();
+    cabs.forEach(k => {
+      const s = cabinetStats[k];
+      const tr = document.createElement('tr');
+      tr.style.cursor = 'pointer';
+      tr.onclick = () => highlightFpMachine(s.ids);
+      tr.innerHTML = `
+        <td style="padding:8px; border-bottom:1px solid var(--border); font-weight:bold;">${s.cab}</td>
+        <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right; color:${s.ggr < 0 ? 'var(--red)' : 'var(--text)'}; font-weight:bold; vertical-align:middle;">${fmt(s.ggr)}</td>
+        <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right; vertical-align:middle;">${fmt(s.tIn)}</td>
+        <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right; vertical-align:middle;">${fmt(s.tTotalIn)}</td>
+      `;
+      leftTableBody.appendChild(tr);
+    });
+    // Total Cabinete
+     const tr = document.createElement('tr');
+     tr.innerHTML = `
+       <td style="padding:8px; border-bottom:1px solid var(--border); font-weight:900; background:var(--surface2);">TOTAL</td>
+       <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right; font-weight:900; background:var(--surface2); color:${totalStats.ggr < 0 ? 'var(--red)' : 'var(--text)'};">${fmt(totalStats.ggr)}</td>
+       <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right; font-weight:900; background:var(--surface2);">${fmt(totalStats.tIn)}</td>
+       <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right; font-weight:900; background:var(--surface2);">${fmt(totalStats.tTotalIn)}</td>
+     `;
+     leftTableBody.appendChild(tr);
+  }
+  
+  const jocuriTableBody = document.getElementById('global-fp-jocuri-table-body');
+  if (jocuriTableBody) {
+    jocuriTableBody.innerHTML = '';
+    const jocs = Object.keys(jocuriStats).sort();
+    jocs.forEach(k => {
+      const s = jocuriStats[k];
+      const tr = document.createElement('tr');
+      tr.style.cursor = 'pointer';
+      tr.onclick = () => highlightFpMachine(s.ids);
+      tr.innerHTML = `
+        <td style="padding:8px; border-bottom:1px solid var(--border); font-weight:bold;">${s.joc}</td>
+        <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right; color:${s.ggr < 0 ? 'var(--red)' : 'var(--text)'}; font-weight:bold; vertical-align:middle;">${fmt(s.ggr)}</td>
+        <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right; vertical-align:middle;">${fmt(s.tIn)}</td>
+        <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right; vertical-align:middle;">${fmt(s.tTotalIn)}</td>
+      `;
+      jocuriTableBody.appendChild(tr);
+    });
+    // Total Jocuri
+     const tr = document.createElement('tr');
+     tr.innerHTML = `
+       <td style="padding:8px; border-bottom:1px solid var(--border); font-weight:900; background:var(--surface2);">TOTAL</td>
+       <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right; font-weight:900; background:var(--surface2); color:${totalStats.ggr < 0 ? 'var(--red)' : 'var(--text)'};">${fmt(totalStats.ggr)}</td>
+       <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right; font-weight:900; background:var(--surface2);">${fmt(totalStats.tIn)}</td>
+       <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right; font-weight:900; background:var(--surface2);">${fmt(totalStats.tTotalIn)}</td>
+     `;
+     jocuriTableBody.appendChild(tr);
+  }
+}
+
+// Upload schiță direct din pagina de vizualizare Floorplan
+async function uploadGlobalFloorplanBg(input) {
+  const select = document.getElementById('global-fp-location-select');
+  const locId = select ? select.value : null;
+  if (!locId) {
+    showAlert("Alege locația mai întâi.");
+    input.value = "";
+    return;
+  }
+  const file = input.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('location_id', locId);
+
+  showLoader(true);
+  try {
+    const res = await fetch(API + '/api/floorplan/upload', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + localStorage.getItem('cp2_token') },
+      body: formData
+    });
+    const data = await res.json();
+    if (data.success) {
+      showAlert("Schița a fost încărcată! Acum du-te la Editor Floorplan pentru a aranja aparatele.", "Succes");
+      loadGlobalFloorplan(); // reload to show the new background
+    } else {
+      showAlert(data.error || "Eroare la încărcare.");
+    }
+  } catch(e) {
+    showAlert("Eroare upload.");
+    console.error(e);
+  } finally {
+    showLoader(false);
+  }
+  input.value = "";
+}
+
+async function renderLocDetailFloorplan(locId, machData) {
+  const container = document.getElementById('ld-floorplan-container');
+  if (!container) return;
+
+  try {
+    // Fetch floorplan config
+    const dataBg = await apiAuth(`/api/floorplan/settings?location_id=${locId}`);
+    
+    // Cache bust on positions
+    const posData = await apiAuth(`/api/floorplan/machines?location_id=${locId}&_t=${Date.now()}`);
+
+    if (!dataBg.floorplan_bg || posData.length === 0) {
+      container.style.display = 'none';
+      return;
+    }
+    
+    container.style.display = 'block';
+    const img = new Image();
+    img.onload = function() {
+      container.style.aspectRatio = `${this.width} / ${this.height}`;
+      container.style.height = 'auto';
+      container.style.backgroundSize = '100% 100%';
+    };
+    img.src = `${API}${dataBg.floorplan_bg}`;
+    container.style.backgroundImage = `url('${API}${dataBg.floorplan_bg}')`;
+    container.innerHTML = ''; // clear
+
+    // Folosim regulile globale în locul celor hardcodate
+    const metric = globalFpSettings.metric || 'in_zi';
+    const rules = globalFpSettings.rules || [];
+
+    posData.forEach(p => {
+      const md = machData.find(x => x.id == p.machine_id);
+      const posLabel = md ? (md.position || md.serial_nr) : p.serial_nr;
+      
+      const el = document.createElement('div');
+      el.style.position = 'absolute';
+      el.style.left = p.pos_x + '%';
+      el.style.top = p.pos_y + '%';
+      el.style.transform = `translate(-50%, -50%) rotate(${p.angle || 0}deg)`;
+      
+      let in_mediu = md ? (md.in_zi || 0) : 0;
+      let val = md ? (md[metric] || 0) : 0;
+      let bg = 'var(--surface2)';
+      let col = 'var(--text)';
+      
+      if (md && rules.length > 0) {
+        for (let r of rules) {
+          if (val >= (r.min || 0) && val <= r.max) {
+            bg = r.color;
+            col = 'white'; 
+            if (bg.toLowerCase() === '#fbbf24' || bg.toLowerCase() === 'yellow' || bg.toLowerCase() === '#ffffff') col = 'black';
+            break;
+          }
+        }
+      }
+
+      const ggr = md ? (md.tot_ggr || md.ggr || 0) : 0;
+
+      el.innerHTML = `
+        <div style="background:${bg}; color:${col}; width:2cqw; aspect-ratio:1/1; border-radius:0.2cqw; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.3); cursor:default;" title="Pos: ${posLabel} | IN mediu: ${fmt(in_mediu)} | GGR: ${fmt(ggr)}">
+          <div style="font-size:0.35cqw; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; text-align:center;">${posLabel}</div>
+          <div style="font-size:0.5cqw; font-weight:800; margin-top:1px;">${fmt(in_mediu)}</div>
+          <div style="font-size:0.35cqw; font-weight:700; margin-top:1px; opacity:0.9;">G: ${fmt(ggr)}</div>
+        </div>
+      `;
+      
+      container.appendChild(el);
+    });
+
+  } catch(e) {
+    console.error('Error rendering floorplan viewer', e);
+    container.style.display = 'none';
+  }
+}
+
+// === MARQUEE SELECTION ===
+let fpMarqueeActive = false;
+let fpMarqueeStartX = 0;
+let fpMarqueeStartY = 0;
+let fpMarqueeEl = null;
+
+document.addEventListener('mousedown', function(e) {
+  const dropzone = document.getElementById('fp-dropzone');
+  if (!dropzone) return;
+  if (e.button !== 0) return; // Only left click
+  
+  // If we clicked on a machine, let startDrag handle it
+  if (e.target.closest('.fp-machine') || e.target.closest('.fp-group-label')) return;
+  
+  // If we clicked inside the wrapper but outside a machine
+  const wrapper = document.getElementById('fp-dropzone-wrapper');
+  if (wrapper && wrapper.contains(e.target)) {
+    e.preventDefault(); // prevent text selection
+    fpMarqueeActive = true;
+    
+    if (!e.shiftKey) {
+      fpDeselectAll();
+    }
+    
+    const dzRect = dropzone.getBoundingClientRect();
+    fpMarqueeStartX = e.clientX;
+    fpMarqueeStartY = e.clientY;
+    
+    fpMarqueeEl = document.createElement('div');
+    fpMarqueeEl.className = 'fp-marquee';
+    fpMarqueeEl.style.position = 'fixed';
+    fpMarqueeEl.style.border = '1px solid var(--accent)';
+    fpMarqueeEl.style.backgroundColor = 'rgba(var(--accent-rgb, 59, 130, 246), 0.2)';
+    fpMarqueeEl.style.pointerEvents = 'none';
+    fpMarqueeEl.style.zIndex = '9999';
+    document.body.appendChild(fpMarqueeEl);
+    
+    // Initial size 0
+    updateMarqueeRect(e.clientX, e.clientY);
+  }
+});
+
+document.addEventListener('mousemove', function(e) {
+  if (!fpMarqueeActive || !fpMarqueeEl) return;
+  updateMarqueeRect(e.clientX, e.clientY);
+});
+
+document.addEventListener('mouseup', function(e) {
+  if (!fpMarqueeActive || !fpMarqueeEl) return;
+  
+  fpMarqueeActive = false;
+  
+  const mRect = fpMarqueeEl.getBoundingClientRect();
+  fpMarqueeEl.remove();
+  fpMarqueeEl = null;
+  
+  // Find all placed machines inside the marquee rectangle
+  const dropzone = document.getElementById('fp-dropzone');
+  if (!dropzone) return;
+  
+  const machines = dropzone.querySelectorAll('.fp-machine.fp-placed');
+  machines.forEach(m => {
+    const r = m.getBoundingClientRect();
+    const overlap = !(r.right < mRect.left || 
+                      r.left > mRect.right || 
+                      r.bottom < mRect.top || 
+                      r.top > mRect.bottom);
+    if (overlap) {
+      m.classList.add('fp-selected');
+      fpSelectedIds.add(m.dataset.id);
+    }
+  });
+});
+
+function updateMarqueeRect(curX, curY) {
+  const left = Math.min(fpMarqueeStartX, curX);
+  const right = Math.max(fpMarqueeStartX, curX);
+  const top = Math.min(fpMarqueeStartY, curY);
+  const bottom = Math.max(fpMarqueeStartY, curY);
+  
+  fpMarqueeEl.style.left = left + 'px';
+  fpMarqueeEl.style.top = top + 'px';
+  fpMarqueeEl.style.width = (right - left) + 'px';
+  fpMarqueeEl.style.height = (bottom - top) + 'px';
+}
+
+function fpAlignGrid(mode = 'horiz') {
+  if (fpSelectedIds.size < 2) { showAlert('Selecteaza minim 2 aparate (click + drag sau Shift+click) apoi aliniaza careu.'); return; }
+  fpSaveUndo();
+  
+  const dropzone = document.getElementById('fp-dropzone');
+  const dzW = dropzone.offsetWidth || 800;
+  const dzH = dropzone.offsetHeight || 600;
+  const gapX = (36 / dzW) * 100;
+  const gapY = (36 / dzH) * 100;
+  
+  const items = [];
+  fpSelectedIds.forEach(id => {
+    const el = dropzone.querySelector(`[data-id="${id}"]`);
+    if (el) items.push({ id, el, x: parseFloat(el.style.left), y: parseFloat(el.style.top) });
+  });
+  
+  // Dacă e orizontal, sortăm rând cu rând (Y primar). Dacă e vertical, coloană cu coloană (X primar).
+  if (mode === 'horiz') {
+    items.sort((a, b) => (Math.abs(a.y - b.y) > gapY/2 ? a.y - b.y : a.x - b.x));
+  } else {
+    items.sort((a, b) => (Math.abs(a.x - b.x) > gapX/2 ? a.x - b.x : a.y - b.y));
+  }
+  
+  const total = items.length;
+  let dims = Math.ceil(Math.sqrt(total));
+  
+  const minX = Math.min(...items.map(i => i.x));
+  const minY = Math.min(...items.map(i => i.y));
+  
+  items.forEach((item, index) => {
+    let r, c;
+    if (mode === 'horiz') {
+      r = Math.floor(index / dims);
+      c = index % dims;
+    } else {
+      c = Math.floor(index / dims);
+      r = index % dims;
+    }
+    const newX = Math.min(100, minX + c * gapX);
+    const newY = Math.min(100, minY + r * gapY);
+    item.el.style.left = newX + '%';
+    item.el.style.top = newY + '%';
+    floorplanState.positions[item.id] = { ...floorplanState.positions[item.id], x: newX, y: newY };
+  });
+}
+
+function fpFilterList() {
+  const searchInput = document.getElementById('fp-search');
+  if (!searchInput) return;
+  const q = searchInput.value.toLowerCase();
+  
+  const listEl = document.getElementById('fp-machine-list');
+  const cards = listEl.querySelectorAll('.fp-list-card, .fp-machine');
+  
+  cards.forEach(card => {
+    const text = card.textContent.toLowerCase();
+    const title = (card.title || '').toLowerCase();
+    if (text.includes(q) || title.includes(q)) {
+      card.style.display = 'block';
+    } else {
+      card.style.display = 'none';
+    }
+  });
+}
+
+// === ROTATION LOGIC ===
+let isRotating = false;
+let rotateStartAngle = 0;
+let rotateStartMouseAngle = 0;
+let rotatingElementId = null;
+
+document.addEventListener('mousedown', function(e) {
+  if (e.target.classList.contains('fp-rotate-handle')) {
+    e.preventDefault();
+    e.stopPropagation();
+    isRotating = true;
+    const machineEl = e.target.closest('.fp-machine');
+    rotatingElementId = machineEl.dataset.id;
+    
+    const rect = machineEl.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    
+    rotateStartMouseAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
+    rotateStartAngle = floorplanState.positions[rotatingElementId].angle || 0;
+    
+    fpSaveUndo();
+  }
+});
+
+document.addEventListener('mousemove', function(e) {
+  if (isRotating && rotatingElementId) {
+    const dropzone = document.getElementById('fp-dropzone');
+    const machineEl = dropzone.querySelector(`[data-id="${rotatingElementId}"]`);
+    if (!machineEl) return;
+    
+    const rect = machineEl.getBoundingClientRect();
+    // Pentru a menține calculul corect, nu folosim centrul afectat de rotație
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    
+    const currentMouseAngle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI);
+    let delta = currentMouseAngle - rotateStartMouseAngle;
+    
+    if (e.shiftKey) {
+      delta = Math.round(delta / 15) * 15;
+    }
+    
+    let newAngle = (rotateStartAngle + delta) % 360;
+    
+    floorplanState.positions[rotatingElementId].angle = newAngle;
+    machineEl.style.transform = `translate(-50%, -50%) rotate(${newAngle}deg)`;
+  }
+});
+
+document.addEventListener('mouseup', function(e) {
+  if (isRotating) {
+    isRotating = false;
+    rotatingElementId = null;
+  }
+});
+
+
+// === GLOBAL FLOORPLAN SETTINGS & ZOOM ===
+let globalFpZoomLevel = 1;
+let globalFpSettings = { metric: 'in_zi', rules: [ { min: 0, max: 200, color: '#ef4444' }, { min: 201, max: 500, color: '#fbbf24' }, { min: 501, max: 9999999, color: '#22c55e' } ] };
+
+async function loadGlobalFpSettings() {
+  try {
+    const res = await apiAuth('/api/settings/floorplan');
+    if (res && res.metric) {
+      globalFpSettings = res;
+      globalFpSettings.rules.forEach((r, idx) => {
+         if (r.color && r.color.includes('var(--red)')) r.color = '#ef4444';
+         if (r.color && r.color.includes('var(--green)')) r.color = '#22c55e';
+         // Convert legacy rules to intervals if needed
+         if (r.min === undefined) {
+           r.min = idx === 0 ? 0 : (globalFpSettings.rules[idx-1].max + 1);
+         }
+      });
+    }
+  } catch(e) { console.error('Error loading fp settings', e); }
+}
+
+async function saveGlobalFpSettings() {
+  const metric = document.getElementById('global-fp-metric').value;
+  const rows = document.querySelectorAll('.fp-rule-row');
+  let rules = [];
+  rows.forEach(r => {
+    const min = parseFloat(r.querySelector('.fp-rule-min').value) || 0;
+    const max = parseFloat(r.querySelector('.fp-rule-max').value) || 0;
+    const color = r.querySelector('.fp-rule-color').value;
+    rules.push({ min, max, color });
+  });
+  rules.sort((a,b) => a.min - b.min);
+  if (rules.length === 0) rules.push({ min: 0, max: 9999999, color: 'var(--green)' });
+  
+  const payload = { metric, rules };
+  try {
+    const res = await apiAuth('/api/settings/floorplan', { method: 'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    if (res.success) {
+      globalFpSettings = payload;
+      closeGlobalFpSettings();
+      loadGlobalFloorplan();
+    }
+  } catch(e) { showAlert('Eroare la salvare.'); }
+}
+
+function openGlobalFpSettings() {
+  document.getElementById('global-fp-metric').value = globalFpSettings.metric;
+  renderGlobalFpRules();
+  document.getElementById('global-fp-settings-modal').style.display = 'flex';
+}
+function closeGlobalFpSettings() {
+  document.getElementById('global-fp-settings-modal').style.display = 'none';
+}
+
+function renderGlobalFpRules() {
+  const c = document.getElementById('global-fp-rules-container');
+  c.innerHTML = '';
+  globalFpSettings.rules.forEach((r, idx) => {
+    addGlobalFpRuleRow(r.min !== undefined ? r.min : 0, r.max, r.color, idx);
+  });
+}
+
+function addGlobalFpRuleRow(minVal = 0, maxVal = 1000, color = '#3b82f6', idx = -1) {
+  const c = document.getElementById('global-fp-rules-container');
+  const div = document.createElement('div');
+  div.className = 'fp-rule-row';
+  div.style = 'display:flex; gap:12px; align-items:center; background:var(--surface); padding:8px 12px; border-radius:8px; border:1px solid var(--border); margin-bottom:8px;';
+  div.innerHTML = `
+    <span style="font-size:12px; color:var(--text); font-weight:600;">Între</span>
+    <input type="number" class="fp-rule-min" value="${minVal}" style="width:70px; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:12px; background:var(--surface2); color:var(--text);">
+    <span style="font-size:12px; color:var(--text); font-weight:600;">și</span>
+    <input type="number" class="fp-rule-max" value="${maxVal}" style="width:70px; padding:6px; border:1px solid var(--border); border-radius:6px; font-size:12px; background:var(--surface2); color:var(--text);">
+    <span style="font-size:12px; color:var(--text); font-weight:600;">colorează în</span>
+    <input type="color" class="fp-rule-color" value="${color}" style="width:40px; height:30px; border:none; padding:0; background:none; cursor:pointer;">
+    <button onclick="this.parentElement.remove()" style="margin-left:auto; background:var(--red); color:white; border:none; border-radius:4px; padding:4px 8px; font-size:11px; cursor:pointer;">X</button>
+  `;
+  c.appendChild(div);
+}
+function addGlobalFpRule() { addGlobalFpRuleRow(0, 1000); }
+
+function globalFpZoom(delta) {
+  globalFpZoomLevel = Math.max(0.5, Math.min(5, globalFpZoomLevel + delta));
+  applyGlobalFpZoom();
+}
+function globalFpZoomReset() {
+  globalFpZoomLevel = 1;
+  applyGlobalFpZoom();
+}
+
+function applyGlobalFpZoom() {
+  const dz = document.getElementById('global-fp-container');
+  const wrapper = document.getElementById('global-fp-wrapper');
+  if (!dz || !wrapper) return;
+  
+  if (dz.style.aspectRatio) {
+    const [w, h] = dz.style.aspectRatio.split('/').map(Number);
+    const imgAspect = w / h;
+    const wrapperAspect = wrapper.clientWidth / wrapper.clientHeight;
+    
+    if (imgAspect > wrapperAspect) {
+      dz.style.width = (100 * globalFpZoomLevel) + '%';
+      dz.style.height = 'auto';
+    } else {
+      dz.style.height = (100 * globalFpZoomLevel) + '%';
+      dz.style.width = 'auto';
+    }
+    dz.style.minHeight = 'auto';
+    dz.style.margin = globalFpZoomLevel > 1 ? '0' : '0 auto';
+  } else {
+    dz.style.width = (100 * globalFpZoomLevel) + '%';
+    dz.style.height = (100 * globalFpZoomLevel) + '%';
+    dz.style.minHeight = (500 * globalFpZoomLevel) + 'px';
+    dz.style.margin = globalFpZoomLevel > 1 ? '0' : '0 auto';
+  }
+  
+  dz.style.backgroundSize = '100% 100%'; 
+  dz.style.transform = 'none';
+  
+  wrapper.style.overflow = globalFpZoomLevel > 1 ? 'auto' : 'hidden';
+  const label = document.getElementById('global-fp-zoom-label');
+  if (label) label.textContent = Math.round(globalFpZoomLevel * 100) + '%';
+}
+
+function showFpTooltip(el, e, serie, joc, ggr, inZi, totalIn, bet, cabinet, betMediu) {
+  const tt = document.getElementById('fp-custom-tooltip');
+  if (!tt) return;
+  document.getElementById('fp-tt-serie').textContent = 'Seria: ' + serie;
+  document.getElementById('fp-tt-cabinet').textContent = cabinet;
+  document.getElementById('fp-tt-joc').textContent = joc;
+  document.getElementById('fp-tt-ggr').textContent = fmt(ggr);
+  document.getElementById('fp-tt-in-zi').textContent = fmt(inZi);
+  document.getElementById('fp-tt-total-in').textContent = fmt(totalIn);
+  document.getElementById('fp-tt-bet').textContent = fmt(bet);
+  document.getElementById('fp-tt-bet-mediu').textContent = fmt(betMediu);
+  
+  tt.style.display = 'block';
+  
+  // Position it next to cursor
+  let x = e.clientX + 15;
+  let y = e.clientY + 15;
+  
+  // keep on screen
+  if (x + tt.offsetWidth > window.innerWidth) x = e.clientX - tt.offsetWidth - 15;
+  if (y + tt.offsetHeight > window.innerHeight) y = e.clientY - tt.offsetHeight - 15;
+  
+  tt.style.left = x + 'px';
+  tt.style.top = y + 'px';
+}
+
+function moveFpTooltip(e) {
+  const tt = document.getElementById('fp-custom-tooltip');
+  if (!tt || tt.style.display === 'none') return;
+  let x = e.clientX + 15;
+  let y = e.clientY + 15;
+  if (x + tt.offsetWidth > window.innerWidth) x = e.clientX - tt.offsetWidth - 15;
+  if (y + tt.offsetHeight > window.innerHeight) y = e.clientY - tt.offsetHeight - 15;
+  tt.style.left = x + 'px';
+  tt.style.top = y + 'px';
+}
+
+function hideFpTooltip() {
+  const tt = document.getElementById('fp-custom-tooltip');
+  if (tt) tt.style.display = 'none';
+}
+
+function switchFpTab(tabId) {
+  const tA = document.getElementById('fp-tab-aparate');
+  const tC = document.getElementById('fp-tab-cabinete');
+  const tJ = document.getElementById('fp-tab-jocuri');
+  const cA = document.getElementById('fp-content-aparate');
+  const cC = document.getElementById('fp-content-cabinete');
+  const cJ = document.getElementById('fp-content-jocuri');
+  
+  if(!tA || !tC || !tJ || !cA || !cC || !cJ) return;
+  
+  // reset all
+  [tA, tC, tJ].forEach(t => {
+    t.style.borderBottom = '2px solid transparent';
+    t.style.color = 'var(--muted)';
+    t.style.background = 'transparent';
+  });
+  [cA, cC, cJ].forEach(c => {
+    c.style.display = 'none';
+  });
+
+  // active
+  let tAct, cAct;
+  if (tabId === 'aparate') { tAct = tA; cAct = cA; }
+  else if (tabId === 'cabinete') { tAct = tC; cAct = cC; }
+  else if (tabId === 'jocuri') { tAct = tJ; cAct = cJ; }
+
+  if (tAct && cAct) {
+    tAct.style.borderBottom = '2px solid var(--accent)';
+    tAct.style.color = 'var(--text)';
+    tAct.style.background = 'var(--surface)';
+    cAct.style.display = 'block';
+  }
+}
+
+// Stare globala pentru directia de sortare pe coloane
+let fpSortDirs = {};
+
+function sortFpTable(tbodyId, colIdx, type) {
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+  const rows = Array.from(tbody.querySelectorAll('tr'));
+  if (rows.length === 0) return;
+
+  const key = tbodyId + '_' + colIdx;
+  fpSortDirs[key] = fpSortDirs[key] === 'asc' ? 'desc' : 'asc';
+  const dir = fpSortDirs[key];
+
+  rows.sort((a, b) => {
+    const tdA = a.querySelectorAll('td')[colIdx];
+    const tdB = b.querySelectorAll('td')[colIdx];
+    if (!tdA || !tdB) return 0;
+
+    // Extragem doar textul (ex. din tdA.innerText care ia si ce e in div-uri)
+    let valA = tdA.innerText.trim();
+    let valB = tdB.innerText.trim();
+
+    if (type === 'num') {
+      valA = parseFloat(valA.replace(/\./g, '').replace(',', '.')) || 0;
+      valB = parseFloat(valB.replace(/\./g, '').replace(',', '.')) || 0;
+      return dir === 'asc' ? valA - valB : valB - valA;
+    } else {
+      valA = valA.toLowerCase();
+      valB = valB.toLowerCase();
+      if (valA < valB) return dir === 'asc' ? -1 : 1;
+      if (valA > valB) return dir === 'asc' ? 1 : -1;
+      return 0;
+    }
+  });
+
+  // Re-append in noua ordine
+  rows.forEach(r => tbody.appendChild(r));
+}
+
+function toggleGlobalFpFullscreen() {
+  const wrapper = document.getElementById('global-fp-wrapper');
+  if (!wrapper) return;
+  if (!document.fullscreenElement) {
+    if (wrapper.requestFullscreen) {
+      wrapper.requestFullscreen();
+    } else if (wrapper.webkitRequestFullscreen) {
+      wrapper.webkitRequestFullscreen();
+    }
+  } else {
+    if (document.exitFullscreen) {
+      document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    }
+  }
+}
+
+let currentHighlightedFpIds = [];
+
+function clearFpMachineHighlights() {
+  currentHighlightedFpIds = [];
+  const allMachines = document.querySelectorAll('#global-fp-container > div');
+  allMachines.forEach(el => {
+    const card = el.querySelector('.fp-machine-card');
+    if (card) {
+      card.style.boxShadow = '0 2px 4px rgba(0,0,0,0.5)';
+      card.style.border = 'none';
+      card.style.transform = 'scale(1)';
+      card.style.zIndex = '1';
+    }
+  });
+}
+
+function highlightFpMachine(machineIds) {
+  const ids = Array.isArray(machineIds) ? machineIds : [machineIds];
+  
+  // Toggle logic if exactly the same machines are already selected
+  if (ids.length === currentHighlightedFpIds.length && ids.every((val, index) => val === currentHighlightedFpIds[index])) {
+    clearFpMachineHighlights();
+    return;
+  }
+
+  clearFpMachineHighlights();
+  currentHighlightedFpIds = ids;
+
+  let firstEl = null;
+
+  ids.forEach(id => {
+    const selectedEl = document.getElementById(`fp-machine-${id}`);
+    if (selectedEl) {
+      if (!firstEl) firstEl = selectedEl;
+      const card = selectedEl.querySelector('.fp-machine-card');
+      if (card) {
+        card.style.boxShadow = '0 0 15px 5px var(--accent)';
+        card.style.border = '2px solid var(--accent)';
+        card.style.transform = 'scale(1.2)';
+        card.style.zIndex = '100';
+      }
+    }
+  });
+
+  if (firstEl) {
+    firstEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+  }
+}
+
+
+// Initial load settings
+document.addEventListener('DOMContentLoaded', () => {
+  loadGlobalFpSettings();
+});
 

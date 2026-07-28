@@ -1,20 +1,15 @@
-import pymysql
-from server import DB_CFG
+import sys
+from server import pg_qry
 
-conn = pymysql.connect(**DB_CFG)
-c = conn.cursor(pymysql.cursors.DictCursor)
-
-sql = """
-    SELECT 
-        (
-            COALESCE((SELECT SUM(amount) FROM player_cashback_in_outs WHERE player_id = p.id AND created_at BETWEEN %s AND %s), 0) +
-            COALESCE((SELECT SUM(amount) FROM player_fortune_wheel_transactions WHERE player_id = p.id AND created_at BETWEEN %s AND %s), 0) +
-            COALESCE((SELECT SUM(amount) FROM player_raffle_transactions WHERE player_id = p.id AND created_at BETWEEN %s AND %s), 0) +
-            COALESCE((SELECT SUM(credits) FROM player_bonus_conversions WHERE player_id = p.id AND created_at BETWEEN %s AND %s), 0) +
-            COALESCE((SELECT SUM(amount) FROM player_transactions WHERE player_id = p.id AND created_at BETWEEN %s AND %s AND (reason LIKE '%%Campanie%%' OR reason LIKE '%%Fortune%%' OR reason LIKE '%%Birthday%%' OR reason = 'JP' OR reason LIKE '%%Tombol%%')), 0) +
-            COALESCE((SELECT SUM(hit_value) FROM player_jackpot_histories WHERE player_id = p.id AND hit_date BETWEEN %s AND %s), 0)
-        ) as promo_amount
-    FROM players p WHERE p.id = 1128
-"""
-c.execute(sql, ['2026-05-01', '2026-05-29 23:59:59'] * 6)
-print(c.fetchone())
+rows = pg_qry("""
+    SELECT f.id, f.expense_date, f.location_ids, f.department_id, f.type_id,
+           f.quantity, f.unit_value, f.currency, f.eur_rate, f.total_ron, f.is_recurring,
+           d.name as department_name, t.name as type_name
+    FROM cp2_monthly_fixed_expenses f
+    LEFT JOIN casino_departments d ON f.department_id::text = d.id::text
+    LEFT JOIN casino_expenditure_types t ON f.type_id::text = t.id::text
+    WHERE f.expense_date >= '2026-07-01' AND f.expense_date <= '2026-07-31'
+""")
+print(f"Total rows: {len(rows)}")
+for r in rows:
+    print(r)

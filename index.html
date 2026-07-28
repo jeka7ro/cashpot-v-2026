@@ -6,10 +6,10 @@
 <title>CyberSlot Analytics</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-<script src="chart.umd.min.js"></script>
-<script src="chartjs-plugin-datalabels.min.js"></script>
-<script src="xlsx.full.min.js"></script>
-<link rel="stylesheet" href="style.css?v=147">
+<script src="chart.umd.min.js?v=149"></script>
+<script src="chartjs-plugin-datalabels.min.js?v=149"></script>
+<script src="xlsx.full.min.js?v=149"></script>
+<link rel="stylesheet" href="style.css?v=149">
 <script>
   if (window.location.hash.startsWith('#invite')) {
     document.write('<style>#app-container, #view-login { display: none !important; } #view-register { display: flex !important; }</style>');
@@ -228,6 +228,10 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
             POS
           </a>
+          <a href="#floorplan" class="nav-item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><path d="M3 9h18M9 21V9"></path></svg>
+            Floorplan
+          </a>
         <a href="#rapoarte" class="nav-item" onclick="document.getElementById('subnav-rapoarte').style.display = document.getElementById('subnav-rapoarte').style.display === 'none' ? 'block' : 'none';">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
           Rapoarte
@@ -279,6 +283,10 @@
         <a href="#admin" class="nav-item" id="nav-admin" style="display:none; color:var(--orange);">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
           Gestiune Useri
+        </a>
+        <a href="#admin-floorplan" class="nav-item" id="nav-admin-floorplan" style="display:none; color:var(--orange);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><path d="M3 9h18M9 21V9"></path></svg>
+          Editor Floorplan
         </a>
 
         <div class="mobile-show" style="display:none; margin-top:24px; border-top:1px solid var(--border); padding-top:16px;">
@@ -420,6 +428,197 @@
       </div>
     </div>
   </section>
+
+    <!-- FLOORPLAN CONTENT -->
+    <div id="view-floorplan" class="view-panel">
+      <div style="padding:24px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <h2 style="font-size:24px; margin:0;">Harta Locației</h2>
+          <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+            <select id="global-fp-location-select" class="glass-select" style="padding:8px 12px; width:200px;" onchange="loadGlobalFloorplan()">
+              <option value="">Alege locația...</option>
+            </select>
+            <select id="global-fp-cabinet-select" class="glass-select" style="padding:8px 12px; width:150px; display:none;" onchange="renderGlobalFloorplanLocal()">
+              <option value="">Toate Cabinetele</option>
+            </select>
+            <select id="global-fp-producator-select" class="glass-select" style="padding:8px 12px; width:150px; display:none;" onchange="renderGlobalFloorplanLocal()">
+              <option value="">Toți Producătorii</option>
+            </select>
+            <button class="settings-btn" onclick="document.getElementById('global-fp-upload').click()" style="padding:8px 16px;">
+              Încarcă Schiță Sală
+            </button>
+            <input type="file" id="global-fp-upload" style="display:none;" accept="image/png, image/jpeg, image/svg+xml" onchange="uploadGlobalFloorplanBg(this)">
+            <a href="#admin-floorplan" class="settings-btn" style="padding:8px 16px; text-decoration:none; background:var(--accent); color:white; border:none; border-radius:8px;">
+              Aranjează Aparate
+            </a>
+          </div>
+        </div>
+
+        <!-- Butoane Setări Dinamice și Zoom -->
+        <div style="margin-top:12px; display:flex; gap:12px; align-items:center;">
+          <button class="settings-btn" onclick="openGlobalFpSettings()" style="padding:6px 12px; font-size:12px; display:flex; align-items:center; gap:6px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            Configurare Praguri
+          </button>
+          <span style="border-left:1px solid var(--border); height:20px;"></span>
+          <button class="settings-btn" onclick="globalFpZoom(0.2)" style="padding:4px 8px; font-weight:bold;">+</button>
+          <button class="settings-btn" onclick="globalFpZoom(-0.2)" style="padding:4px 10px; font-weight:bold;">-</button>
+          <button class="settings-btn" onclick="globalFpZoomReset()" style="padding:4px 8px; font-size:11px;">100%</button>
+          <span id="global-fp-zoom-label" style="font-size:11px; color:var(--muted); width:40px; text-align:center;">100%</span>
+        </div>
+
+        <!-- Empty state - shown when no floorplan is loaded -->
+        <div id="global-fp-empty" style="display:none; text-align:center; padding:80px 40px; margin-top:24px; border:2px dashed var(--border); border-radius:16px; background:var(--surface2);">
+          <h3 style="font-size:20px; color:var(--text); margin-bottom:8px;">Nu ai o schiță încărcată pentru această locație</h3>
+          <p style="color:var(--muted); margin-bottom:24px; max-width:500px; margin-left:auto; margin-right:auto;">
+            Încarcă o imagine (PNG, JPG sau SVG) cu planul sălii, apoi du-te la <strong>Editor Floorplan</strong> pentru a aranja aparatele pe hartă.
+          </p>
+          <button class="settings-btn" onclick="document.getElementById('global-fp-upload').click()" style="padding:12px 24px; font-size:16px; background:var(--green); color:white; border:none; border-radius:8px; cursor:pointer;">
+            Încarcă Schița Sălii
+          </button>
+        </div>
+
+        <!-- Container pentru harta si tabele laterale -->
+        <div style="display:flex; gap:24px; margin-top:24px; align-items:flex-start;">
+          
+          <!-- Tabbed Sidebar for Floorplan Stats -->
+          <div id="global-fp-table-wrapper" style="display:none; width:400px; height: 70vh; background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden; flex-direction:column;">
+            
+            <!-- Tabs -->
+            <div style="display:flex; border-bottom:1px solid var(--border); background:var(--surface2);">
+              <div id="fp-tab-aparate" onclick="switchFpTab('aparate')" style="flex:1; text-align:center; padding:12px 4px; font-weight:bold; cursor:pointer; background:var(--surface); border-bottom:2px solid var(--accent); font-size:12px;">Aparate</div>
+              <div id="fp-tab-cabinete" onclick="switchFpTab('cabinete')" style="flex:1; text-align:center; padding:12px 4px; font-weight:bold; cursor:pointer; border-bottom:2px solid transparent; color:var(--muted); font-size:12px;">Cabinete</div>
+              <div id="fp-tab-jocuri" onclick="switchFpTab('jocuri')" style="flex:1; text-align:center; padding:12px 4px; font-weight:bold; cursor:pointer; border-bottom:2px solid transparent; color:var(--muted); font-size:12px;">Jocuri</div>
+            </div>
+
+            <!-- Content Aparate -->
+            <div id="fp-content-aparate" style="overflow-y:auto; flex:1;">
+              <table class="styled-table" style="width:100%; margin:0; border:none; font-size:11px;">
+                <thead style="position:sticky; top:0; z-index:5;">
+                  <tr>
+                    <th style="padding:8px; white-space:nowrap; cursor:pointer;" onclick="sortFpTable('global-fp-table-body', 0, 'num')">Poz. ↕</th>
+                    <th style="padding:8px; white-space:nowrap; cursor:pointer;" onclick="sortFpTable('global-fp-table-body', 1, 'str')">Serie ↕</th>
+                    <th style="padding:8px; white-space:nowrap; text-align:right; cursor:pointer;" onclick="sortFpTable('global-fp-table-body', 2, 'num')">GGR ↕</th>
+                    <th style="padding:8px; white-space:nowrap; text-align:right; cursor:pointer;" onclick="sortFpTable('global-fp-table-body', 3, 'num')">IN Mediu ↕</th>
+                    <th style="padding:8px; white-space:nowrap; text-align:right; cursor:pointer;" onclick="sortFpTable('global-fp-table-body', 4, 'num')">Total IN ↕</th>
+                  </tr>
+                </thead>
+                <tbody id="global-fp-table-body">
+                  <!-- JS rows here -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Content Cabinete -->
+            <div id="fp-content-cabinete" style="overflow-y:auto; flex:1; display:none;">
+              <table class="styled-table" style="width:100%; margin:0; border:none; font-size:11px;">
+                <thead style="position:sticky; top:0; z-index:5;">
+                  <tr>
+                    <th style="padding:8px; white-space:nowrap; cursor:pointer;" onclick="sortFpTable('global-fp-left-table-body', 0, 'str')">Cabinet ↕</th>
+                    <th style="padding:8px; white-space:nowrap; text-align:right; cursor:pointer;" onclick="sortFpTable('global-fp-left-table-body', 1, 'num')">GGR ↕</th>
+                    <th style="padding:8px; white-space:nowrap; text-align:right; cursor:pointer;" onclick="sortFpTable('global-fp-left-table-body', 2, 'num')">IN Mediu ↕</th>
+                    <th style="padding:8px; white-space:nowrap; text-align:right; cursor:pointer;" onclick="sortFpTable('global-fp-left-table-body', 3, 'num')">Total IN ↕</th>
+                  </tr>
+                </thead>
+                <tbody id="global-fp-left-table-body">
+                  <!-- JS rows here -->
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Content Jocuri -->
+            <div id="fp-content-jocuri" style="overflow-y:auto; flex:1; display:none;">
+              <table class="styled-table" style="width:100%; margin:0; border:none; font-size:11px;">
+                <thead style="position:sticky; top:0; z-index:5;">
+                  <tr>
+                    <th style="padding:8px; white-space:nowrap; cursor:pointer;" onclick="sortFpTable('global-fp-jocuri-table-body', 0, 'str')">Denumire Joc ↕</th>
+                    <th style="padding:8px; white-space:nowrap; text-align:right; cursor:pointer;" onclick="sortFpTable('global-fp-jocuri-table-body', 1, 'num')">GGR ↕</th>
+                    <th style="padding:8px; white-space:nowrap; text-align:right; cursor:pointer;" onclick="sortFpTable('global-fp-jocuri-table-body', 2, 'num')">IN Mediu ↕</th>
+                    <th style="padding:8px; white-space:nowrap; text-align:right; cursor:pointer;" onclick="sortFpTable('global-fp-jocuri-table-body', 3, 'num')">Total IN ↕</th>
+                  </tr>
+                </thead>
+                <tbody id="global-fp-jocuri-table-body">
+                  <!-- JS rows here -->
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+
+          <!-- Floorplan container Wrapper - shown when we have a background -->
+          <div id="global-fp-wrapper" style="display:none; flex:1; height: 70vh; border:1px solid var(--border); border-radius:12px; background:var(--surface); overflow:auto; position:relative;">
+            
+            <!-- Controls overlay -->
+            <div style="position:absolute; bottom:16px; right:16px; display:flex; flex-direction:column; gap:8px; z-index:50;">
+              <button onclick="toggleGlobalFpFullscreen()" style="background:var(--surface2); border:1px solid var(--border); color:var(--text); width:36px; height:36px; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,0.5);" title="Fullscreen">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+              </button>
+              <button onclick="zoomGlobalFp(0.1)" style="background:var(--surface2); border:1px solid var(--border); color:var(--text); width:36px; height:36px; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,0.5);" title="Zoom In">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              </button>
+              <button onclick="zoomGlobalFp(-0.1)" style="background:var(--surface2); border:1px solid var(--border); color:var(--text); width:36px; height:36px; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,0.5);" title="Zoom Out">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              </button>
+            </div>
+
+            <div id="global-fp-container" style="width:100%; height:100%; position:relative; background-size:contain; background-repeat:no-repeat; background-position:center; transform-origin: top left;">
+              <!-- Aparatele vor fi randate aici -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal Setări Praguri Harta Globală -->
+    <div id="global-fp-settings-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); backdrop-filter:blur(5px); z-index:999999; justify-content:center; align-items:center;">
+      <div style="background:var(--surface); width:90%; max-width:600px; border-radius:16px; border:1px solid var(--border); overflow:hidden; box-shadow:0 24px 48px rgba(0,0,0,0.5); display:flex; flex-direction:column;">
+        <div style="padding:20px 24px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:var(--surface2);">
+          <h3 style="margin:0; font-size:18px; font-weight:800;">Configurare Praguri Harta</h3>
+          <button onclick="closeGlobalFpSettings()" style="background:none; border:none; color:var(--muted); cursor:pointer; font-size:24px; line-height:1;">&times;</button>
+        </div>
+        <div style="padding:24px; max-height:60vh; overflow-y:auto;">
+          
+          <div style="margin-bottom:24px;">
+            <label style="display:block; font-size:12px; font-weight:700; color:var(--muted); margin-bottom:8px; text-transform:uppercase; letter-spacing:1px;">Indicator Principal</label>
+            <select id="global-fp-metric" class="glass-select" style="width:100%; padding:10px 14px;">
+              <option value="in_zi">IN mediu</option>
+              <option value="ggr">GGR</option>
+              <option value="total_in">Total IN</option>
+              <option value="bet">BET</option>
+            </select>
+            <p style="font-size:11px; color:var(--muted); margin-top:8px;">Acest indicator va fi afișat mare pe cardurile aparatelor de pe hartă și va fi folosit pentru colorarea lor conform regulilor de mai jos.</p>
+          </div>
+
+          <label style="display:block; font-size:12px; font-weight:700; color:var(--muted); margin-bottom:8px; text-transform:uppercase; letter-spacing:1px;">Reguli de Culoare</label>
+          <div id="global-fp-rules-container" style="display:flex; flex-direction:column; gap:12px; margin-bottom:16px;">
+            <!-- Aici vor fi randate regulile (JS) -->
+          </div>
+          <button class="settings-btn" onclick="addGlobalFpRule()" style="padding:8px 16px; font-size:12px; display:inline-flex; align-items:center; gap:6px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Adaugă Regulă Nouă
+          </button>
+          
+        </div>
+        <div style="padding:16px 24px; border-top:1px solid var(--border); display:flex; justify-content:flex-end; gap:12px; background:var(--surface2);">
+          <button class="settings-btn" onclick="closeGlobalFpSettings()">Anulează</button>
+          <button class="settings-btn" onclick="saveGlobalFpSettings()" id="btn-save-fp-settings" style="background:var(--accent); color:white; border:none; font-weight:700;">Salvează Modificările</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tooltip Custom Floorplan -->
+    <div id="fp-custom-tooltip" style="display:none; position:fixed; background:rgba(20,20,25,0.95); border:1px solid rgba(255,255,255,0.1); backdrop-filter:blur(10px); color:white; padding:12px 16px; border-radius:8px; box-shadow:0 8px 32px rgba(0,0,0,0.6); pointer-events:none; z-index:999999; font-size:12px; min-width:160px; line-height:1.4;">
+      <div id="fp-tt-serie" style="font-size:14px; font-weight:900; margin-bottom:2px; color:var(--accent);"></div>
+      <div id="fp-tt-cabinet" style="font-size:11px; font-weight:700; color:white; margin-bottom:1px; text-transform:uppercase;"></div>
+      <div id="fp-tt-joc" style="font-size:10px; color:rgba(255,255,255,0.6); margin-bottom:10px; text-transform:uppercase; letter-spacing:0.5px;"></div>
+      <div style="display:grid; grid-template-columns:auto 1fr; gap:6px 12px; font-size:11px;">
+        <span style="color:rgba(255,255,255,0.6);">GGR:</span> <strong id="fp-tt-ggr" style="text-align:right;"></strong>
+        <span style="color:rgba(255,255,255,0.6);">IN Mediu:</span> <strong id="fp-tt-in-zi" style="text-align:right;"></strong>
+        <span style="color:rgba(255,255,255,0.6);">Total IN:</span> <strong id="fp-tt-total-in" style="text-align:right;"></strong>
+        <span style="color:rgba(255,255,255,0.6);">BET:</span> <strong id="fp-tt-bet" style="text-align:right;"></strong>
+        <span style="color:rgba(255,255,255,0.6);">BET Mediu:</span> <strong id="fp-tt-bet-mediu" style="text-align:right;"></strong>
+      </div>
+    </div>
 
     <!-- MAIN DASHBOARD CONTENT -->
     <div id="view-dashboard" class="view-panel active">
@@ -1610,6 +1809,10 @@
         </div>
       </div>
 
+      <!-- Floorplan Viewer -->
+      <div id="ld-floorplan-container" style="display:none; margin-bottom:24px; border:1px solid var(--border); border-radius:12px; background:var(--surface); height:500px; position:relative; overflow:hidden; background-size:contain; background-repeat:no-repeat; background-position:center;">
+      </div>
+
       <!-- KPI Grid -->
       <div id="ld-kpi-row" style="display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-bottom:24px;">
         <!-- Filled by JS -->
@@ -1912,6 +2115,92 @@
         </div>
         <div id="pg-admin-sloturi" class="pagination-wrapper" style="border-top:1px solid var(--border); padding:12px 20px; display:flex; justify-content:space-between; align-items:center; background:var(--surface2);"></div>
       </section>
+    </div>
+  </div>
+
+  <!-- ═══ VIEW: ADMIN FLOORPLAN ═══ -->
+  <div id="view-admin-floorplan" class="view-panel" style="overflow-y:auto;">
+    <div style="padding:24px;">
+      <h2 style="font-size:24px;">Editor Floorplan (Drag & Drop)</h2>
+      
+      <div style="display:flex; gap:16px; margin-top:20px; flex-wrap:wrap;">
+        <select id="fp-location-select" class="glass-select" style="padding:8px 12px; width:200px;" onchange="loadAdminFloorplan()">
+          <option value="">Alege locația...</option>
+        </select>
+        <button class="settings-btn" onclick="document.getElementById('fp-upload').click()" style="padding:8px 16px;">
+          Încărcare Schiță
+        </button>
+        <input type="file" id="fp-upload" style="display:none;" accept="image/png, image/jpeg, image/svg+xml" onchange="uploadFloorplanBg(this)">
+        <button class="settings-btn" onclick="saveFloorplanPositions()" style="padding:8px 16px; background:var(--green); color:white; border:none;">
+          Salvează Pozițiile
+        </button>
+        <span style="border-left:1px solid var(--border); height:24px;"></span>
+        <button class="settings-btn" onclick="fpAlignH()" style="padding:8px 12px; font-size:11px;" title="Aliniază aparatele selectate pe aceeași linie orizontală">
+          Aliniază Orizontal
+        </button>
+        <button class="settings-btn" onclick="fpAlignV()" style="padding:8px 12px; font-size:11px;" title="Aliniază aparatele selectate pe aceeași coloană verticală">
+          Aliniază Vertical
+        </button>
+        <button class="settings-btn" onclick="fpAlignGrid('horiz')" style="padding:8px 12px; font-size:11px; font-weight:bold; color:var(--accent);" title="Aranjează sub formă de careu (rânduri)">
+          Aliniază Careu Oriz.
+        </button>
+        <button class="settings-btn" onclick="fpAlignGrid('vert')" style="padding:8px 12px; font-size:11px; font-weight:bold; color:var(--accent);" title="Aranjează sub formă de careu (coloane)">
+          Aliniază Careu Vert.
+        </button>
+        <button class="settings-btn" onclick="fpDeselectAll()" style="padding:8px 12px; font-size:11px;">
+          Deselecteaza
+        </button>
+        <span style="border-left:1px solid var(--border); height:24px;"></span>
+        <button class="settings-btn" onclick="fpUndo()" style="padding:8px 12px; font-size:11px;" title="Ctrl+Z">
+          Undo
+        </button>
+        <span style="border-left:1px solid var(--border); height:24px;"></span>
+        <button class="settings-btn" onclick="fpCreateGroup()" style="padding:8px 12px; font-size:11px; background:var(--accent); color:white; border:none;" title="Selecteaza aparate apoi creaza un grup cu nume">
+          Creaza Grup
+        </button>
+        <button class="settings-btn" onclick="fpDeleteGroup()" style="padding:8px 12px; font-size:11px;" title="Selecteaza un aparat din grup apoi sterge grupul">
+          Sterge Grup
+        </button>
+        <button class="settings-btn" onclick="fpClearAllGroups()" style="padding:8px 12px; font-size:11px; color:var(--red);" title="Sterge absolut toate grupurile pentru aceasta locatie">
+          Reset Grupuri
+        </button>
+      </div>
+
+      <div style="display:flex; gap:24px; margin-top:24px; height:70vh;">
+        <!-- Lista de aparate -->
+        <div style="width:250px; background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:16px; display:flex; flex-direction:column;">
+          <h3 style="margin-top:0; margin-bottom:8px; font-size:16px; display:flex; justify-content:space-between; align-items:center;">
+            Aparate
+            <span id="fp-counter-total" style="font-size:12px; background:var(--surface); padding:2px 6px; border-radius:12px; color:var(--text);">0</span>
+          </h3>
+          <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--muted); margin-bottom:12px; padding-bottom:8px; border-bottom:1px solid var(--border);">
+            <span>Pe plan: <strong id="fp-counter-placed" style="color:var(--text);">0</strong></span>
+            <span>Neatribuite: <strong id="fp-counter-unassigned" style="color:var(--red);">0</strong></span>
+          </div>
+          <div style="position:relative; margin-bottom:12px;">
+            <input type="text" id="fp-search" placeholder="Caută serie, poz, joc..." onkeyup="fpFilterList()" style="width:100%; padding:8px 24px 8px 8px; border-radius:8px; border:1px solid var(--border); background:var(--surface); font-size:11px; color:var(--text);">
+            <button onclick="document.getElementById('fp-search').value=''; fpFilterList()" style="position:absolute; right:4px; top:5px; background:none; border:none; color:var(--muted); cursor:pointer; font-size:14px;">&times;</button>
+          </div>
+          <div id="fp-machine-list" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:8px;">
+            <!-- Aparatele care trebuie așezate vor apărea aici -->
+          </div>
+        </div>
+        
+        <!-- Zona de Drag & Drop cu zoom -->
+        <div style="flex:1; display:flex; flex-direction:column;">
+          <div style="display:flex; gap:8px; margin-bottom:8px; align-items:center;">
+            <button class="settings-btn" onclick="fpZoom(0.2)" style="padding:4px 10px; font-size:14px; font-weight:bold;">+</button>
+            <button class="settings-btn" onclick="fpZoom(-0.2)" style="padding:4px 10px; font-size:14px; font-weight:bold;">-</button>
+            <button class="settings-btn" onclick="fpZoomReset()" style="padding:4px 10px; font-size:11px;">Reset</button>
+            <span id="fp-zoom-label" style="font-size:11px; color:var(--muted);">100%</span>
+          </div>
+          <div id="fp-dropzone-wrapper" style="flex:1; border:2px dashed var(--border); border-radius:12px; overflow:auto; position:relative; background:#f0f0f0;">
+            <div id="fp-dropzone" style="position:relative; width:100%; height:100%; transform-origin:0 0; background-size:contain; background-repeat:no-repeat; background-position:center; min-height:500px;">
+              <!-- Aparatele vor fi mutate aici -->
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -2491,7 +2780,7 @@
 </div>
 
 <script src="game_uuids.js?v=1"></script>
-<script src="app.js?v=20260725_v20"></script>
+<script src="app.js?v=20260728_v16"></script>
 <!-- CUSTOM PROMPT MODAL -->
 <div class="settings-modal" id="modal-custom-prompt" onclick="if(event.target===this) { if(window.customPromptCancel) window.customPromptCancel(); }">
   <div class="settings-panel" style="width:400px; max-width:90%; background:var(--surface);">
