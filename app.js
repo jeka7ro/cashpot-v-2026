@@ -8535,17 +8535,27 @@ function applyFpZoom() {
       dz.style.width = 'auto';
     }
     dz.style.minHeight = 'auto';
-    dz.style.margin = fpZoomLevel > 1 ? '0' : '0 auto';
+    dz.style.margin = 'auto'; // Flex will handle centering
   } else {
     dz.style.width = (100 * fpZoomLevel) + '%';
     dz.style.height = (100 * fpZoomLevel) + '%';
     dz.style.minHeight = (500 * fpZoomLevel) + 'px';
-    dz.style.margin = fpZoomLevel > 1 ? '0' : '0 auto';
+    dz.style.margin = 'auto';
   }
   dz.style.backgroundSize = '100% 100%'; 
   dz.style.transform = 'none';
   
-  wrapper.style.overflow = fpZoomLevel > 1 ? 'auto' : 'hidden';
+  if (fpZoomLevel <= 1) {
+    wrapper.style.display = 'flex';
+    wrapper.style.alignItems = 'center';
+    wrapper.style.justifyContent = 'center';
+    wrapper.style.overflow = 'hidden';
+  } else {
+    wrapper.style.display = 'block';
+    wrapper.style.alignItems = 'initial';
+    wrapper.style.justifyContent = 'initial';
+    wrapper.style.overflow = 'auto';
+  }
   
   const label = document.getElementById('fp-zoom-label');
   if (label) label.textContent = Math.round(fpZoomLevel * 100) + '%';
@@ -9284,74 +9294,75 @@ function renderGlobalFloorplanLocal() {
   const metric = globalFpSettings.metric || 'in_zi';
   const rules = globalFpSettings.rules || [];
 
-  // Sort posData numerically by position or serial
-  posData.sort((a,b) => {
-    const mdA = machData.find(x => x.id == a.machine_id);
-    const mdB = machData.find(x => x.id == b.machine_id);
-    const posA = String(mdA ? (mdA.position || mdA.serial_nr) : a.serial_nr).toLowerCase();
-    const posB = String(mdB ? (mdB.position || mdB.serial_nr) : b.serial_nr).toLowerCase();
+  // Sort machData numerically by position or serial
+  machData.sort((a,b) => {
+    const posA = String(a.position || a.serial_nr).toLowerCase();
+    const posB = String(b.position || b.serial_nr).toLowerCase();
     const numA = parseInt(posA, 10);
     const numB = parseInt(posB, 10);
     if (!isNaN(numA) && !isNaN(numB) && numA !== numB) return numA - numB;
     return posA.localeCompare(posB);
   });
 
-  posData.forEach(p => {
-    const md = machData.find(x => x.id == p.machine_id);
-    if (selCab && (!md || md.cabinet !== selCab)) return;
-    if (selProd && (!md || md.producator !== selProd)) return;
+  machData.forEach(md => {
+    if (selCab && md.cabinet !== selCab) return;
+    if (selProd && md.producator !== selProd) return;
 
-    const posLabel = md ? (md.position || md.serial_nr) : p.serial_nr;
-    const el = document.createElement('div');
-    el.id = `fp-machine-${p.machine_id}`;
-    el.style.position = 'absolute';
-    el.style.left = p.pos_x + '%';
-    el.style.top = p.pos_y + '%';
-    el.style.transform = `translate(-50%, -50%) rotate(${p.angle || 0}deg)`;
+    const p = posData.find(x => x.machine_id == md.id);
+    const posLabel = md.position || md.serial_nr;
+    const serie = md.serial_nr;
+    const ggr = md.tot_ggr || md.ggr || 0;
+    const tIn = md.in_zi || 0; // IN mediu
+    const tTotalIn = md.tin || md.total_in || 0; // Total IN
+    const tBet = md.tot_bet || md.bet || 0;
+    const games = md.games || 0;
+    const tBetMediu = games > 0 ? (tBet / games) : 0;
+    const joc = md.tip_slot || '-';
+    const cabinet = md.cabinet || '-';
     
-    let val = md ? (md[metric] || 0) : 0;
-    let bg = 'var(--surface2)';
-    let col = 'var(--text)';
-    
-    if (md && rules.length > 0) {
-      for (let r of rules) {
-        if (val >= (r.min || 0) && val <= r.max) {
-          bg = r.color;
-          col = 'white'; 
-          if (bg.toLowerCase() === '#fbbf24' || bg.toLowerCase() === 'yellow' || bg.toLowerCase() === '#ffffff') col = 'black';
-          break;
+    // Draw on map only if it has position
+    if (p) {
+      const el = document.createElement('div');
+      el.id = `fp-machine-${md.id}`;
+      el.style.position = 'absolute';
+      el.style.left = p.pos_x + '%';
+      el.style.top = p.pos_y + '%';
+      el.style.transform = `translate(-50%, -50%) rotate(${p.angle || 0}deg)`;
+      
+      let val = md[metric] || 0;
+      let bg = 'var(--surface2)';
+      let col = 'var(--text)';
+      
+      if (rules.length > 0) {
+        for (let r of rules) {
+          if (val >= (r.min || 0) && val <= r.max) {
+            bg = r.color;
+            col = 'white'; 
+            if (bg.toLowerCase() === '#fbbf24' || bg.toLowerCase() === 'yellow' || bg.toLowerCase() === '#ffffff') col = 'black';
+            break;
+          }
         }
       }
+
+      el.innerHTML = `
+        <div class="fp-machine-card" style="background:${bg}; color:${col}; width:2cqw; aspect-ratio:1/1; padding:0; border-radius:0.2cqw; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.5); cursor:pointer; transition: transform 0.2s, box-shadow 0.2s;" 
+             onmouseenter="showFpTooltip(this, event, '${serie}', '${joc}', ${ggr}, ${tIn}, ${tTotalIn}, ${tBet}, '${cabinet}', ${tBetMediu})"
+             onmousemove="moveFpTooltip(event)"
+             onmouseleave="hideFpTooltip()">
+          <div style="font-size:0.35cqw; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; text-align:center;">${posLabel}</div>
+          <div style="font-size:0.5cqw; font-weight:800; margin-top:1px;">${fmt(tIn)}</div>
+          <div style="font-size:0.35cqw; font-weight:700; margin-top:1px; opacity:0.9;">G: ${fmt(ggr)}</div>
+        </div>
+      `;
+      container.appendChild(el);
     }
-
-    const ggr = md ? (md.tot_ggr || md.ggr || 0) : 0;
-    const tIn = md ? (md.in_zi || 0) : 0; // IN mediu
-    const tTotalIn = md ? (md.tin || md.total_in || 0) : 0; // Total IN
-    const tBet = md ? (md.tot_bet || md.bet || 0) : 0;
-    const games = md ? (md.games || 0) : 0;
-    const tBetMediu = games > 0 ? (tBet / games) : 0;
-    const joc = md ? (md.tip_slot || '-') : '-';
-    const cabinet = md ? (md.cabinet || '-') : '-';
-    const serie = md ? md.serial_nr : p.serial_nr;
-
-    el.innerHTML = `
-      <div class="fp-machine-card" style="background:${bg}; color:${col}; width:2cqw; aspect-ratio:1/1; padding:0; border-radius:0.2cqw; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.5); cursor:pointer; transition: transform 0.2s, box-shadow 0.2s;" 
-           onmouseenter="showFpTooltip(this, event, '${serie}', '${joc}', ${ggr}, ${tIn}, ${tTotalIn}, ${tBet}, '${cabinet}', ${tBetMediu})"
-           onmousemove="moveFpTooltip(event)"
-           onmouseleave="hideFpTooltip()">
-        <div style="font-size:0.35cqw; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; text-align:center;">${posLabel}</div>
-        <div style="font-size:0.5cqw; font-weight:800; margin-top:1px;">${fmt(tIn)}</div>
-        <div style="font-size:0.35cqw; font-weight:700; margin-top:1px; opacity:0.9;">G: ${fmt(ggr)}</div>
-      </div>
-    `;
-    container.appendChild(el);
     
     if (tableBody) {
       const tr = document.createElement('tr');
       tr.style.cursor = 'pointer';
-      tr.onclick = () => highlightFpMachine(p.machine_id);
+      tr.onclick = () => highlightFpMachine(md.id);
       tr.innerHTML = `
-        <td style="padding:8px; border-bottom:1px solid var(--border); font-weight:bold;">${posLabel}</td>
+        <td style="padding:8px; border-bottom:1px solid var(--border); font-weight:bold;">${posLabel} ${!p ? '<span style="color:var(--orange);font-size:10px;">(Neplasat)</span>' : ''}</td>
         <td style="padding:8px; border-bottom:1px solid var(--border); color:var(--muted);">${serie}</td>
         <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right; color:${ggr < 0 ? 'var(--red)' : 'var(--text)'}; font-weight:bold;">${fmt(ggr)}</td>
         <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right;">${fmt(tIn)}</td>
@@ -9360,22 +9371,22 @@ function renderGlobalFloorplanLocal() {
       tableBody.appendChild(tr);
     }
     
-    const realCab = md ? (md.cabinet || 'Necunoscut') : 'Necunoscut';
-    const realJoc = md ? (md.tip_slot || '-') : '-';
+    const realCab = md.cabinet || 'Necunoscut';
+    const realJoc = md.tip_slot || '-';
     
     // Cabinet stats
     if (!cabinetStats[realCab]) cabinetStats[realCab] = { cab: realCab, ggr: 0, tIn: 0, tTotalIn: 0, ids: [] };
     cabinetStats[realCab].ggr += ggr;
     cabinetStats[realCab].tIn += tIn;
     cabinetStats[realCab].tTotalIn += tTotalIn;
-    cabinetStats[realCab].ids.push(p.machine_id);
+    cabinetStats[realCab].ids.push(md.id);
 
     // Jocuri stats
     if (!jocuriStats[realJoc]) jocuriStats[realJoc] = { joc: realJoc, ggr: 0, tIn: 0, tTotalIn: 0, ids: [] };
     jocuriStats[realJoc].ggr += ggr;
     jocuriStats[realJoc].tIn += tIn;
     jocuriStats[realJoc].tTotalIn += tTotalIn;
-    jocuriStats[realJoc].ids.push(p.machine_id);
+    jocuriStats[realJoc].ids.push(md.id);
     
     // Totals
     totalStats.ggr += ggr;
@@ -9881,18 +9892,28 @@ function applyGlobalFpZoom() {
       dz.style.width = 'auto';
     }
     dz.style.minHeight = 'auto';
-    dz.style.margin = globalFpZoomLevel > 1 ? '0' : '0 auto';
+    dz.style.margin = 'auto';
   } else {
     dz.style.width = (100 * globalFpZoomLevel) + '%';
     dz.style.height = (100 * globalFpZoomLevel) + '%';
     dz.style.minHeight = (500 * globalFpZoomLevel) + 'px';
-    dz.style.margin = globalFpZoomLevel > 1 ? '0' : '0 auto';
+    dz.style.margin = 'auto';
   }
   
   dz.style.backgroundSize = '100% 100%'; 
   dz.style.transform = 'none';
   
-  wrapper.style.overflow = globalFpZoomLevel > 1 ? 'auto' : 'hidden';
+  if (globalFpZoomLevel <= 1) {
+    wrapper.style.display = 'flex';
+    wrapper.style.alignItems = 'center';
+    wrapper.style.justifyContent = 'center';
+    wrapper.style.overflow = 'hidden';
+  } else {
+    wrapper.style.display = 'block';
+    wrapper.style.alignItems = 'initial';
+    wrapper.style.justifyContent = 'initial';
+    wrapper.style.overflow = 'auto';
+  }
   const label = document.getElementById('global-fp-zoom-label');
   if (label) label.textContent = Math.round(globalFpZoomLevel * 100) + '%';
 }
@@ -10014,8 +10035,11 @@ function sortFpTable(tbodyId, colIdx, type) {
 
 function toggleGlobalFpFullscreen() {
   const wrapper = document.getElementById('global-fp-wrapper');
+  const tooltip = document.getElementById('fp-custom-tooltip');
   if (!wrapper) return;
   if (!document.fullscreenElement) {
+    // Move tooltip inside wrapper so it's visible in fullscreen
+    if (tooltip) wrapper.appendChild(tooltip);
     if (wrapper.requestFullscreen) {
       wrapper.requestFullscreen();
     } else if (wrapper.webkitRequestFullscreen) {
@@ -10027,6 +10051,8 @@ function toggleGlobalFpFullscreen() {
     } else if (document.webkitExitFullscreen) {
       document.webkitExitFullscreen();
     }
+    // Move tooltip back to body after exiting fullscreen
+    if (tooltip) document.body.appendChild(tooltip);
   }
 }
 
