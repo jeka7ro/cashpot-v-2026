@@ -2064,14 +2064,14 @@ async function loadLocations(s,e){
   const res = await Promise.all(promises);
   const data = res[0], prevData = c ? res[1] : [], currExclData = c ? res[2] : data;
 
-  let tIn=0,tGgr=0,tJp=0,tHh=0,tCb=0,tGm=0,tMkt=0,tBet=0,tClientiCard=0,tClientiTotal=0,tChelt=0;
+  let tIn=0,tGgr=0,tJp=0,tHh=0,tCb=0,tGm=0,tMkt=0,tBet=0,tClientiCard=0,tClientiTotal=0,tChelt=0,tPos=0;
   data.forEach(r => tGgr += +r.ggr||0);
   const maxG=Math.max(1,...data.map(r=>Math.abs(parseFloat(r.ggr||0))));
   tableStates.locatii.rows=data.map((r, i)=>{
     tIn+=+r.total_in||0;tJp+=+r.jackpot||0;tHh+=+r.hh||0;
     tCb+=+r.cashback||0;tGm+=+r.games||0;tMkt+=+r.marketing||0;tBet+=+r.bet||0;
     tClientiCard+=+(r.clienti_card||0); tClientiTotal+=+(r.clienti_total||0);
-    tChelt+=+(r.cheltuieli||0);
+    tChelt+=+(r.cheltuieli||0); tPos+=+(r.pos||0);
     const cc=cellCls(+r.ggr||0,maxG);
     const prev = prevData.find(x => x.id === r.id);
     const currE = currExclData.find(x => x.id === r.id);
@@ -2087,6 +2087,7 @@ async function loadLocations(s,e){
       <td class="mobile-hide num" style="font-weight:bold;">${fmt(r.total_in)}${inB}</td>
       <td class="num">${fmt(r.bet)}${betB}</td>
       <td class="num ${cc}">${fmt(r.ggr)}${ggrB}</td>
+      <td class="num" style="color:var(--accent); font-weight:bold;">${fmt(r.pos||0)}</td>
       <td class="num" style="color:var(--red)">${fmt(r.cheltuieli||0)}</td>
       <td style="text-align:center">${r.zile}</td>
       <td class="num">${fmt(r.jackpot)}</td><td class="num">${fmt(r.hh)}</td><td class="num">${fmt(r.cashback)}</td><td class="num">${fmt(r.roata||0)}</td><td class="num" style="color:var(--blue)">${fmt(r.raffles||0)}</td>
@@ -2120,6 +2121,7 @@ async function loadLocations(s,e){
     <td class="mobile-hide num" style="font-weight:bold;">${fmt(tIn)}${totalInBadge}</td>
     <td class="num">${fmt(tBet)}${c ? tBadge(currExclData.reduce((s,x)=>s+(x.bet||0),0), prevData.reduce((s,x)=>s+(x.bet||0),0)) : ''}</td>
     <td class="num">${fmt(tGgr)}${totalGgrBadge}</td>
+    <td class="num" style="color:var(--accent); font-weight:bold;">${fmt(tPos)}</td>
     <td class="num" style="color:var(--red)">${fmt(tChelt)}</td>
     <td style="text-align:center">—</td>
     <td class="num">${fmt(tJp)}</td>

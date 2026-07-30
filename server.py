@@ -679,11 +679,27 @@ def locations():
                     
     # Map back to mysql locations
     loc_expenses = {}
+    loc_pos = {}
+    
+    # Query POS payments
+    pos_res = pg_qry(f"""
+        SELECT p.location_id, SUM(p.amount) as s
+        FROM casino_payments p
+        LEFT JOIN casino_payment_types pt ON p.type_id = pt.id
+        LEFT JOIN casino_departments cd ON p.department_id = cd.id
+        WHERE p.operational_date >= %s::date AND p.operational_date <= %s::date
+          AND (p.is_deleted = false OR p.is_deleted IS NULL)
+          AND (pt.name ILIKE '%%pos%%' OR cd.name ILIKE '%%pos%%')
+        GROUP BY p.location_id
+    """, [start, end])
+    pg_pos_map = {str(r['location_id']): float(r['s'] or 0) for r in pos_res} if pos_res else {}
+
     for ml in mysql_locs:
         mid = str(ml['id'])
         if mid in mysql_to_pg_map:
             pid = mysql_to_pg_map[mid]
             loc_expenses[mid] = pg_exp_map.get(pid, 0) + pg_fixed_exp.get(pid, 0)
+            loc_pos[mid] = pg_pos_map.get(pid, 0)
 
     rows = qry("""
         SELECT
@@ -746,6 +762,7 @@ def locations():
             'clienti_card': cc,
             'clienti_total': cc + est_fara,
             'cheltuieli': loc_expenses.get(str(r['id']), 0),
+            'pos': loc_pos.get(str(r['id']), 0),
             'ggr_eur': round(ggr/EUR_RATE,2), 'ngr_eur': round(ngr/EUR_RATE,2),
             'hold_pct': round(ggr/tin*100,2) if tin else 0,
             'ngr_pct':  round(ngr/tin*100,2) if tin else 0,
