@@ -165,18 +165,18 @@ body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); 
   z-index: 10;
 }
 .fp-machine.fp-placed {
-  width: 2cqw !important;
-  height: 2cqw !important;
+  width: 2.4cqw !important;
+  height: 2.4cqw !important;
   min-width: unset !important;
   padding: 0 !important;
   border: none !important;
-  border-radius: 0.2cqw !important;
+  border-radius: 0.25cqw !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
   background: #1a1a2e !important;
   color: white !important;
-  font-size: 0.4cqw !important;
+  font-size: 0.45cqw !important;
   font-weight: bold !important;
   box-shadow: 0 2px 4px rgba(0,0,0,0.3) !important;
   transform: translate(-50%, -50%);
@@ -236,7 +236,7 @@ select.glass-select { padding-right: 30px; background-image: url("data:image/svg
 .data-table tbody tr:hover { background:var(--surface2); cursor:pointer; }
 .data-table td { padding:8px 12px; white-space:nowrap; }
 .data-table td.num { text-align:right; font-variant-numeric:tabular-nums; }
-.data-table tfoot td { background:var(--surface2); font-weight:700; padding:9px 12px; border-top:2px solid var(--border); }
+.data-table tfoot td { background:var(--surface2); font-weight:700; padding:9px 12px; border-top:2px solid var(--border); position: sticky; bottom: -1px; z-index: 5; box-shadow: 0 -2px 8px rgba(0,0,0,0.1); }
 .data-table tfoot td.num { text-align:right; }
 .table-scroll { overflow-x: auto; overflow-y: visible; }
 .table-scroll::-webkit-scrollbar { width:6px; height:6px; }
@@ -458,10 +458,10 @@ td.cell-neg-3 { background:rgba(239,68,68,.38) !important; }
 
 .bot-nav-btn { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; background:none; border:none; color:#ffffff; opacity:0.85; font-size:10px; font-weight:600; cursor:pointer; width:64px; }
 .bot-nav-btn:hover { opacity:1; color:#ffffff; }
-.bot-nav-home { position:relative; }
-.home-fab { position:absolute; bottom:20px; width:56px; height:56px; border-radius:50%; background:linear-gradient(135deg, var(--green), #059669); color:#fff; display:flex; align-items:center; justify-content:center; box-shadow:0 8px 24px rgba(16,185,129,0.4); border:4px solid var(--surface); transition:transform 0.2s; }
-.bot-nav-btn:hover .home-fab { transform:scale(1.05); }
-.bot-nav-home span { position:absolute; bottom:-12px; }
+.bot-nav-home { position:relative; width: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; background:none; border:none; color:#ffffff; font-size:10px; font-weight:600; cursor:pointer; }
+.home-fab { position:absolute; bottom:20px; left: 50%; transform: translateX(-50%); width:56px; height:56px; border-radius:50%; background:linear-gradient(135deg, var(--green), #059669); color:#fff; display:flex; align-items:center; justify-content:center; box-shadow:0 8px 24px rgba(16,185,129,0.4); border:4px solid var(--surface); transition:transform 0.2s; }
+.bot-nav-home:hover .home-fab { transform: translateX(-50%) scale(1.05); }
+.bot-nav-home span { position:absolute; bottom:-12px; white-space: nowrap; }
 
 @media(max-width: 600px) {
   .header { display:none !important; }
@@ -478,13 +478,13 @@ td.cell-neg-3 { background:rgba(239,68,68,.38) !important; }
 
 
 @media(max-width: 600px) {
-  .mobile-bottom-bar.mobile-show { display: flex !important; }
+  .mobile-bottom-bar.mobile-show { display: flex !important; position: absolute !important; bottom: 0 !important; }
   #view-dashboard.active { display: flex !important; flex-direction: column; }
   #view-dashboard > .tables-section { order: -1; margin-bottom: 24px; }
   
-  body, html { height: 100dvh !important; overflow: hidden !important; }
-  .app-layout { height: 100dvh !important; overflow: hidden !important; }
-  .main-content { padding-bottom: 90px !important; -webkit-overflow-scrolling: touch; }
+  body, html { height: 100dvh !important; overflow: hidden !important; position: relative !important; }
+  .app-layout { height: 100dvh !important; overflow: hidden !important; position: relative !important; padding: 0 !important; padding-bottom: 0 !important; }
+  .main-content { padding-bottom: 90px !important; -webkit-overflow-scrolling: touch; border-radius: 0 !important; border: none !important; margin-bottom: 0 !important; }
   .home-fab { bottom: 12px !important; }
 }
 

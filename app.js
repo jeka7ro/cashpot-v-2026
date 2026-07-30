@@ -8484,7 +8484,7 @@ async function loadAdminFloorplan() {
   // Fetch machines for this location
   try {
     const { s, e } = getPeriod();
-    const machinesData = await api(`/api/machines?start=${s}&end=${e}&loc_ids=${locId}`);
+    const machinesData = await api(`/api/machines?start=${s}&end=${e}&loc_ids=${locId}&fp_mode=1`);
     floorplanState.machines = machinesData;
   } catch(e) { console.error('Error loading machines', e); }
 
@@ -8525,14 +8525,15 @@ function applyFpZoom() {
   if (dz.style.aspectRatio) {
     const [w, h] = dz.style.aspectRatio.split('/').map(Number);
     const imgAspect = w / h;
-    const wrapperAspect = wrapper.clientWidth / wrapper.clientHeight;
-    
-    if (imgAspect > wrapperAspect) {
-      dz.style.width = (100 * fpZoomLevel) + '%';
-      dz.style.height = 'auto';
-    } else {
-      dz.style.height = (100 * fpZoomLevel) + '%';
-      dz.style.width = 'auto';
+    if (wrapper.clientWidth > 0 && wrapper.clientHeight > 0) {
+      const wrapperAspect = wrapper.clientWidth / wrapper.clientHeight;
+      if (imgAspect > wrapperAspect) {
+        dz.style.width = (100 * fpZoomLevel) + '%';
+        dz.style.height = 'auto';
+      } else {
+        dz.style.width = ((imgAspect / wrapperAspect) * 100 * fpZoomLevel) + '%';
+        dz.style.height = 'auto';
+      }
     }
     dz.style.minHeight = 'auto';
     dz.style.margin = 'auto'; // Flex will handle centering
@@ -8582,6 +8583,21 @@ function fpToggleGrid() {
       dz.style.backgroundSize = 'contain';
     }
   }
+}
+
+
+function fpRemoveSelected() {
+  if (fpSelectedIds.size === 0) { 
+    showAlert('Selecteaza cel putin un aparat de pe plan pentru a-l scoate.'); 
+    return; 
+  }
+  fpSaveUndo();
+  fpSelectedIds.forEach(id => {
+    delete floorplanState.positions[id];
+  });
+  fpSelectedIds.clear();
+  renderAdminFloorplan();
+  showAlert('Aparatele selectate au fost scoase de pe plan și trimise înapoi în listă.');
 }
 
 // Scroll wheel zoom pe dropzone
@@ -8910,8 +8926,7 @@ function fpAlignH() {
   if (fpSelectedIds.size < 2) { showAlert('Selecteaza minim 2 aparate (click + Shift+click) apoi aliniaza.'); return; }
   fpSaveUndo();
   const dropzone = document.getElementById('fp-dropzone');
-  const dzW = dropzone.offsetWidth || 800;
-  const gap = (32 / dzW) * 100; // 32px gap în procente
+  const gap = 2.8; // 2.8% of container width (machines are 2.4cqw width)
   
   // Colectăm elementele sortate după X curent
   const items = [];
@@ -8937,8 +8952,9 @@ function fpAlignV() {
   if (fpSelectedIds.size < 2) { showAlert('Selecteaza minim 2 aparate (click + Shift+click) apoi aliniaza.'); return; }
   fpSaveUndo();
   const dropzone = document.getElementById('fp-dropzone');
+  const dzW = dropzone.offsetWidth || 800;
   const dzH = dropzone.offsetHeight || 600;
-  const gap = (32 / dzH) * 100; // 32px gap în procente
+  const gap = 2.8 * (dzW / dzH); // Adjust percentage for height to match width
   
   // Colectăm elementele sortate după Y curent
   const items = [];
@@ -9212,7 +9228,7 @@ async function loadGlobalFloorplan() {
     const dateS = document.getElementById('date-start') ? document.getElementById('date-start').value : new Date().toISOString().split('T')[0];
     const dateE = document.getElementById('date-end') ? document.getElementById('date-end').value : new Date().toISOString().split('T')[0];
     const [machData, dataBg, posData] = await Promise.all([
-      apiAuth(`/api/machines?start=${dateS}&end=${dateE}&loc_ids=${locId}`),
+      apiAuth(`/api/machines?start=${dateS}&end=${dateE}&loc_ids=${locId}&fp_mode=1`),
       apiAuth(`/api/floorplan/settings?location_id=${locId}`),
       apiAuth(`/api/floorplan/machines?location_id=${locId}`)
     ]);
@@ -9268,11 +9284,22 @@ function renderGlobalFloorplanLocal() {
   if (emptyState) emptyState.style.display = 'none';
   if (wrapper) wrapper.style.display = 'block';
   if (tableWrapper) tableWrapper.style.display = 'flex';
+  
+  const oldScrollTop = wrapper ? wrapper.scrollTop : 0;
+  const oldScrollLeft = wrapper ? wrapper.scrollLeft : 0;
   const img = new Image();
   img.onload = function() {
     container.style.aspectRatio = `${this.width} / ${this.height}`;
+    container.style.height = 'auto'; // Fix discrepancy
     container.style.backgroundSize = '100% 100%';
     applyGlobalFpZoom();
+    if (wrapper) {
+      wrapper.scrollTop = oldScrollTop;
+      wrapper.scrollLeft = oldScrollLeft;
+    }
+    if (typeof makeWrapperDraggable === 'function') {
+      makeWrapperDraggable('global-fp-scroll');
+    }
   };
   img.src = `${API}${dataBg.floorplan_bg}`;
   container.style.backgroundImage = `url('${API}${dataBg.floorplan_bg}')`;
@@ -9344,35 +9371,47 @@ function renderGlobalFloorplanLocal() {
         }
       }
 
+      const safeSerie = String(serie).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      const safeJoc = String(joc).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      const safeCabinet = String(cabinet).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
       el.innerHTML = `
-        <div class="fp-machine-card" style="background:${bg}; color:${col}; width:2cqw; aspect-ratio:1/1; padding:0; border-radius:0.2cqw; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.5); cursor:pointer; transition: transform 0.2s, box-shadow 0.2s;" 
-             onmouseenter="showFpTooltip(this, event, '${serie}', '${joc}', ${ggr}, ${tIn}, ${tTotalIn}, ${tBet}, '${cabinet}', ${tBetMediu})"
+        <div class="fp-machine-card" style="background:${bg}; color:${col}; width:2.4cqw; aspect-ratio:1/1; padding:0; border-radius:0.25cqw; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.5); cursor:pointer; transition: transform 0.2s, box-shadow 0.2s;" 
+             onmouseenter="showFpTooltip(this, event, '${safeSerie}', '${safeJoc}', ${ggr}, ${tIn}, ${tTotalIn}, ${tBet}, '${safeCabinet}', ${tBetMediu})"
              onmousemove="moveFpTooltip(event)"
              onmouseleave="hideFpTooltip()">
-          <div style="font-size:0.35cqw; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; text-align:center;">${posLabel}</div>
-          <div style="font-size:0.5cqw; font-weight:800; margin-top:1px;">${fmt(tIn)}</div>
-          <div style="font-size:0.35cqw; font-weight:700; margin-top:1px; opacity:0.9;">G: ${fmt(ggr)}</div>
+          <div style="font-size:0.4cqw; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; text-align:center;">${posLabel}</div>
+          <div style="font-size:0.55cqw; font-weight:900; margin-top:1px;">${fmt(tIn)}</div>
+          <div style="font-size:0.4cqw; font-weight:700; margin-top:1px; opacity:0.9;">G: ${fmt(ggr)}</div>
         </div>
       `;
       container.appendChild(el);
     }
     
+    const realCab = md.cabinet || 'Necunoscut';
+    const realJoc = md.tip_slot || '-';
+
     if (tableBody) {
       const tr = document.createElement('tr');
       tr.style.cursor = 'pointer';
       tr.onclick = () => highlightFpMachine(md.id);
       tr.innerHTML = `
-        <td style="padding:8px; border-bottom:1px solid var(--border); font-weight:bold;">${posLabel} ${!p ? '<span style="color:var(--orange);font-size:10px;">(Neplasat)</span>' : ''}</td>
-        <td style="padding:8px; border-bottom:1px solid var(--border); color:var(--muted);">${serie}</td>
-        <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right; color:${ggr < 0 ? 'var(--red)' : 'var(--text)'}; font-weight:bold;">${fmt(ggr)}</td>
-        <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right;">${fmt(tIn)}</td>
-        <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right;">${fmt(tTotalIn)}</td>
+        <td style="padding:8px; border-bottom:1px solid var(--border); vertical-align:top;">
+          <div style="display:flex; justify-content:flex-start; align-items:center; gap:8px;">
+             <span style="font-weight:bold;">${posLabel}</span>
+             <span style="font-weight:bold; color:var(--text);">${serie}</span>
+             ${!p ? '<span style="color:var(--orange);font-size:10px; font-weight:bold;">(Neplasat)</span>' : ''}
+          </div>
+          <div style="font-size:10px; color:var(--muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:200px;" title="${realCab} • ${realJoc}">${realCab} &bull; ${realJoc}</div>
+        </td>
+        <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right; color:${ggr < 0 ? 'var(--red)' : 'var(--text)'}; font-weight:bold; vertical-align:top;">${fmt(ggr)}</td>
+        <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right; vertical-align:top;">
+          <div style="font-weight:bold; color:var(--text);">${fmt(tIn)}</div>
+          <div style="font-size:10px; color:var(--muted); margin-top:2px;">${fmt(tTotalIn)}</div>
+        </td>
       `;
       tableBody.appendChild(tr);
     }
-    
-    const realCab = md.cabinet || 'Necunoscut';
-    const realJoc = md.tip_slot || '-';
     
     // Cabinet stats
     if (!cabinetStats[realCab]) cabinetStats[realCab] = { cab: realCab, ggr: 0, tIn: 0, tTotalIn: 0, ids: [] };
@@ -9398,10 +9437,12 @@ function renderGlobalFloorplanLocal() {
   if (tableBody) {
      const tr = document.createElement('tr');
      tr.innerHTML = `
-       <td colspan="2" style="padding:8px; border-bottom:1px solid var(--border); font-weight:900; background:var(--surface2);">TOTAL</td>
+       <td style="padding:8px; border-bottom:1px solid var(--border); font-weight:900; background:var(--surface2);">TOTAL</td>
        <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right; font-weight:900; background:var(--surface2); color:${totalStats.ggr < 0 ? 'var(--red)' : 'var(--text)'};">${fmt(totalStats.ggr)}</td>
-       <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right; font-weight:900; background:var(--surface2);">${fmt(totalStats.tIn)}</td>
-       <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right; font-weight:900; background:var(--surface2);">${fmt(totalStats.tTotalIn)}</td>
+       <td style="padding:8px; border-bottom:1px solid var(--border); text-align:right; background:var(--surface2); vertical-align:top;">
+         <div style="font-weight:900;">${fmt(totalStats.tIn)}</div>
+         <div style="font-size:10px; font-weight:900; color:var(--muted); margin-top:2px;">${fmt(totalStats.tTotalIn)}</div>
+       </td>
      `;
      tableBody.appendChild(tr);
   }
@@ -9502,7 +9543,8 @@ async function uploadGlobalFloorplanBg(input) {
 
 async function renderLocDetailFloorplan(locId, machData) {
   const container = document.getElementById('ld-floorplan-container');
-  if (!container) return;
+  const wrapper = document.getElementById('ld-floorplan-wrapper');
+  if (!container || !wrapper) return;
 
   try {
     // Fetch floorplan config
@@ -9512,16 +9554,27 @@ async function renderLocDetailFloorplan(locId, machData) {
     const posData = await apiAuth(`/api/floorplan/machines?location_id=${locId}&_t=${Date.now()}`);
 
     if (!dataBg.floorplan_bg || posData.length === 0) {
-      container.style.display = 'none';
+      wrapper.style.display = 'none';
+      const btn = document.getElementById('ld-toggle-fp-btn');
+      if (btn) btn.style.display = 'none';
       return;
     }
     
-    container.style.display = 'block';
+    wrapper.style.display = 'block';
+    container.style.containerType = 'inline-size'; // Set container type for cqw
+    const btn = document.getElementById('ld-toggle-fp-btn');
+    if (btn) {
+      btn.style.display = 'inline-flex';
+      btn.innerHTML = 'Ascunde Harta';
+    }
     const img = new Image();
     img.onload = function() {
       container.style.aspectRatio = `${this.width} / ${this.height}`;
       container.style.height = 'auto';
       container.style.backgroundSize = '100% 100%';
+      if (typeof applyLocFpZoom === 'function') {
+        applyLocFpZoom();
+      }
     };
     img.src = `${API}${dataBg.floorplan_bg}`;
     container.style.backgroundImage = `url('${API}${dataBg.floorplan_bg}')`;
@@ -9557,22 +9610,62 @@ async function renderLocDetailFloorplan(locId, machData) {
         }
       }
 
+      const tIn = md ? (md.in_zi || 0) : 0; // IN mediu
+      const tTotalIn = md ? (md.tin || md.total_in || 0) : 0; // Total IN
+      const tBet = md ? (md.tot_bet || md.bet || 0) : 0;
+      const games = md ? (md.games || 0) : 0;
+      const tBetMediu = games > 0 ? (tBet / games) : 0;
+      const joc = md ? (md.tip_slot || '-') : '-';
+      const cabinet = md ? (md.cabinet || '-') : '-';
+      const serie = md ? md.serial_nr : p.serial_nr;
       const ggr = md ? (md.tot_ggr || md.ggr || 0) : 0;
+      
+      const safeSerie = String(serie).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      const safeJoc = String(joc).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+      const safeCabinet = String(cabinet).replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
       el.innerHTML = `
-        <div style="background:${bg}; color:${col}; width:2cqw; aspect-ratio:1/1; border-radius:0.2cqw; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.3); cursor:default;" title="Pos: ${posLabel} | IN mediu: ${fmt(in_mediu)} | GGR: ${fmt(ggr)}">
-          <div style="font-size:0.35cqw; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; text-align:center;">${posLabel}</div>
-          <div style="font-size:0.5cqw; font-weight:800; margin-top:1px;">${fmt(in_mediu)}</div>
-          <div style="font-size:0.35cqw; font-weight:700; margin-top:1px; opacity:0.9;">G: ${fmt(ggr)}</div>
+        <div class="fp-machine-card" style="background:${bg}; color:${col}; width:2.4cqw; aspect-ratio:1/1; border-radius:0.25cqw; display:flex; flex-direction:column; align-items:center; justify-content:center; box-shadow:0 2px 4px rgba(0,0,0,0.3); cursor:pointer; transition: transform 0.2s, box-shadow 0.2s;" 
+             onmouseenter="showFpTooltip(this, event, '${safeSerie}', '${safeJoc}', ${ggr}, ${tIn}, ${tTotalIn}, ${tBet}, '${safeCabinet}', ${tBetMediu})"
+             onmousemove="moveFpTooltip(event)"
+             onmouseleave="hideFpTooltip()">
+          <div style="font-size:0.4cqw; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; text-align:center;">${posLabel}</div>
+          <div style="font-size:0.55cqw; font-weight:900; margin-top:1px;">${fmt(in_mediu)}</div>
+          <div style="font-size:0.4cqw; font-weight:700; margin-top:1px; opacity:0.9;">G: ${fmt(ggr)}</div>
         </div>
       `;
       
       container.appendChild(el);
     });
+    
+    locFpZoomLevel = 1;
+    if (typeof applyLocFpZoom === 'function') {
+      applyLocFpZoom();
+    }
+    
+    if (typeof makeWrapperDraggable === 'function') {
+      makeWrapperDraggable('ld-floorplan-scroll');
+    }
 
   } catch(e) {
     console.error('Error rendering floorplan viewer', e);
-    container.style.display = 'none';
+    const wrapper = document.getElementById('ld-floorplan-wrapper');
+    if (wrapper) wrapper.style.display = 'none';
+    const btn = document.getElementById('ld-toggle-fp-btn');
+    if (btn) btn.style.display = 'none';
+  }
+}
+
+function toggleLocDetailFloorplan() {
+  const wrapper = document.getElementById('ld-floorplan-wrapper');
+  const btn = document.getElementById('ld-toggle-fp-btn');
+  if (!wrapper) return;
+  if (wrapper.style.display === 'none') {
+    wrapper.style.display = 'block';
+    if(btn) btn.innerHTML = 'Ascunde Harta';
+  } else {
+    wrapper.style.display = 'none';
+    if(btn) btn.innerHTML = 'Arată Harta';
   }
 }
 
@@ -9669,8 +9762,8 @@ function fpAlignGrid(mode = 'horiz') {
   const dropzone = document.getElementById('fp-dropzone');
   const dzW = dropzone.offsetWidth || 800;
   const dzH = dropzone.offsetHeight || 600;
-  const gapX = (36 / dzW) * 100;
-  const gapY = (36 / dzH) * 100;
+  const gapX = 2.8;
+  const gapY = 2.8 * (dzW / dzH);
   
   const items = [];
   fpSelectedIds.forEach(id => {
@@ -9882,14 +9975,15 @@ function applyGlobalFpZoom() {
   if (dz.style.aspectRatio) {
     const [w, h] = dz.style.aspectRatio.split('/').map(Number);
     const imgAspect = w / h;
-    const wrapperAspect = wrapper.clientWidth / wrapper.clientHeight;
-    
-    if (imgAspect > wrapperAspect) {
-      dz.style.width = (100 * globalFpZoomLevel) + '%';
-      dz.style.height = 'auto';
-    } else {
-      dz.style.height = (100 * globalFpZoomLevel) + '%';
-      dz.style.width = 'auto';
+    if (wrapper.clientWidth > 0 && wrapper.clientHeight > 0) {
+      const wrapperAspect = wrapper.clientWidth / wrapper.clientHeight;
+      if (imgAspect > wrapperAspect) {
+        dz.style.width = (100 * globalFpZoomLevel) + '%';
+        dz.style.height = 'auto';
+      } else {
+        dz.style.width = ((imgAspect / wrapperAspect) * 100 * globalFpZoomLevel) + '%';
+        dz.style.height = 'auto';
+      }
     }
     dz.style.minHeight = 'auto';
     dz.style.margin = 'auto';
@@ -9903,20 +9997,145 @@ function applyGlobalFpZoom() {
   dz.style.backgroundSize = '100% 100%'; 
   dz.style.transform = 'none';
   
+  const scroll = document.getElementById('global-fp-scroll');
+  if (!scroll) return;
+  
   if (globalFpZoomLevel <= 1) {
-    wrapper.style.display = 'flex';
-    wrapper.style.alignItems = 'center';
-    wrapper.style.justifyContent = 'center';
-    wrapper.style.overflow = 'hidden';
+    scroll.style.display = 'flex';
+    scroll.style.alignItems = 'center';
+    scroll.style.justifyContent = 'center';
+    scroll.style.overflow = 'hidden';
   } else {
-    wrapper.style.display = 'block';
-    wrapper.style.alignItems = 'initial';
-    wrapper.style.justifyContent = 'initial';
-    wrapper.style.overflow = 'auto';
+    scroll.style.display = 'block';
+    scroll.style.alignItems = 'initial';
+    scroll.style.justifyContent = 'initial';
+    scroll.style.overflow = 'auto';
   }
   const label = document.getElementById('global-fp-zoom-label');
   if (label) label.textContent = Math.round(globalFpZoomLevel * 100) + '%';
 }
+
+// === LOCATIE FLOORPLAN ZOOM ===
+let locFpZoomLevel = 1;
+window.locFpZoom = function(delta) {
+  locFpZoomLevel = Math.max(0.5, Math.min(5, locFpZoomLevel + delta));
+  applyLocFpZoom();
+}
+function applyLocFpZoom() {
+  const dz = document.getElementById('ld-floorplan-container');
+  const wrapper = document.getElementById('ld-floorplan-wrapper');
+  if (!dz || !wrapper) return;
+  
+  if (dz.style.aspectRatio) {
+    const [w, h] = dz.style.aspectRatio.split('/').map(Number);
+    const imgAspect = w / h;
+    if (wrapper.clientWidth > 0 && wrapper.clientHeight > 0) {
+      const wrapperAspect = wrapper.clientWidth / wrapper.clientHeight;
+      if (imgAspect > wrapperAspect) {
+        dz.style.width = (100 * locFpZoomLevel) + '%';
+        dz.style.height = 'auto';
+      } else {
+        dz.style.width = ((imgAspect / wrapperAspect) * 100 * locFpZoomLevel) + '%';
+        dz.style.height = 'auto';
+      }
+    }
+    dz.style.minHeight = 'auto';
+    dz.style.margin = 'auto';
+  } else {
+    dz.style.width = (100 * locFpZoomLevel) + '%';
+    dz.style.height = (100 * locFpZoomLevel) + '%';
+    dz.style.minHeight = (500 * locFpZoomLevel) + 'px';
+    dz.style.margin = 'auto';
+  }
+  
+  dz.style.backgroundSize = '100% 100%'; 
+  dz.style.transform = 'none';
+  
+  const scroll = document.getElementById('ld-floorplan-scroll');
+  if (!scroll) return;
+  
+  if (locFpZoomLevel <= 1) {
+    scroll.style.display = 'flex';
+    scroll.style.alignItems = 'center';
+    scroll.style.justifyContent = 'center';
+    scroll.style.overflow = 'hidden';
+  } else {
+    scroll.style.display = 'block';
+    scroll.style.alignItems = 'initial';
+    scroll.style.justifyContent = 'initial';
+    scroll.style.overflow = 'auto';
+  }
+}
+
+window.locFpFullscreen = function() {
+  const wrp = document.getElementById('ld-floorplan-wrapper');
+  const tooltip = document.getElementById('fp-custom-tooltip');
+  if (!wrp) return;
+  if (!document.fullscreenElement) {
+    if (tooltip) wrp.appendChild(tooltip);
+    if (wrp.requestFullscreen) {
+      wrp.requestFullscreen().catch(err => {
+        console.warn(`Error attempting to enable fullscreen: ${err.message}`);
+      });
+    } else if (wrp.webkitRequestFullscreen) {
+      wrp.webkitRequestFullscreen();
+    }
+  } else {
+    if (document.exitFullscreen) {
+      document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
+    }
+  }
+}
+
+function makeWrapperDraggable(wrapperId) {
+  const wrapper = document.getElementById(wrapperId);
+  if (!wrapper) return;
+  if (wrapper.dataset.dragEnabled === 'true') return;
+  wrapper.dataset.dragEnabled = 'true';
+  
+  let isDown = false;
+  let startX;
+  let startY;
+  let scrollLeft;
+  let scrollTop;
+
+  wrapper.addEventListener('mousedown', (e) => {
+    // Only pan if clicking on the background, not on machines or buttons
+    if (e.target.closest('button') || e.target.closest('.fp-machine-card') || e.target.closest('.fp-rotate-handle')) return;
+    
+    isDown = true;
+    wrapper.style.cursor = 'grabbing';
+    startX = e.pageX - wrapper.offsetLeft;
+    startY = e.pageY - wrapper.offsetTop;
+    scrollLeft = wrapper.scrollLeft;
+    scrollTop = wrapper.scrollTop;
+  });
+  
+  wrapper.addEventListener('mouseleave', () => {
+    isDown = false;
+    wrapper.style.cursor = '';
+  });
+  
+  wrapper.addEventListener('mouseup', () => {
+    isDown = false;
+    wrapper.style.cursor = '';
+  });
+  
+  wrapper.addEventListener('mousemove', (e) => {
+    if (!isDown) return;
+    e.preventDefault();
+    const x = e.pageX - wrapper.offsetLeft;
+    const y = e.pageY - wrapper.offsetTop;
+    const walkX = (x - startX) * 1.5;
+    const walkY = (y - startY) * 1.5;
+    wrapper.scrollLeft = scrollLeft - walkX;
+    wrapper.scrollTop = scrollTop - walkY;
+  });
+}
+
+
 
 function showFpTooltip(el, e, serie, joc, ggr, inZi, totalIn, bet, cabinet, betMediu) {
   const tt = document.getElementById('fp-custom-tooltip');
@@ -10051,10 +10270,15 @@ function toggleGlobalFpFullscreen() {
     } else if (document.webkitExitFullscreen) {
       document.webkitExitFullscreen();
     }
-    // Move tooltip back to body after exiting fullscreen
-    if (tooltip) document.body.appendChild(tooltip);
   }
 }
+
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement) {
+    const tooltip = document.getElementById('fp-custom-tooltip');
+    if (tooltip) document.body.appendChild(tooltip);
+  }
+});
 
 let currentHighlightedFpIds = [];
 
@@ -10092,19 +10316,14 @@ function highlightFpMachine(machineIds) {
       if (!firstEl) firstEl = selectedEl;
       const card = selectedEl.querySelector('.fp-machine-card');
       if (card) {
-        card.style.boxShadow = '0 0 15px 5px var(--accent)';
-        card.style.border = '2px solid var(--accent)';
-        card.style.transform = 'scale(1.2)';
+        card.style.boxShadow = '0 0 8px 3px var(--purple)';
+        card.style.border = '2px solid var(--purple)';
+        card.style.transform = 'scale(1.1)';
         card.style.zIndex = '100';
       }
     }
   });
-
-  if (firstEl) {
-    firstEl.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
-  }
 }
-
 
 // Initial load settings
 document.addEventListener('DOMContentLoaded', () => {

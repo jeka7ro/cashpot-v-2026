@@ -2,7 +2,7 @@
 <html lang="ro">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
 <title>CyberSlot Analytics</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -496,11 +496,11 @@
               <table class="styled-table" style="width:100%; margin:0; border:none; font-size:11px;">
                 <thead style="position:sticky; top:0; z-index:5;">
                   <tr>
-                    <th style="padding:8px; white-space:nowrap; cursor:pointer;" onclick="sortFpTable('global-fp-table-body', 0, 'num')">Poz. ↕</th>
-                    <th style="padding:8px; white-space:nowrap; cursor:pointer;" onclick="sortFpTable('global-fp-table-body', 1, 'str')">Serie ↕</th>
-                    <th style="padding:8px; white-space:nowrap; text-align:right; cursor:pointer;" onclick="sortFpTable('global-fp-table-body', 2, 'num')">GGR ↕</th>
-                    <th style="padding:8px; white-space:nowrap; text-align:right; cursor:pointer;" onclick="sortFpTable('global-fp-table-body', 3, 'num')">IN Mediu ↕</th>
-                    <th style="padding:8px; white-space:nowrap; text-align:right; cursor:pointer;" onclick="sortFpTable('global-fp-table-body', 4, 'num')">Total IN ↕</th>
+                    <th style="padding:8px; white-space:nowrap; cursor:pointer;" onclick="sortFpTable('global-fp-table-body', 0, 'str')">Poz / Serie ↕</th>
+                    <th style="padding:8px; white-space:nowrap; text-align:right; cursor:pointer;" onclick="sortFpTable('global-fp-table-body', 1, 'num')">GGR ↕</th>
+                    <th style="padding:8px; white-space:nowrap; text-align:right; cursor:pointer;" onclick="sortFpTable('global-fp-table-body', 2, 'num')">
+                      IN Mediu ↕<br><span style="font-size:9px; color:var(--muted); font-weight:normal;">Total IN</span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody id="global-fp-table-body">
@@ -546,7 +546,7 @@
           </div>
 
           <!-- Floorplan container Wrapper - shown when we have a background -->
-          <div id="global-fp-wrapper" style="display:none; flex:1; height: 70vh; border:1px solid var(--border); border-radius:12px; background:var(--surface); overflow:auto; position:relative;">
+          <div id="global-fp-wrapper" style="display:none; flex:1; height: 70vh; border:1px solid var(--border); border-radius:12px; background:var(--surface); position:relative;">
             
             <!-- Controls overlay -->
             <div style="position:absolute; bottom:16px; right:16px; display:flex; flex-direction:column; gap:8px; z-index:50;">
@@ -561,8 +561,10 @@
               </button>
             </div>
 
-            <div id="global-fp-container" style="width:100%; height:100%; position:relative; background-size:contain; background-repeat:no-repeat; background-position:center; transform-origin: top left;">
-              <!-- Aparatele vor fi randate aici -->
+            <div id="global-fp-scroll" style="width:100%; height:100%; overflow:auto; position:relative; border-radius:12px;">
+              <div id="global-fp-container" style="width:100%; height:100%; position:relative; background-size:contain; background-repeat:no-repeat; background-position:center; transform-origin: top left;">
+                <!-- Aparatele vor fi randate aici -->
+              </div>
             </div>
           </div>
         </div>
@@ -1807,10 +1809,30 @@
             </div>
           </div>
         </div>
+        <button id="ld-toggle-fp-btn" class="settings-btn" onclick="toggleLocDetailFloorplan()" style="display:none; align-items:center; gap:6px; padding:6px 12px; border-radius:8px; font-size:12px; font-weight:600;">
+          Ascunde Harta
+        </button>
       </div>
 
       <!-- Floorplan Viewer -->
-      <div id="ld-floorplan-container" style="display:none; margin-bottom:24px; border:1px solid var(--border); border-radius:12px; background:var(--surface); height:500px; position:relative; overflow:hidden; background-size:contain; background-repeat:no-repeat; background-position:center;">
+      <div id="ld-floorplan-wrapper" style="display:none; margin-bottom:24px; border:1px solid var(--border); border-radius:12px; background:var(--surface); height:500px; position:relative;">
+        <!-- Controls overlay -->
+        <div style="position:absolute; bottom:16px; right:16px; display:flex; flex-direction:column; gap:8px; z-index:50;">
+          <button onclick="locFpFullscreen()" style="background:var(--surface2); border:1px solid var(--border); color:var(--text); width:36px; height:36px; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,0.5);" title="Fullscreen">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+          </button>
+          <button onclick="locFpZoom(0.2)" style="background:var(--surface2); border:1px solid var(--border); color:var(--text); width:36px; height:36px; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,0.5);" title="Zoom In">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          </button>
+          <button onclick="locFpZoom(-0.2)" style="background:var(--surface2); border:1px solid var(--border); color:var(--text); width:36px; height:36px; border-radius:8px; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,0.5);" title="Zoom Out">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          </button>
+        </div>
+        
+        <div id="ld-floorplan-scroll" style="width:100%; height:100%; overflow:auto; position:relative; border-radius:12px;">
+          <div id="ld-floorplan-container" style="width:100%; height:100%; position:relative; background-size:contain; background-repeat:no-repeat; background-position:center; transform-origin: top left;">
+          </div>
+        </div>
       </div>
 
       <!-- KPI Grid -->
@@ -2149,6 +2171,9 @@
         </button>
         <button class="settings-btn" onclick="fpDeselectAll()" style="padding:8px 12px; font-size:11px;">
           Deselecteaza
+        </button>
+        <button class="settings-btn" onclick="fpRemoveSelected()" style="padding:8px 12px; font-size:11px; color:var(--red); font-weight:bold;" title="Scoate aparatele selectate de pe plan">
+          Scoate de pe plan
         </button>
         <span style="border-left:1px solid var(--border); height:24px;"></span>
         <button class="settings-btn" onclick="fpUndo()" style="padding:8px 12px; font-size:11px;" title="Ctrl+Z">

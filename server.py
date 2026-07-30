@@ -905,8 +905,13 @@ def machines():
             ph = ','.join(['%s'] * len(all_ids))
             filters.append(f"mas.location_id IN ({ph})")
             params.extend(all_ids)
+            if request.args.get('fp_mode') == '1':
+                filters.append(f"m.location_id IN ({ph})")
+                params.extend(all_ids)
         except:
             filters.append("mas.location_id = %s"); params.append(loc_id)
+            if request.args.get('fp_mode') == '1':
+                filters.append("m.location_id = %s"); params.append(loc_id)
     loc_ids_raw = request.args.get('loc_ids', '')
     if loc_ids_raw and (not loc_id or loc_id == 'all'):
         try:
@@ -919,6 +924,9 @@ def machines():
                 ph = ','.join(['%s'] * len(expanded))
                 filters.append(f"mas.location_id IN ({ph})")
                 params.extend(list(expanded))
+                if request.args.get('fp_mode') == '1':
+                    filters.append(f"m.location_id IN ({ph})")
+                    params.extend(list(expanded))
         except:
             pass
     # Filter by provider via machine_types.manufacturer_id
