@@ -46,6 +46,29 @@ function getProviderLogo(name) {
 }
 function bar(v,max){const w=Math.min(100,max?(Math.abs(v)/max)*100:0);const bg=v<0?'var(--red)':'var(--accent)';return`<div class="pct-bar" style="justify-content:flex-end"><div class="bar-track"><div class="bar-fill" style="width:${w}%;background:${bg}"></div></div></div>`;}
 
+window.formatNumberInput = function(e) {
+    let val = e.target.value.replace(/[^0-9,]/g, '');
+    if (!val) { e.target.value = ''; return; }
+    let parts = val.split(',');
+    let intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    if (parts.length > 1) e.target.value = intPart + ',' + parts[1].substring(0, 2);
+    else e.target.value = intPart;
+};
+
+window.formatNumberValue = function(num) {
+    if (num === null || num === undefined) return '';
+    let parts = num.toString().split('.');
+    let intPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    if (parts.length > 1) return intPart + ',' + parts[1].substring(0, 2);
+    return intPart;
+};
+
+window.parseNumberInput = function(str) {
+    if (!str) return 0;
+    str = str.replace(/\./g, '').replace(',', '.');
+    return parseFloat(str) || 0;
+};
+
 function getGameThumbnail(name, id) {
   return 'slot_icon.png';
 }
@@ -182,7 +205,49 @@ window.reloadCurrentView = function() {
   else if (hash === '#floorplan') loadGlobalFloorplan();
   else if (hash.startsWith('#live')) { /* live se gestioneaza prin hashchange */ }
   else if (hash === '#pos') loadPosReport();
+  else if (hash.startsWith('#analiza')) {
+    loadKPI(s,e).catch(console.error);
+    const parts = hash.split('/');
+    const tab = parts[1] || 'landing';
+    loadAnaliza(tab);
+  }
   else loadAll();
+};
+
+window.loadAnaliza = function(tab) {
+  const viewAnaliza = document.getElementById('view-analiza');
+
+  // Highlight sidebar active item
+  document.querySelectorAll('.sidebar-nav .nav-item').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.sidebar-nav .sub-item').forEach(el => el.classList.remove('active'));
+  const parentMenu = document.querySelector('a[href="#analiza"]');
+  if (parentMenu) parentMenu.classList.add('active');
+  const activeSub = document.querySelector(`a[href="#analiza/${tab}"]`);
+  if (activeSub) activeSub.classList.add('active');
+
+  // Ensure subnav is open
+  const subnav = document.getElementById('subnav-analiza');
+  if (subnav) subnav.style.display = 'block';
+
+  // Hide all rep-pages inside view-analiza, show the active one
+  if (viewAnaliza) {
+    viewAnaliza.querySelectorAll('.rep-page').forEach(el => el.style.display = 'none');
+    const activePage = document.getElementById('analiza-' + tab);
+    if (activePage) {
+      activePage.style.display = 'block';
+      if (tab === 'rtp') {
+        if (typeof window.loadAnalizaRtpData === 'function') {
+          window.loadAnalizaRtpData();
+        }
+      } else if (tab === 'resets') {
+        if (typeof window.loadAnalizaResetsData === 'function') {
+          window.loadAnalizaResetsData();
+        }
+      }
+    } else {
+      document.getElementById('analiza-landing').style.display = 'block';
+    }
+  }
 };
 async function api(path, options = {}) {
   const r = await fetch(API + path, options);
@@ -213,7 +278,9 @@ const tableStates = {
   'hh-players': { page: 1, limit: dLimit, rows: [] },
   'rep-lunare': { page: 1, limit: dLimit, rows: [] },
   pos: { page: 1, limit: 50, rows: [] },
-  'fixed-expenses': { page: 1, limit: dLimit, rows: [] }
+  'fixed-expenses': { page: 1, limit: dLimit, rows: [] },
+  'analiza-rtp': { page: 1, limit: dLimit, rows: [] },
+  'analiza-resets': { page: 1, limit: dLimit, rows: [] }
 };
 
 function renderTablePaginated(key) {
@@ -307,18 +374,14 @@ function renderTablePaginated(key) {
   }
   
   if(pgWrap) {
-    if(rowsToRender.length <= 10 && st.limit === 'all') {
-      pgWrap.style.display = 'none';
-      return;
-    }
     pgWrap.style.display = 'flex';
-    const totalPages = st.limit === 'all' ? 1 : Math.ceil(st.rows.length / st.limit);
-    const startNum = st.limit === 'all' ? 1 : ((st.page-1)*st.limit + 1);
-    const endNum = st.limit === 'all' ? st.rows.length : Math.min(st.page*st.limit, st.rows.length);
+    const totalRecords = rowsToRender.length;
+    const totalPages = st.limit === 'all' ? 1 : Math.ceil(totalRecords / st.limit) || 1;
     
     pgWrap.innerHTML = `
-      <div class="pg-controls" style="gap:12px;">
-        <span class="pg-info" style="font-size:12px;">Afișează</span>
+      <div class="pg-controls" style="gap:12px; align-items:center;">
+        <span class="pg-info" style="font-size:12px; font-weight:700; color:var(--text); padding-right:12px; border-right:1px solid var(--border);">Total: ${totalRecords} rezultate</span>
+        <span class="pg-info" style="font-size:12px; padding-left:4px;">Afișează</span>
         <select onchange="changeLimit('${key}', this.value)" class="glass-select" style="padding:4px 30px 4px 12px; font-size:12px; background-color: transparent;">
           <option value="10" ${st.limit==10?'selected':''}>10</option>
           <option value="15" ${st.limit==15?'selected':''}>15</option>
@@ -345,9 +408,31 @@ window.exportToExcel = function(key) {
   const tbody = document.getElementById('body-' + key);
   const table = tbody ? tbody.closest('table') : null;
   if (!table) return;
-  // Clone table to remove ignore elements or change them before export if needed
-  const wb = XLSX.utils.table_to_book(table, { sheet: "Data" });
+  
+  // Clone the table to inject all rows and remove ignore elements
+  const cloneTable = table.cloneNode(true);
+  const cloneTbody = cloneTable.querySelector('tbody');
+  
+  // Try to use the full data from tableStates if available
+  const st = tableStates[key];
+  if (st && cloneTbody) {
+    let rowsToRender = st.filteredRows || st.rows;
+    if (st.parsedRows) {
+        rowsToRender = st.parsedRows.map(r => r.html);
+    }
+    cloneTbody.innerHTML = rowsToRender ? rowsToRender.join('') : '';
+  }
+
+  // Attach to DOM temporarily so SheetJS can parse innerHTML/rows properly
+  cloneTable.style.position = 'absolute';
+  cloneTable.style.left = '-9999px';
+  cloneTable.style.top = '-9999px';
+  document.body.appendChild(cloneTable);
+
+  const wb = XLSX.utils.table_to_book(cloneTable, { sheet: "Data", raw: true });
   XLSX.writeFile(wb, `Export_${key}_${new Date().toISOString().split('T')[0]}.xlsx`);
+
+  document.body.removeChild(cloneTable);
 };
 
 window.sortTable = function(key, colIndex, th) {
@@ -529,8 +614,8 @@ window.updateMultiMonthSelection = function() {
   
   selectedMultiMonths.forEach(val => {
     const [y, m] = val.split('-');
-    const s = new Date(y, m, 1);
-    let e = new Date(y, parseInt(m)+1, 0);
+    const s = new Date(y, parseInt(m)-1, 1);
+    let e = new Date(y, parseInt(m), 0);
     if (e > today) e = today;
     
     if (s < minDate) minDate = s;
@@ -1705,7 +1790,38 @@ async function saveSettings(){
 }
 
 // ─── Period & Trends ────────────────────────────────────────────────────────
-function getPeriod(){return{s:document.getElementById('date-start').value,e:document.getElementById('date-end').value};}
+function sanitizeDateStr(dStr) {
+  if (!dStr) return dStr;
+  let y, m, d;
+  if (dStr.includes('.')) {
+    const p = dStr.split('.');
+    d = parseInt(p[0], 10);
+    m = parseInt(p[1], 10);
+    y = parseInt(p[2], 10);
+  } else {
+    const p = dStr.split('-');
+    y = parseInt(p[0], 10);
+    m = parseInt(p[1], 10);
+    d = parseInt(p[2], 10);
+  }
+  if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+    if (m < 1) m = 1;
+    if (m > 12) m = 12;
+    let lastDay = new Date(y, m, 0).getDate();
+    if (d < 1) d = 1;
+    if (d > lastDay) d = lastDay;
+    return y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+  }
+  const today = new Date();
+  return today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+}
+
+function getPeriod(){
+  return {
+    s: sanitizeDateStr(document.getElementById('date-start').value),
+    e: sanitizeDateStr(document.getElementById('date-end').value)
+  };
+}
 function getCompDates(s, e) {
   const dStart = new Date(s);
   const dEnd = new Date(e);
@@ -1754,10 +1870,16 @@ async function loadFilters(){
     }
   }
   
+  const repLunareLoc = document.getElementById('rep-lunare-loc');
+  if (repLunareLoc) {
+    repLunareLoc.innerHTML = '';
+  }
+  
   (filtersData.locations||[]).forEach(l=>{
-    if(!ex.includes(String(l.id)) && fs) {
+    if(!ex.includes(String(l.id))) {
       if (perms.locations && perms.locations.length > 0 && !perms.locations.includes(l.id)) return;
-      fs.innerHTML+=`<option value="${l.id}">${l.name}</option>`;
+      if (fs) fs.innerHTML+=`<option value="${l.id}">${l.name}</option>`;
+      if (repLunareLoc) repLunareLoc.innerHTML+=`<label style="display:flex; align-items:center; gap:8px; font-size:12px; padding:6px 8px; cursor:pointer; border-radius:8px; transition:background 0.2s; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'"><input type="checkbox" class="lunare-loc-cb" value="${l.id}" onchange="updateLocSelectText()"> ${l.name}</label>`;
     }
   });
   
@@ -2744,6 +2866,7 @@ window.addEventListener('hashchange', () => {
   const parts = rawHash.split('/');
   const mainHash = parts[0];
   const subHash = parts[1];
+  console.log("DEBUG Hash:", fullHash, "main:", mainHash, "sub:", subHash);
   
   if (mainHash === 'invite') {
     handleInviteHash(subHash);
@@ -2783,6 +2906,12 @@ window.addEventListener('hashchange', () => {
     if (headerFilters) headerFilters.style.display = 'flex';
   }
 
+  // Exceptii specifice pentru afisare header:
+  if (mainHash === 'contracte') {
+    if (kpiSection) kpiSection.style.display = 'none'; // hide general KPIs
+    if (timelineSection) timelineSection.style.display = 'none'; // hide date picker
+  }
+
   const targetView = document.getElementById('view-' + mainHash);
   if(targetView) targetView.classList.add('active');
 
@@ -2795,11 +2924,17 @@ window.addEventListener('hashchange', () => {
   
   const targetBtn = document.querySelector(`.sidebar .nav-item[href="#${mainHash}"]`) || document.querySelector('.sidebar .nav-item');
   if(targetBtn) targetBtn.classList.add('active');
+  
+  if (mainHash === 'contracte') {
+    if (typeof window.loadContracts === 'function') {
+      window.loadContracts();
+    }
+  }
 
   // Hide period selector on Live and Admin-Floorplan
   const tlSection = document.querySelector('.timeline-section');
   if(tlSection) {
-    if (mainHash === 'live' || mainHash === 'admin-floorplan') {
+    if (mainHash === 'live' || mainHash === 'admin-floorplan' || mainHash === 'contracte') {
       tlSection.style.display = 'none';
     } else {
       tlSection.style.display = 'flex';
@@ -2825,6 +2960,12 @@ window.addEventListener('hashchange', () => {
     loadExpensesReport();
     const btnExpSettings = document.getElementById('btn-exp-settings');
     if (btnExpSettings) btnExpSettings.style.display = (currentUser && currentUser.role === 'Super Admin') ? 'inline-flex' : 'none';
+  } else if (mainHash === 'contracte') {
+    // Hide ALL global KPIs for contracte, because they have their own inline KPIs
+    ['kpi-in', 'kpi-ggr', 'kpi-profit', 'kpi-total-expenses', 'kpi-marketing', 'kpi-games', 'kpi-aparate', 'kpi-jp'].forEach(id => {
+      const el = document.getElementById(id);
+      if(el) el.style.display = 'none';
+    });
   } else {
     // Show them back on other pages
     ['kpi-in', 'kpi-ggr', 'kpi-profit', 'kpi-games', 'kpi-aparate'].forEach(id => {
@@ -2929,6 +3070,15 @@ window.addEventListener('hashchange', () => {
   } else {
     const subnav = document.getElementById('subnav-rapoarte');
     if (subnav) subnav.style.display = 'none';
+  }
+  
+  if(mainHash === 'analiza') {
+    if (typeof window.loadAnaliza === 'function') {
+      window.loadAnaliza(subHash || 'landing');
+    }
+  } else {
+    const subnavAnaliza = document.getElementById('subnav-analiza');
+    if (subnavAnaliza) subnavAnaliza.style.display = 'none';
   }
   
   if(mainHash === 'analize') {
@@ -6709,27 +6859,131 @@ window.switchExpTab = function(tab) {
   }
 }
 
+window.toggleExpDep = function(depIndex) {
+  const typeRows = document.querySelectorAll('.exp-subrow-' + depIndex);
+  const expRows = document.querySelectorAll('.exp-subsubrow-dep-' + depIndex);
+  const icon = document.getElementById('exp-icon-' + depIndex);
+  let isHidden = false;
+  
+  typeRows.forEach(r => {
+    if(r.style.display === 'none') {
+      r.style.display = 'table-row';
+      isHidden = true;
+    } else {
+      r.style.display = 'none';
+    }
+  });
+  
+  if (!isHidden) {
+    expRows.forEach(r => r.style.display = 'none');
+    document.querySelectorAll('.exp-type-icon-dep-' + depIndex).forEach(i => i.textContent = '▶');
+  }
+  
+  if(icon) {
+    icon.textContent = isHidden ? '▼' : '▶';
+  }
+}
+
+window.toggleExpType = function(typeIndex) {
+  const rows = document.querySelectorAll('.exp-subsubrow-' + typeIndex);
+  const icon = document.getElementById('exp-type-icon-' + typeIndex);
+  let isHidden = false;
+  rows.forEach(r => {
+    if(r.style.display === 'none') {
+      r.style.display = 'table-row';
+      isHidden = true;
+    } else {
+      r.style.display = 'none';
+    }
+  });
+  if(icon) {
+    icon.textContent = isHidden ? '▼' : '▶';
+  }
+}
+
+window.toggleAllExpDeps = function() {
+  const isExpanded = document.body.dataset.expAll === 'true';
+  const newExpanded = !isExpanded;
+  document.body.dataset.expAll = newExpanded ? 'true' : 'false';
+  
+  document.querySelectorAll('tr[class*="exp-subrow-"]').forEach(r => {
+    r.style.display = newExpanded ? 'table-row' : 'none';
+  });
+  
+  if (!newExpanded) {
+    document.querySelectorAll('tr[class*="exp-subsubrow-"]').forEach(r => {
+      r.style.display = 'none';
+    });
+    document.querySelectorAll('[id^="exp-type-icon-"]').forEach(i => {
+      i.textContent = '▶';
+    });
+  }
+  
+  document.querySelectorAll('[id^="exp-icon-"]').forEach(i => {
+    i.textContent = newExpanded ? '▼' : '▶';
+  });
+}
+
+window.goToExpDetails = function(q) {
+  const s = document.getElementById('exp-search');
+  if (s) {
+    s.value = q;
+    window.filterExpensesTable();
+  }
+  window.switchExpTab('details');
+};
+
 window.renderExpSummary = function() {
   const q = (document.getElementById('exp-search')?.value || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const filtered = typeof getExpFiltered === 'function' ? getExpFiltered() : _expensesData.filter(r => !q || [r.explanation, r.location_name, r.department_name, r.vendor_name, r.expenditure_type_name].join(' ').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(q));
 
-  // Categorii ca rânduri, locații ca coloane
-  const depsMap = {};  // dep → total
-  const locsMap = {};  // dep → { loc → total }
-  const locTotals = {}; // loc → grand total
+  // Categorii (Departments) as rows, Locations as columns
+  // Also we want to expand into Types (expenditure_type_name)
+  const depsMap = {};  // dep -> { total: 0, locs: { loc: 0 }, types: { typeName: { total: 0, locs: { loc: 0 } } } }
+  const locTotals = {};
 
   for (const r of filtered) {
+    if (r.is_hidden) continue;
+    
     const dName = r.department_name || 'Fără Dep.';
+    const tName = r.expenditure_type_name || 'Fără Tip';
+    const eName = r.explanation || 'Fără Explicație';
     const lName = r.location_name || 'Fără Locație';
 
-    if (!depsMap[dName]) depsMap[dName] = 0;
-    if (!locsMap[dName]) locsMap[dName] = {};
-    if (!locsMap[dName][lName]) locsMap[dName][lName] = 0;
-    if (!locTotals[lName]) locTotals[lName] = 0;
+    if (!depsMap[dName]) {
+      depsMap[dName] = { total: 0, items: [], locs: {}, types: {} };
+    }
+    if (!depsMap[dName].locs[lName]) depsMap[dName].locs[lName] = { amount: 0, items: [] };
+    
+    if (!depsMap[dName].types[tName]) {
+      depsMap[dName].types[tName] = { total: 0, items: [], locs: {}, exps: {} };
+    }
+    if (!depsMap[dName].types[tName].locs[lName]) depsMap[dName].types[tName].locs[lName] = { amount: 0, items: [] };
+    
+    if (!depsMap[dName].types[tName].exps[eName]) {
+      depsMap[dName].types[tName].exps[eName] = { total: 0, items: [], locs: {} };
+    }
+    if (!depsMap[dName].types[tName].exps[eName].locs[lName]) depsMap[dName].types[tName].exps[eName].locs[lName] = { amount: 0, items: [] };
+    
+    if (!locTotals[lName]) locTotals[lName] = { amount: 0, items: [] };
 
-    depsMap[dName] += r.amount;
-    locsMap[dName][lName] += r.amount;
-    locTotals[lName] += r.amount;
+    depsMap[dName].total += r.amount;
+    depsMap[dName].items.push(r);
+    depsMap[dName].locs[lName].amount += r.amount;
+    depsMap[dName].locs[lName].items.push(r);
+    
+    depsMap[dName].types[tName].total += r.amount;
+    depsMap[dName].types[tName].items.push(r);
+    depsMap[dName].types[tName].locs[lName].amount += r.amount;
+    depsMap[dName].types[tName].locs[lName].items.push(r);
+    
+    depsMap[dName].types[tName].exps[eName].total += r.amount;
+    depsMap[dName].types[tName].exps[eName].items.push(r);
+    depsMap[dName].types[tName].exps[eName].locs[lName].amount += r.amount;
+    depsMap[dName].types[tName].exps[eName].locs[lName].items.push(r);
+    
+    locTotals[lName].amount += r.amount;
+    locTotals[lName].items.push(r);
   }
 
   const deps = Object.keys(depsMap).sort();
@@ -6739,34 +6993,74 @@ window.renderExpSummary = function() {
   const tbody = document.getElementById('body-exp-summary');
   if (!thead || !tbody) return;
 
-  // Header: Categorie | Loc1 | Loc2 | ... | Total
-  let thHtml = '<tr><th>Categorie</th>';
+  // Header: Departament | Loc1 | Loc2 | ... | Total
+  let thHtml = '<tr><th style="white-space:nowrap;">Departament / Tip <button onclick="toggleAllExpDeps()" style="background:var(--surface); border:1px solid var(--border); color:var(--text); padding:2px 6px; border-radius:4px; font-size:10px; cursor:pointer; margin-left:6px;" title="Extinde/Restrânge Tot">+/-</button></th>';
   for (const l of locs) thHtml += `<th class="num">${l}</th>`;
   thHtml += '<th class="num" style="color:var(--red);">Total</th></tr>';
   thead.innerHTML = thHtml;
 
   let tbHtml = '';
   let grandTotal = 0;
-  const locGrandTotals = {};
-
+  
+  const makeTooltip = (items) => {
+    if (!items || items.length === 0) return '';
+    const lines = items.map(i => `${i.date || ''}: ${i.explanation ? i.explanation.replace(/"/g, '&quot;') : ''} (${fmt(i.amount)})`);
+    return `title="${lines.join('&#10;')}"`;
+  };
+  
+  let depIndex = 0;
+  let typeIndex = 0;
   for (const d of deps) {
-    let depTotal = 0;
-    tbHtml += `<tr><td style="font-weight:600; color:var(--accent); white-space:nowrap;">${d}</td>`;
+    depIndex++;
+    const depData = depsMap[d];
+    
+    const types = Object.keys(depData.types).sort();
+    
+    tbHtml += `<tr style="cursor:pointer;" onclick="toggleExpDep(${depIndex})" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background=''">
+      <td style="font-weight:600; color:var(--accent); white-space:nowrap;">
+        <span id="exp-icon-${depIndex}" style="display:inline-block; width:16px; font-size:10px;">▶</span> ${d}
+      </td>`;
+      
     for (const l of locs) {
-      const amt = locsMap[d][l] || 0;
-      depTotal += amt;
-      if (!locGrandTotals[l]) locGrandTotals[l] = 0;
-      locGrandTotals[l] += amt;
-      tbHtml += `<td class="num">${amt > 0 ? fmt(amt) : '-'}</td>`;
+      const cell = depData.locs[l] || { amount: 0, items: [] };
+      tbHtml += `<td class="num" ${makeTooltip(cell.items)}>${cell.amount !== 0 ? fmt(cell.amount) : '-'}</td>`;
     }
-    grandTotal += depTotal;
-    tbHtml += `<td class="num" style="font-weight:700; color:var(--red);">${fmt(depTotal)}</td></tr>`;
+    grandTotal += depData.total;
+    tbHtml += `<td class="num" style="font-weight:700; color:var(--red);" ${makeTooltip(depData.items)}>${fmt(depData.total)}</td></tr>`;
+    
+    for (const t of types) {
+      typeIndex++;
+      const tData = depData.types[t];
+      const exps = Object.keys(tData.exps).sort();
+      
+      tbHtml += `<tr class="exp-subrow-${depIndex}" style="display:none; background:var(--surface); cursor:pointer;" onclick="toggleExpType(${typeIndex})" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='var(--surface)'">
+        <td style="padding-left:24px; font-size:12px; color:var(--muted); white-space:nowrap;">
+          <span id="exp-type-icon-${typeIndex}" class="exp-type-icon-dep-${depIndex}" style="display:inline-block; width:16px; font-size:10px;">▶</span> ${t}
+        </td>`;
+      for (const l of locs) {
+        const cell = tData.locs[l] || { amount: 0, items: [] };
+        tbHtml += `<td class="num" style="font-size:12px; color:var(--muted);" ${makeTooltip(cell.items)}>${cell.amount !== 0 ? fmt(cell.amount) : '-'}</td>`;
+      }
+      tbHtml += `<td class="num" style="font-size:12px; font-weight:600; color:var(--red); opacity:0.8;" ${makeTooltip(tData.items)}>${fmt(tData.total)}</td></tr>`;
+      
+      // Sub-sub-rows for explanations
+      for (const e of exps) {
+        const eData = tData.exps[e];
+        tbHtml += `<tr class="exp-subsubrow-${typeIndex} exp-subsubrow-dep-${depIndex}" style="display:none; background:var(--surface2);">
+          <td style="padding-left:48px; font-size:11px; color:var(--muted); white-space:nowrap;">- ${e}</td>`;
+        for (const l of locs) {
+          const cell = eData.locs[l] || { amount: 0, items: [] };
+          tbHtml += `<td class="num" style="font-size:11px; color:var(--muted);" ${makeTooltip(cell.items)}>${cell.amount !== 0 ? fmt(cell.amount) : '-'}</td>`;
+        }
+        tbHtml += `<td class="num" style="font-size:11px; font-weight:500; color:var(--red); opacity:0.7;" ${makeTooltip(eData.items)}>${fmt(eData.total)}</td></tr>`;
+      }
+    }
   }
 
   // Total row
   if (deps.length > 0) {
     tbHtml += `<tr style="background:var(--surface2);"><td style="font-weight:700;">TOTAL GENERAL</td>`;
-    for (const l of locs) tbHtml += `<td class="num" style="font-weight:700;">${fmt(locGrandTotals[l] || 0)}</td>`;
+    for (const l of locs) tbHtml += `<td class="num" style="font-weight:700;" ${makeTooltip(locTotals[l]?.items)}>${fmt(locTotals[l]?.amount || 0)}</td>`;
     tbHtml += `<td class="num" style="font-weight:800; color:var(--red);">${fmt(grandTotal)}</td></tr>`;
   } else {
     tbHtml += `<tr><td colspan="${locs.length + 2}" style="text-align:center; color:var(--muted); padding:20px;">Nu există date conform filtrelor selectate.</td></tr>`;
@@ -6808,23 +7102,202 @@ window.exportActiveDashTable = function() {
   exportToExcel(key);
 };
 
-window.exportExpensesCSV = async function() {
-  if (!_expensesData || !_expensesData.length) { showAlert('Nu există date de exportat.'); return; }
-  const q = (document.getElementById('exp-search')?.value || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  const rows = _expensesData.filter(r => {
-    if (!q) return true;
-    return [r.explanation, r.location_name, r.department_name, r.vendor_name, r.expenditure_type_name].join(' ').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(q);
+window.exportExpensesExcel = async function() {
+  const tbody = document.getElementById('body-exp-summary');
+  const table = tbody ? tbody.closest('table') : null;
+  if (!table) { 
+      if (typeof showAlert === 'function') showAlert('Nu există date de exportat.'); 
+      else alert('Nu există date de exportat.');
+      return; 
+  }
+  
+  // Clone table to ensure all rows are exported even if hidden
+  const clone = table.cloneNode(true);
+  
+  // 1. Remove the expand all button
+  const btn = clone.querySelector('button');
+  if (btn) btn.remove();
+  
+  // 2. Remove expand/collapse icons (▶, ▼)
+  const icons = clone.querySelectorAll('[id^="exp-icon-"]');
+  icons.forEach(i => i.remove());
+  
+  // 3. Remove the '↳ ' prefix from subrows and make sure they are visible
+  const subrows = clone.querySelectorAll('[class^="exp-subrow-"]');
+  subrows.forEach(r => {
+    r.style.display = '';
+    const td = r.querySelector('td');
+    if (td && td.textContent.includes('↳')) {
+      td.textContent = td.textContent.replace('↳', '').trim();
+    }
   });
-  const bom = '\uFEFF';
-  const header = ['Data','Locatie','Departament','Categorie','Furnizor','Explicatie','Suma (RON)'];
-  const csv = bom + [header, ...rows.map(r => [
-    r.date, r.location_name, r.department_name, r.expenditure_type_name, r.vendor_name,
-    (r.explanation||'').replace(/,/g,' '), r.amount
-  ].map(v => `"${v||''}"`).join(','))].join('\n');
-  const a = document.createElement('a');
-  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
-  a.download = `cheltuieli_${new Date().toISOString().split('T')[0]}.csv`;
-  a.click();
+  
+  // 4. Make category rows bold (convert td to th so Excel makes them bold)
+  const catRows = clone.querySelectorAll('tr[onclick^="toggleExpDep"]');
+  catRows.forEach(r => {
+    const tds = r.querySelectorAll('td');
+    tds.forEach(td => {
+      const th = document.createElement('th');
+      th.innerHTML = td.innerHTML.trim();
+      r.replaceChild(th, td);
+    });
+  });
+
+  const hiddenRows = clone.querySelectorAll('tr[style*="display: none"], tr[style*="display:none"]');
+  hiddenRows.forEach(r => r.style.display = '');
+  
+  const wb = XLSX.utils.table_to_book(clone, { sheet: "Centralizator Cheltuieli", display: true });
+  XLSX.writeFile(wb, `Cheltuieli_Centralizator_${new Date().toISOString().split('T')[0]}.xlsx`);
+}
+
+window.copyExpSummaryTable = async function(btn) {
+  const tbody = document.getElementById('body-exp-summary');
+  const table = tbody ? tbody.closest('table') : null;
+  if (!table) { 
+      if (typeof showAlert === 'function') showAlert('Nu există date de copiat.'); 
+      else alert('Nu există date de copiat.');
+      return; 
+  }
+  
+  const originalHtml = btn ? btn.innerHTML : '';
+  const originalColor = btn ? btn.style.color : '';
+  const originalBorder = btn ? btn.style.borderColor : '';
+
+  const showSuccessState = () => {
+    if (btn) {
+      btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+      btn.style.color = '#10b981';
+      btn.style.borderColor = '#10b981';
+      setTimeout(() => {
+        btn.innerHTML = originalHtml;
+        btn.style.color = originalColor;
+        btn.style.borderColor = originalBorder;
+      }, 3000);
+    }
+  };
+
+  const clone = table.cloneNode(true);
+  
+  const hdrBtn = clone.querySelector('button');
+  if (hdrBtn) hdrBtn.remove();
+  
+  const icons = clone.querySelectorAll('[id^="exp-icon-"]');
+  icons.forEach(i => i.remove());
+  
+  const subrows = clone.querySelectorAll('[class^="exp-subrow-"]');
+  subrows.forEach(r => {
+    r.style.display = '';
+    const td = r.querySelector('td');
+    if (td && td.textContent.includes('↳')) {
+      td.textContent = td.textContent.replace('↳', '').trim();
+    }
+  });
+  
+  const catRows = clone.querySelectorAll('tr[onclick^="toggleExpDep"]');
+  catRows.forEach(r => {
+    const tds = r.querySelectorAll('td');
+    tds.forEach(td => {
+      const th = document.createElement('th');
+      th.innerHTML = td.innerHTML.trim();
+      r.replaceChild(th, td);
+    });
+  });
+
+  const hiddenRows = clone.querySelectorAll('tr[style*="display: none"], tr[style*="display:none"]');
+  hiddenRows.forEach(r => r.style.display = '');
+
+  // Apply inline styles for HTML export (so Sheets/Excel keeps formatting)
+  clone.style.borderCollapse = 'collapse';
+  clone.style.fontFamily = 'Arial, sans-serif';
+  clone.style.fontSize = '12px';
+  
+  const allRows = clone.querySelectorAll('tr');
+  allRows.forEach((r, idx) => {
+    if (idx === 0) {
+      r.style.backgroundColor = '#F8FAFC'; // header
+    } else if (r.querySelector('th')) {
+      r.style.backgroundColor = '#F1F5F9'; // catRows (since we changed td to th)
+    } else if (r.textContent.includes('TOTAL GENERAL')) {
+      r.style.backgroundColor = '#E2E8F0'; // total row
+    } else {
+      r.style.backgroundColor = '#FFFFFF'; // subrows
+    }
+    
+    const cells = r.querySelectorAll('th, td');
+    cells.forEach(c => {
+      c.style.border = '1px solid #E2E8F0';
+      c.style.padding = '4px 8px';
+      
+      // Translate CSS variables to HEX
+      if (c.style.color && c.style.color.includes('var(--red)')) {
+        c.style.color = '#DC2626';
+      } else if (c.style.color && c.style.color.includes('var(--muted)')) {
+        c.style.color = '#64748B';
+      } else {
+        c.style.color = '#0F172A';
+      }
+      
+      if (c.classList.contains('num')) {
+        c.style.textAlign = 'right';
+      } else {
+        c.style.textAlign = 'left';
+      }
+    });
+  });
+
+  let tsv = '';
+  const rows = clone.querySelectorAll('tr');
+  rows.forEach(row => {
+    const cells = row.querySelectorAll('th, td');
+    const rowData = Array.from(cells).map(cell => cell.textContent.trim().replace(/\n/g, ' '));
+    tsv += rowData.join('\t') + '\n';
+  });
+
+  let html = clone.outerHTML;
+  let clipboardApiSupported = !!(navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== 'undefined');
+
+  if (clipboardApiSupported) {
+    try {
+      const blobHtml = new Blob([html], { type: 'text/html' });
+      const blobText = new Blob([tsv], { type: 'text/plain' });
+      const data = [new ClipboardItem({ 'text/html': blobHtml, 'text/plain': blobText })];
+      
+      navigator.clipboard.write(data).then(() => {
+        if (typeof showToast === 'function') showToast('Tabelul a fost copiat în memorie!', 'success');
+        showSuccessState();
+      }).catch(err => {
+        console.error('Clipboard API a eșuat...', err);
+        fallbackCopy(tsv, showSuccessState);
+      });
+      return;
+    } catch (err) {
+      console.error('ClipboardItem error...', err);
+      clipboardApiSupported = false;
+    }
+  }
+
+  if (!clipboardApiSupported) {
+    fallbackCopy(tsv, showSuccessState);
+  }
+  
+  function fallbackCopy(text, onSuccess) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.top = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      const ok = document.execCommand('copy');
+      if (ok) {
+        if (typeof showToast === 'function') showToast('Copiat cu succes!', 'success');
+        if (onSuccess) onSuccess();
+      } else {
+        if (typeof showToast === 'function') showToast('Eroare la copiere.', 'error');
+      }
+    } catch(e) {}
+    document.body.removeChild(ta);
+  }
 }
 
 let _expSortCol = 'date';
@@ -6897,10 +7370,12 @@ filtered.sort((a, b) => {
   let total = 0;
   
   for (const r of pageData) {
-    total += r.amount;
+    if (!r.is_hidden) {
+      total += r.amount;
+    }
     
     html += `
-      <tr>
+      <tr style="${r.is_hidden ? 'opacity:0.4;' : ''}">
         <td style="text-align:center;">${r.is_manual ? `<input type="checkbox" class="exp-row-cb" value="${r.id}" onclick="updateExpBulkToolbar()" style="cursor:pointer;">` : ''}</td>
         <td style="white-space:nowrap;font-size:11px;color:var(--muted)">${r.date}</td>
         <td style="color:var(--accent);font-weight:600">${r.location_name || '-'}</td>
@@ -6912,9 +7387,18 @@ filtered.sort((a, b) => {
         <td class="num" style="color:var(--red);font-weight:700">${fmt(r.amount)}</td>
         
         <td style="text-align:center;">
-          ${r.id && r.is_manual ? `<div style="display:flex; justify-content:center; gap:4px;">
+          ${r.id ? `<div style="display:flex; justify-content:center; gap:4px;">
+            <button onclick="toggleExpenseVisibility('${r.id}')" style="background:none;border:none;cursor:pointer;color:var(--text);padding:4px;border-radius:4px;display:flex;align-items:center;justify-content:center;transition:background 0.2s;" onmouseover="this.style.background='var(--surface)'" onmouseout="this.style.background='none'" title="${r.is_hidden ? 'Afișează' : 'Ascunde (exclude din calcule)'}">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                ${r.is_hidden ? 
+                  '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>' 
+                  : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>'}
+              </svg>
+            </button>
+            ${r.is_manual ? `
             <button onclick="openEditExpense('${r.id}')" style="background:none;border:none;cursor:pointer;color:var(--text);padding:4px;border-radius:4px;display:flex;align-items:center;justify-content:center;transition:background 0.2s;" onmouseover="this.style.background='var(--surface)'" onmouseout="this.style.background='none'" title="Modifică">✎</button>
             <button onclick="deleteExpense('${r.id}')" style="background:none;border:none;cursor:pointer;color:var(--red);padding:4px;border-radius:4px;display:flex;align-items:center;justify-content:center;transition:background 0.2s;" onmouseover="this.style.background='rgba(239,68,68,0.1)'" onmouseout="this.style.background='none'" title="Șterge"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg></button>
+            ` : ''}
           </div>` : ''}
         </td>
       </tr>
@@ -6922,8 +7406,8 @@ filtered.sort((a, b) => {
   }
   
   // Totals
-  const totalGeneral = filtered.reduce((s, r) => s + r.amount, 0); // all filtered rows
-  const totalAll = _expensesData.reduce((s, r) => s + r.amount, 0); // all data (no filter)
+  const totalGeneral = filtered.reduce((s, r) => s + (r.is_hidden ? 0 : r.amount), 0); // all filtered rows
+  const totalAll = _expensesData.reduce((s, r) => s + (r.is_hidden ? 0 : r.amount), 0); // all data (no filter)
   const isFiltered = filtered.length < _expensesData.length;
   
   if (!html) html = `<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--muted)">Nu s-au găsit cheltuieli.</td></tr>`;
@@ -6962,12 +7446,19 @@ window.resetExpFilters = function() {
 
 function getExpFiltered() {
   const q   = (document.getElementById('exp-search')?.value || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  const loc = document.getElementById('exp-filter-loc')?.value || '';
+  
+  const locCheckboxes = document.querySelectorAll('.exp-loc-cb:checked');
+  const locs = Array.from(locCheckboxes).map(cb => cb.value).filter(Boolean);
+  
   const dep = document.getElementById('exp-filter-dep')?.value || '';
   const tip = document.getElementById('exp-filter-tip')?.value || '';
+  
   return _expensesData.filter(r => {
     if (q && ![r.explanation, r.location_name, r.department_name, r.vendor_name, r.expenditure_type_name].join(' ').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(q)) return false;
-    if (loc && (r.location_name||'').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") !== loc) return false;
+    
+    const rloc = (r.location_name||'').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    if (locs.length > 0 && !locs.includes(rloc)) return false;
+    
     if (dep && (r.department_name||'').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") !== dep) return false;
     if (tip && (r.expenditure_type_name||'').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") !== tip) return false;
     return true;
@@ -6981,13 +7472,16 @@ function populateExpFilterOptions() {
   const locEl = document.getElementById('exp-filter-loc');
   const depEl = document.getElementById('exp-filter-dep');
   const tipEl = document.getElementById('exp-filter-tip');
-  if (locEl) locEl.innerHTML = '<option value="">Toate locațiile</option>' + locs.map(l => `<option value="${l.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")}">${l}</option>`).join('');
+  
+  if (locEl) {
+    locEl.innerHTML = locs.map(l => `<label style="display:flex; align-items:center; gap:8px; font-size:12px; padding:6px 8px; cursor:pointer; border-radius:8px; transition:background 0.2s; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'"><input type="checkbox" class="exp-loc-cb" value="${l.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")}" onchange="updateExpLocSelectText()"> ${l}</label>`).join('');
+  }
   if (depEl) depEl.innerHTML = '<option value="">Toate departamentele</option>' + deps.map(d => `<option value="${d.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")}">${d}</option>`).join('');
   if (tipEl) tipEl.innerHTML = '<option value="">Toate tipurile</option>' + tips.map(t => `<option value="${t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")}">${t}</option>`).join('');
 }
 
 window.renderExpCharts = function() {
-  const data = getExpFiltered();
+  const data = getExpFiltered().filter(r => !r.is_hidden);
   // Vibrant, highly distinct UI colors for charts
   const COLORS = ['#FF3366', '#20D6B5', '#F5A623', '#9B51E0', '#3498DB', '#F1C40F', '#E74C3C', '#2ECC71', '#34495E', '#1ABC9C'];
 
@@ -7347,7 +7841,7 @@ window.customConfirmSubmit = function() {
 window.addLocalDepartment = async function() {
   const name = await customPrompt("Nume departament local:");
   if (!name || name.trim() === '') return;
-  const id = crypto.randomUUID();
+  const id = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'local-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
   _expConfigDeps.push({ id: id, name: name.trim(), types: [], is_local: true, is_expense: true });
   _expConfigDeps.sort((a,b) => {
      if(a.is_local !== b.is_local) return a.is_local ? 1 : -1;
@@ -7420,7 +7914,7 @@ window.addLocalType = async function() {
   if (!dep) return;
   const name = await customPrompt("Nume tip cheltuială local:");
   if (!name || name.trim() === '') return;
-  const id = crypto.randomUUID();
+  const id = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : 'local-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
   dep.types.push({ id: id, name: name.trim(), is_expense: true, is_local: true });
   dep.types.sort((a,b) => {
      if(a.is_local !== b.is_local) return a.is_local ? 1 : -1;
@@ -7517,6 +8011,56 @@ window.checkLocsSelection = function() {
   } else {
     strat.style.display = 'none';
   }
+  if (window.updateSplitPreview) window.updateSplitPreview();
+}
+
+window.updateSplitPreview = function() {
+  const cbs = document.querySelectorAll('input[name="me-loc"]:checked');
+  const preview = document.getElementById('me-split-preview');
+  const amountInput = document.getElementById('me-amount');
+  
+  if (!preview) return;
+  
+  if (cbs.length <= 1 || !amountInput.value) {
+    preview.innerHTML = '';
+    return;
+  }
+  
+  const amount = parseFloat(amountInput.value);
+  if (isNaN(amount) || amount === 0) {
+    preview.innerHTML = '';
+    return;
+  }
+  
+  let split_mode = 'equal';
+  const radios = document.getElementsByName('split_mode');
+  for (let r of radios) { if (r.checked) split_mode = r.value; }
+  
+  let html = '<div style="margin-bottom:4px;"><strong>Previzualizare sume pe locații:</strong></div><div style="display:grid; grid-template-columns: 1fr 1fr; gap:4px;">';
+  
+  if (split_mode === 'equal') {
+    const val = (amount / cbs.length).toFixed(2);
+    cbs.forEach(c => {
+      const name = c.nextElementSibling.title || c.nextElementSibling.innerText;
+      html += `<div>• <span style="font-weight:600;">${name}</span>: <span style="color:var(--success); font-weight:bold;">${val} RON</span></div>`;
+    });
+  } else {
+    let totalSlots = 0;
+    cbs.forEach(c => totalSlots += parseInt(c.getAttribute('data-slots') || '0', 10));
+    
+    if (totalSlots === 0) {
+      html += '<div style="color:var(--danger); grid-column: 1 / -1;">Locațiile selectate nu au sloturi setate. Suma nu poate fi împărțită proporțional.</div>';
+    } else {
+      cbs.forEach(c => {
+        const slots = parseInt(c.getAttribute('data-slots') || '0', 10);
+        const name = c.nextElementSibling.title || c.nextElementSibling.innerText;
+        const val = ((amount * slots) / totalSlots).toFixed(2);
+        html += `<div>• <span style="font-weight:600;">${name}</span> (${slots} ap): <span style="color:var(--success); font-weight:bold;">${val} RON</span></div>`;
+      });
+    }
+  }
+  html += '</div>';
+  preview.innerHTML = html;
 }
 
 window.submitManualExpense = async function(e) {
@@ -7546,7 +8090,10 @@ window.submitManualExpense = async function(e) {
   try {
     const r = await fetch(API + '/api/admin/expenses', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + localStorage.getItem('cp2_token')
+      },
       body: JSON.stringify(payload)
     });
     const res = await r.json();
@@ -7563,6 +8110,21 @@ window.submitManualExpense = async function(e) {
   } finally {
     btn.disabled = false;
     btn.innerText = 'Salvează Cheltuiala';
+  }
+}
+
+window.toggleExpenseVisibility = async function(id) {
+  try {
+    const res = await api('/api/admin/expenses/' + id + '/toggle_hide', { method: 'POST' });
+    if (res.success) {
+      if (window.loadExpensesReport) {
+        await window.loadExpensesReport();
+      }
+    } else {
+      showAlert('Eroare la comutare vizibilitate: ' + (res.error || 'Necunoscută'));
+    }
+  } catch (e) {
+    showAlert('Eroare rețea: ' + e);
   }
 }
 
@@ -8354,18 +8916,32 @@ let _lunareSort = { col: 'month', dir: 'desc' };
 window.loadLunareReport = async function() {
   const serialsEl = document.getElementById('rep-lunare-serials');
   const serials = serialsEl ? serialsEl.value : '';
+  const locCheckboxes = document.querySelectorAll('.lunare-loc-cb:checked');
+  let customLoc = locParam();
+  if (locCheckboxes && locCheckboxes.length > 0) {
+    const vals = Array.from(locCheckboxes).map(cb => cb.value).filter(Boolean);
+    if (vals.length > 0) customLoc = `&loc_ids=${vals.join(',')}`;
+  }
+  
   const { s, e } = getPeriod();
   showLoader(true);
   try {
-    const data = await api(`/api/rapoarte/lunare?start=${s}&end=${e}&serials=${encodeURIComponent(serials)}${locParam()}`);
+    const data = await api(`/api/rapoarte/lunare?start=${s}&end=${e}&serials=${encodeURIComponent(serials)}${customLoc}`);
     _lunareData = data || [];
     renderLunareReport();
   } catch (err) {
     console.error('loadLunareReport error:', err);
-    showAlert('Eroare la încărcarea raportului lunar.');
+    if (typeof showAlert === 'function') showAlert('Eroare la încărcarea raportului lunar.');
+    else alert('Eroare la încărcarea raportului lunar.');
   } finally {
     showLoader(false);
   }
+};
+
+let _lunareTotalSortAsc = false;
+window.sortLunareTotalMonths = function() {
+  _lunareTotalSortAsc = !_lunareTotalSortAsc;
+  renderLunareReport();
 };
 
 function renderLunareReport() {
@@ -8380,18 +8956,149 @@ function renderLunareReport() {
   }
 
   // Pre-calculate totals for the full dataset
-  let tIn = 0, tOut = 0, tGgr = 0;
+  let tIn = 0, tOut = 0, tGgr = 0, tMkt = 0, tNgr = 0, tWin = 0, tBet = 0;
+  const monthlyData = {};
+  const locations = new Set();
+  const globalSerials = new Set();
+  
   _lunareData.forEach(r => {
-    tIn += (+r.in_val || 0);
-    tOut += (+r.out_val || 0);
-    tGgr += (+r.ggr || 0);
+    const inV = (+r.in_val || 0);
+    const outV = (+r.out_val || 0);
+    const ggrV = (+r.ggr || 0);
+    const mktV = (+r.marketing || 0);
+    const ngrV = (+r.ngr || 0);
+    const winV = (+r.win || 0);
+    const betV = (+r.bet || 0);
+    tIn += inV;
+    tOut += outV;
+    tGgr += ggrV;
+    tMkt += mktV;
+    tNgr += ngrV;
+    tWin += winV;
+    tBet += betV;
+    
+    const daysActive = (+r.days_active || 0);
+    if (r.serial_nr && daysActive >= 3) globalSerials.add(r.serial_nr);
+    
+    const m = r.month || 'Necunoscut';
+    const loc = r.location_name || 'Necunoscut';
+    locations.add(loc);
+    
+    if (!monthlyData[m]) monthlyData[m] = { in: 0, out: 0, ggr: 0, mkt: 0, ngr: 0, win: 0, bet: 0, serials: new Set(), locs: {} };
+    if (!monthlyData[m].locs[loc]) monthlyData[m].locs[loc] = { in: 0, out: 0, ggr: 0, mkt: 0, ngr: 0, win: 0, bet: 0, serials: new Set() };
+    
+    if (r.serial_nr && daysActive >= 3) {
+      monthlyData[m].serials.add(r.serial_nr);
+      monthlyData[m].locs[loc].serials.add(r.serial_nr);
+    }
+    
+    monthlyData[m].in += inV;
+    monthlyData[m].out += outV;
+    monthlyData[m].ggr += ggrV;
+    monthlyData[m].mkt += mktV;
+    monthlyData[m].ngr += ngrV;
+    monthlyData[m].win += winV;
+    monthlyData[m].bet += betV;
+    
+    monthlyData[m].locs[loc].in += inV;
+    monthlyData[m].locs[loc].out += outV;
+    monthlyData[m].locs[loc].ggr += ggrV;
+    monthlyData[m].locs[loc].mkt += mktV;
+    monthlyData[m].locs[loc].ngr += ngrV;
+    monthlyData[m].locs[loc].win += winV;
+    monthlyData[m].locs[loc].bet += betV;
   });
+
+  const headTotal = document.getElementById('head-rep-lunare-total');
+  const bodyTotal = document.getElementById('body-rep-lunare-total');
+  const footTotal = document.getElementById('foot-rep-lunare-total');
+  if (headTotal && bodyTotal) {
+    const sortedLocs = Array.from(locations).sort((a,b) => a.localeCompare(b));
+    const sortedMonths = Object.keys(monthlyData).sort((a,b) => _lunareTotalSortAsc ? a.localeCompare(b) : b.localeCompare(a));
+    
+    let headHtml = `<tr>
+      <th style="cursor:pointer;" onclick="sortLunareTotalMonths()">Lună / Locație ${_lunareTotalSortAsc ? '↑' : '↓'}</th>
+      <th class="num">Aparate</th>
+      <th class="num">IN</th>
+      <th class="num">IN Mediu</th>
+      <th class="num">OUT</th>
+      <th class="num">GGR</th>
+      <th class="num">GGR Mediu</th>
+      <th class="num">NGR</th>
+      <th class="num">MKT Cost</th>
+      <th class="num">WIN/BET %</th>
+      <th class="num">WIN/BET NGR %</th>
+    </tr>`;
+    headTotal.innerHTML = headHtml;
+
+    let totalHtml = '';
+    sortedMonths.forEach(m => {
+      const d = monthlyData[m];
+      totalHtml += `<tr style="background:var(--surface2);">
+        <td style="font-weight:700; border-top:1px solid var(--border);">${m} (TOTAL)</td>
+        <td class="num" style="font-weight:700; border-top:1px solid var(--border);">${d.serials.size}</td>
+        <td class="num" style="font-weight:700; border-top:1px solid var(--border);">${fmt(d.in)}</td>
+        <td class="num" style="font-weight:700; border-top:1px solid var(--border);">${d.serials.size > 0 ? fmt(d.in / d.serials.size) : 0}</td>
+        <td class="num" style="font-weight:700; border-top:1px solid var(--border);">${fmt(d.out)}</td>
+        <td class="num" style="font-weight:700; border-top:1px solid var(--border); color:${d.ggr >= 0 ? 'var(--green)' : 'var(--red)'}">${fmt(d.ggr)}</td>
+        <td class="num" style="font-weight:700; border-top:1px solid var(--border); color:${d.ggr >= 0 ? 'var(--green)' : 'var(--red)'}">${d.serials.size > 0 ? fmt(d.ggr / d.serials.size) : 0}</td>
+        <td class="num" style="font-weight:700; border-top:1px solid var(--border); color:${d.ngr >= 0 ? 'var(--green)' : 'var(--red)'}">${fmt(d.ngr)}</td>
+        <td class="num" style="font-weight:700; border-top:1px solid var(--border); color:var(--muted);">${fmt(d.mkt)}</td>
+        <td class="num" style="font-weight:700; border-top:1px solid var(--border);">${d.bet > 0 ? (d.win / d.bet * 100).toFixed(2) + '%' : '0.00%'}</td>
+        <td class="num" style="font-weight:700; border-top:1px solid var(--border);">${d.bet > 0 ? ((d.win - d.mkt) / d.bet * 100).toFixed(2) + '%' : '0.00%'}</td>
+      </tr>`;
+      
+      sortedLocs.forEach(loc => {
+        if (!d.locs[loc]) return;
+        const ld = d.locs[loc];
+        if (ld.in === 0 && ld.out === 0 && ld.ggr === 0 && ld.mkt === 0 && (!ld.serials || ld.serials.size === 0)) return;
+
+        totalHtml += `<tr>
+          <td style="padding-left:20px; font-size:12px;">${loc}</td>
+          <td class="num" style="font-weight:700; font-size:12px;">${ld.serials ? ld.serials.size : 0}</td>
+          <td class="num" style="font-size:12px;">${fmt(ld.in)}</td>
+          <td class="num" style="font-size:12px;">${(ld.serials && ld.serials.size > 0) ? fmt(ld.in / ld.serials.size) : 0}</td>
+          <td class="num" style="font-size:12px;">${fmt(ld.out)}</td>
+          <td class="num" style="font-weight:700; font-size:12px; color:${ld.ggr >= 0 ? 'var(--green)' : 'var(--red)'}">${fmt(ld.ggr)}</td>
+          <td class="num" style="font-weight:700; font-size:12px; color:${ld.ggr >= 0 ? 'var(--green)' : 'var(--red)'}">${(ld.serials && ld.serials.size > 0) ? fmt(ld.ggr / ld.serials.size) : 0}</td>
+          <td class="num" style="font-weight:700; font-size:12px; color:${ld.ngr >= 0 ? 'var(--green)' : 'var(--red)'}">${fmt(ld.ngr)}</td>
+          <td class="num" style="font-size:12px; color:var(--muted);">${fmt(ld.mkt)}</td>
+          <td class="num" style="font-weight:700; font-size:12px;">${ld.bet > 0 ? (ld.win / ld.bet * 100).toFixed(2) + '%' : '0.00%'}</td>
+          <td class="num" style="font-weight:700; font-size:12px;">${ld.bet > 0 ? ((ld.win - ld.mkt) / ld.bet * 100).toFixed(2) + '%' : '0.00%'}</td>
+        </tr>`;
+      });
+    });
+    bodyTotal.innerHTML = totalHtml;
+    
+    if (footTotal) {
+      let footHtml = `<tr style="background:var(--surface2); font-weight:800;">
+        <td style="border-top:2px solid var(--border);">TOTAL PERIOADĂ (GLOBAL)</td>
+        <td class="num" style="border-top:2px solid var(--border); font-weight:700;">${globalSerials.size}</td>
+        <td class="num" style="border-top:2px solid var(--border);">${fmt(tIn)}</td>
+        <td class="num" style="border-top:2px solid var(--border);">${globalSerials.size > 0 ? fmt(tIn / globalSerials.size) : 0}</td>
+        <td class="num" style="border-top:2px solid var(--border);">${fmt(tOut)}</td>
+        <td class="num" style="border-top:2px solid var(--border); color:${tGgr >= 0 ? 'var(--green)' : 'var(--red)'}">${fmt(tGgr)}</td>
+        <td class="num" style="border-top:2px solid var(--border); color:${tGgr >= 0 ? 'var(--green)' : 'var(--red)'}">${globalSerials.size > 0 ? fmt(tGgr / globalSerials.size) : 0}</td>
+        <td class="num" style="border-top:2px solid var(--border); color:${tNgr >= 0 ? 'var(--green)' : 'var(--red)'}">${fmt(tNgr)}</td>
+        <td class="num" style="border-top:2px solid var(--border); color:var(--muted);">${fmt(tMkt)}</td>
+        <td class="num" style="border-top:2px solid var(--border);">${tBet > 0 ? (tWin / tBet * 100).toFixed(2) + '%' : '0.00%'}</td>
+        <td class="num" style="border-top:2px solid var(--border);">${tBet > 0 ? ((tWin - tMkt) / tBet * 100).toFixed(2) + '%' : '0.00%'}</td>
+      </tr>`;
+      footTotal.innerHTML = footHtml;
+    }
+  }
 
   // Prepare table state rows (formatted HTML strings)
   tableStates['rep-lunare'].rows = _lunareData.map(r => {
     const inVal = +r.in_val || 0;
     const outVal = +r.out_val || 0;
     const ggrVal = +r.ggr || 0;
+    const mktVal = +r.marketing || 0;
+    const ngrVal = +r.ngr || 0;
+    const winVal = +r.win || 0;
+    const betVal = +r.bet || 0;
+    const pct = betVal > 0 ? (winVal / betVal * 100).toFixed(2) + '%' : '0.00%';
+    const pctNgr = betVal > 0 ? ((winVal - mktVal) / betVal * 100).toFixed(2) + '%' : '0.00%';
     return `<tr>
       <td>${r.serial_nr || '—'}</td>
       <td>${r.month || '—'}</td>
@@ -8401,6 +9108,10 @@ function renderLunareReport() {
       <td class="num">${fmt(inVal)}</td>
       <td class="num">${fmt(outVal)}</td>
       <td class="num" style="font-weight:700; color:${ggrVal >= 0 ? 'var(--green)' : 'var(--red)'}">${fmt(ggrVal)}</td>
+      <td class="num" style="font-weight:700; color:${ngrVal >= 0 ? 'var(--green)' : 'var(--red)'}">${fmt(ngrVal)}</td>
+      <td class="num" style="color:var(--muted);">${fmt(mktVal)}</td>
+      <td class="num">${pct}</td>
+      <td class="num">${pctNgr}</td>
     </tr>`;
   });
 
@@ -8418,30 +9129,188 @@ function renderLunareReport() {
   }
 }
 
+window.toggleLunareDetails = function() {
+  const container = document.getElementById('lunare-detaliat-container');
+  const btn = document.getElementById('btn-toggle-lunare-detaliat');
+  if (container) {
+    const isHidden = container.style.display === 'none';
+    container.style.display = isHidden ? 'block' : 'none';
+    if (btn) {
+      btn.textContent = isHidden ? 'Ascunde detaliat pe aparate' : 'Arată detaliat pe aparate';
+    }
+  }
+};
+
 window.sortLunare = function(colIdx, th) {
   sortTable('rep-lunare', colIdx, th);
 };
 
 window.exportLunareExcel = function() {
   if (!_lunareData || _lunareData.length === 0) {
-    alert('Nu există date pentru export.');
+    if (typeof showAlert === 'function') showAlert('Nu există date pentru export.');
+    else alert('Nu există date pentru export.');
     return;
   }
   
-  const data = _lunareData.map(r => ({
+  const monthlyData = {};
+  const locations = new Set();
+  _lunareData.forEach(r => {
+    const m = r.month || 'Necunoscut';
+    const loc = r.location_name || 'Necunoscut';
+    locations.add(loc);
+    if (!monthlyData[m]) monthlyData[m] = { in: 0, out: 0, ggr: 0, mkt: 0, ngr: 0, win: 0, bet: 0, serials: new Set(), locs: {} };
+    if (!monthlyData[m].locs[loc]) monthlyData[m].locs[loc] = { in: 0, out: 0, ggr: 0, mkt: 0, ngr: 0, win: 0, bet: 0, serials: new Set() };
+    
+    const daysActive = (+r.days_active || 0);
+    if (r.serial_nr && daysActive >= 3) {
+      monthlyData[m].serials.add(r.serial_nr);
+      monthlyData[m].locs[loc].serials.add(r.serial_nr);
+    }
+    
+    const inV = (+r.in_val || 0);
+    const outV = (+r.out_val || 0);
+    const ggrV = (+r.ggr || 0);
+    const mktV = (+r.marketing || 0);
+    const ngrV = (+r.ngr || 0);
+    const winV = (+r.win || 0);
+    const betV = (+r.bet || 0);
+    
+    monthlyData[m].in += inV;
+    monthlyData[m].out += outV;
+    monthlyData[m].ggr += ggrV;
+    monthlyData[m].mkt += mktV;
+    monthlyData[m].ngr += ngrV;
+    monthlyData[m].win += winV;
+    monthlyData[m].bet += betV;
+    
+    monthlyData[m].locs[loc].in += inV;
+    monthlyData[m].locs[loc].out += outV;
+    monthlyData[m].locs[loc].ggr += ggrV;
+    monthlyData[m].locs[loc].mkt += mktV;
+    monthlyData[m].locs[loc].ngr += ngrV;
+    monthlyData[m].locs[loc].win += winV;
+    monthlyData[m].locs[loc].bet += betV;
+  });
+  const sortedMonths = Object.keys(monthlyData).sort((a,b) => b.localeCompare(a));
+  const sortedLocs = Array.from(locations).sort((a,b) => a.localeCompare(b));
+  
+  const dataTotal = [];
+  sortedMonths.forEach(m => {
+    dataTotal.push({
+      'Lună / Locație': `${m} (TOTAL)`,
+      'Aparate': monthlyData[m].serials.size,
+      'IN': monthlyData[m].in,
+      'IN Mediu': monthlyData[m].serials.size > 0 ? (monthlyData[m].in / monthlyData[m].serials.size) : 0,
+      'OUT': monthlyData[m].out,
+      'GGR': monthlyData[m].ggr,
+      'GGR Mediu': monthlyData[m].serials.size > 0 ? (monthlyData[m].ggr / monthlyData[m].serials.size) : 0,
+      'NGR': monthlyData[m].ngr,
+      'MKT Cost': monthlyData[m].mkt,
+      'WIN/BET %': monthlyData[m].bet > 0 ? (monthlyData[m].win / monthlyData[m].bet * 100).toFixed(2) + '%' : '0.00%',
+      'WIN/BET NGR %': monthlyData[m].bet > 0 ? ((monthlyData[m].win - monthlyData[m].mkt) / monthlyData[m].bet * 100).toFixed(2) + '%' : '0.00%'
+    });
+    
+    sortedLocs.forEach(loc => {
+      const ld = monthlyData[m].locs[loc];
+      if (!ld) return;
+      if (ld.in === 0 && ld.out === 0 && ld.ggr === 0 && ld.mkt === 0 && (!ld.serials || ld.serials.size === 0)) return;
+
+      dataTotal.push({
+        'Lună / Locație': `  ${loc}`,
+        'Aparate': ld.serials ? ld.serials.size : 0,
+        'IN': ld.in,
+        'IN Mediu': (ld.serials && ld.serials.size > 0) ? (ld.in / ld.serials.size) : 0,
+        'OUT': ld.out,
+        'GGR': ld.ggr,
+        'GGR Mediu': (ld.serials && ld.serials.size > 0) ? (ld.ggr / ld.serials.size) : 0,
+        'NGR': ld.ngr,
+        'MKT Cost': ld.mkt,
+        'WIN/BET %': ld.bet > 0 ? (ld.win / ld.bet * 100).toFixed(2) + '%' : '0.00%',
+        'WIN/BET NGR %': ld.bet > 0 ? ((ld.win - ld.mkt) / ld.bet * 100).toFixed(2) + '%' : '0.00%'
+      });
+    });
+  });
+
+  const dataDetaliat = _lunareData.map(r => ({
     'Serie': r.serial_nr || '',
     'Lună': r.month || '',
     'Locație': r.location_name || '',
     'Provider': r.provider || '',
     'Cabinet': r.cabinet || '',
-    'IN (RON)': r.in_val || 0,
-    'OUT (RON)': r.out_val || 0,
-    'GGR (RON)': r.ggr || 0
+    'IN': r.in_val || 0,
+    'OUT': r.out_val || 0,
+    'GGR': r.ggr || 0,
+    'NGR': r.ngr || 0,
+    'MKT Cost': r.marketing || 0,
+    'WIN/BET %': (r.bet && +r.bet > 0) ? ((+r.win || 0) / (+r.bet) * 100).toFixed(2) + '%' : '0.00%',
+    'WIN/BET NGR %': (r.bet && +r.bet > 0) ? (((+r.win || 0) - (+r.marketing || 0)) / (+r.bet) * 100).toFixed(2) + '%' : '0.00%'
   }));
 
-  const worksheet = XLSX.utils.json_to_sheet(data);
+  const wsTotal = XLSX.utils.json_to_sheet(dataTotal);
+  const wsDetaliat = XLSX.utils.json_to_sheet(dataDetaliat);
+  
+  function formatWorksheet(ws) {
+    if (!ws['!ref']) return;
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    for (let R = range.s.r; R <= range.e.r; ++R) {
+      let isTotalRow = false;
+      const cellA = ws[XLSX.utils.encode_cell({r: R, c: 0})];
+      if (cellA && cellA.v && cellA.v.toString().includes('(TOTAL)')) {
+        isTotalRow = true;
+      }
+      
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const cellAddress = XLSX.utils.encode_cell({r: R, c: C});
+        const cell = ws[cellAddress];
+        if (!cell) continue;
+        
+        if (!cell.s) cell.s = {};
+        if (!cell.s.font) cell.s.font = { name: "Arial", sz: 10 };
+        
+        if (isTotalRow || R === 0) {
+          cell.s.font.bold = true;
+          if (!cell.s.fill) cell.s.fill = { patternType: "solid" };
+          if (R === 0) { // Header
+             cell.s.fill.fgColor = { rgb: "F8FAFC" }; // Light grey for header
+             cell.s.font.color = { rgb: "1E293B" };
+          } else { // Total row
+             cell.s.fill.fgColor = { rgb: "F1F5F9" };
+          }
+        }
+        
+        const headerCell = ws[XLSX.utils.encode_cell({r: 0, c: C})];
+        const headerName = (headerCell && headerCell.v) ? headerCell.v.toString() : '';
+        
+        if (R > 0) {
+           if (headerName.includes('GGR') || headerName.includes('NGR') || headerName.includes('WIN')) {
+              const val = parseFloat(cell.v);
+              if (!isNaN(val)) {
+                  if (val > 0) {
+                     cell.s.font.color = { rgb: "059669" }; // green
+                  } else if (val < 0) {
+                     cell.s.font.color = { rgb: "DC2626" }; // red
+                  }
+              }
+           }
+        }
+        
+        if (cell.t === 'n' && R > 0) {
+          if (headerName === 'Aparate') {
+            cell.z = '#,##0';
+          } else if (headerName !== 'Serie') {
+            cell.z = '#,##0.00';
+          }
+        }
+      }
+    }
+  }
+  
+  formatWorksheet(wsTotal);
+  formatWorksheet(wsDetaliat);
+  
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Lunare");
+  XLSX.utils.book_append_sheet(workbook, wsTotal, "Total pe Luni");
+  XLSX.utils.book_append_sheet(workbook, wsDetaliat, "Detaliat");
   XLSX.writeFile(workbook, `raport_lunare_${new Date().toISOString().slice(0,10)}.xlsx`);
 };
 
@@ -10331,4 +11200,1250 @@ function highlightFpMachine(machineIds) {
 document.addEventListener('DOMContentLoaded', () => {
   loadGlobalFpSettings();
 });
+
+
+window.loadAnalizaRtpData = async function() {
+  const { s, e } = getPeriod();
+  const loc = document.getElementById('locationFilter') ? document.getElementById('locationFilter').value : '';
+  const tbody = document.getElementById('body-analiza-rtp');
+  
+  if (tbody) {
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; padding:30px;"><div class="spinner"></div><br>Se generează matricea RTP...</td></tr>';
+  }
+
+  try {
+    const url = `/api/analiza/rtp?start=${s}&end=${e}${loc ? '&location='+loc : ''}`;
+    const data = await api(url);
+    
+    // Store raw data for filtering
+    tableStates['analiza-rtp'].rawData = data;
+    
+    // Populate filter dropdowns
+    const uniqueLocs = [...new Set(data.map(r => r.locatie).filter(Boolean))].sort();
+    const uniqueMixes = [...new Set(data.map(r => r.producator).filter(Boolean))].sort();
+    
+    const selLoc = document.getElementById('flt-rtp-loc');
+    const selMix = document.getElementById('flt-rtp-prod');
+    
+    if (selLoc) {
+      selLoc.innerHTML = '<option value="">Toate</option>' + uniqueLocs.map(l => `<option value="${l}">${l}</option>`).join('');
+    }
+    if (selMix) {
+      selMix.innerHTML = '<option value="">Toate</option>' + uniqueMixes.map(m => `<option value="${m}">${m}</option>`).join('');
+    }
+
+    // Map JSON to HTML rows
+    tableStates['analiza-rtp'].rows = data.map((r, i) => {
+      const diffColor = r.diff > 0 ? '#ef4444' : (r.diff < 0 ? '#10b981' : 'var(--text)');
+      return `
+        <tr style="${r.is_active ? '' : 'opacity:0.8;'}">
+          <td style="text-align:center;">${i + 1}</td>
+          <td style="text-align:left;">
+            ${r.is_active ? '' : '<span class="badge" style="background:var(--danger); color:white; padding:2px 6px; font-size:10px; margin-right:6px; border-radius:4px;">RETRAS</span>'}
+            ${r.locatie}
+          </td>
+          <td style="text-align:left;">${r.producator}</td>
+          <td style="text-align:left;">${r.tip}</td>
+          <td style="text-align:left;">${r.serial}</td>
+          <td style="text-align:center;">${(r.install_date ? Math.max(1, Math.floor((new Date() - new Date(r.install_date.replace(' ', 'T'))) / (1000 * 60 * 60 * 24))) : 0)}</td>
+          <td style="text-align:right;">${fmt(r.total_in, 2)}</td>
+          <td style="text-align:right;">${fmt(r.total_out, 2)}</td>
+          <td style="text-align:right;">${fmt(r.marketing, 2)}</td>
+          <td style="text-align:right;"><b>${fmt(r.ggr, 2)}</b></td>
+          <td style="text-align:right; color:#eab308; font-weight:bold;">${r.real_rtp.toFixed(2)}%</td>
+          <td style="text-align:right; color:#3b82f6;">${r.theoretical_rtp.toFixed(2)}%</td>
+          <td style="text-align:right; color:${diffColor}; font-weight:bold;">${r.diff > 0 ? '+' : ''}${r.diff.toFixed(2)}%</td>
+        </tr>
+      `;
+    });
+    
+    tableStates['analiza-rtp'].filteredRows = null;
+    tableStates['analiza-rtp'].page = 1;
+
+    
+    const countEl = document.getElementById('analiza-rtp-count');
+    if (countEl) countEl.innerText = data.length;
+    
+    // Calculați totalurile pentru RTP Teoretic table
+    let tIn = 0, tOut = 0, tMkt = 0, tGgr = 0;
+    data.forEach(r => {
+        tIn += r.total_in || 0;
+        tOut += r.total_out || 0;
+        tMkt += r.marketing || 0;
+        tGgr += r.ggr || 0;
+    });
+    
+    const overallRtp = tIn > 0 ? (tOut / tIn) * 100 : 0;
+    
+    const foot = document.getElementById('foot-analiza-rtp');
+    if (foot) {
+        foot.innerHTML = `
+            <tr>
+                <th colspan="6" style="text-align:right; padding:12px;">TOTAL:</th>
+                <th style="text-align:right; padding:12px;">${fmt(tIn, 2)}</th>
+                <th style="text-align:right; padding:12px;">${fmt(tOut, 2)}</th>
+                <th style="text-align:right; padding:12px;">${fmt(tMkt, 2)}</th>
+                <th style="text-align:right; padding:12px;">${fmt(tGgr, 2)}</th>
+                <th style="text-align:right; color:#eab308; padding:12px;">${overallRtp.toFixed(2)}%</th>
+                <th colspan="2"></th>
+            </tr>
+        `;
+    }
+    
+
+    renderTablePaginated('analiza-rtp');
+
+  } catch(err) {
+    console.error(err);
+    if (tbody) tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; color:red; padding:30px;">Eroare: ${err.message}</td></tr>`;
+  }
+}
+
+window.filterRtpTable = function() {
+  const loc = document.getElementById('flt-rtp-loc').value.toLowerCase();
+  const prod = document.getElementById('flt-rtp-prod').value.toLowerCase();
+  const serial = document.getElementById('flt-rtp-serial').value.toLowerCase();
+  const zile = document.getElementById('flt-rtp-zile').value.toLowerCase();
+  
+  if (!tableStates['analiza-rtp'].rawData) return;
+  
+  if (!loc && !prod && !serial && !zile) {
+    tableStates['analiza-rtp'].filteredRows = null;
+    document.getElementById('analiza-rtp-count').innerText = tableStates['analiza-rtp'].rawData.length;
+  } else {
+    tableStates['analiza-rtp'].filteredRows = tableStates['analiza-rtp'].rawData.map((r, i) => {
+      const matchLoc = r.locatie.toLowerCase().includes(loc);
+      const matchProd = (r.producator + ' ' + r.tip).toLowerCase().includes(prod);
+      const matchSerial = r.serial.toLowerCase().includes(serial);
+      const calcZile = (r.install_date ? Math.max(1, Math.floor((new Date() - new Date(r.install_date.replace(' ', 'T'))) / (1000 * 60 * 60 * 24))) : 0);
+      const matchZile = String(calcZile).includes(zile);
+      if (matchLoc && matchProd && matchSerial && matchZile) {
+        return tableStates['analiza-rtp'].rows[i];
+      }
+      return null;
+    }).filter(row => row !== null);
+    document.getElementById('analiza-rtp-count').innerText = tableStates['analiza-rtp'].filteredRows.length;
+  }
+  
+  tableStates['analiza-rtp'].page = 1;
+  renderTablePaginated('analiza-rtp');
+};
+
+window.loadAnalizaResetsData = async function() {
+  const tbody = document.getElementById('body-analiza-resets');
+  
+  if (tbody) {
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:30px;"><div class="spinner"></div><br>Se generează raportul...</td></tr>';
+  }
+
+  try {
+    const url = `/api/analiza/resets`;
+    const data = await api(url);
+    
+    // Store raw data for filtering
+    tableStates['analiza-resets'].rawData = data;
+    
+    let tIn = 0;
+    let tOut = 0;
+    let tGgr = 0;
+
+    // Populate filter dropdowns
+    const uniqueLocs = [...new Set(data.map(r => r.locatie).filter(Boolean))].sort();
+    const uniqueMixes = [...new Set(data.map(r => r.tip).filter(Boolean))].sort();
+    
+    const selLoc = document.getElementById('flt-resets-loc');
+    const selMix = document.getElementById('flt-resets-mix');
+    
+    if (selLoc) {
+      selLoc.innerHTML = '<option value="">Toate</option>' + uniqueLocs.map(l => `<option value="${l}">${l}</option>`).join('');
+    }
+    if (selMix) {
+      selMix.innerHTML = '<option value="">Toate</option>' + uniqueMixes.map(m => `<option value="${m}">${m}</option>`).join('');
+    }
+
+    // Map JSON to HTML rows
+    tableStates['analiza-resets'].rows = data.map((r, i) => {
+      tIn += r.total_in;
+      tOut += r.total_out;
+      tGgr += r.ggr;
+      return `
+        <tr style="transition: background 0.2s; ${r.is_active ? '' : 'opacity:0.8;'}" onmouseover="this.style.background='rgba(255,255,255,0.05)'" onmouseout="this.style.background=''">
+          <td style="text-align:center;">${i + 1}</td>
+          <td style="text-align:left;">
+            ${r.is_active ? '' : '<span class="badge" style="background:var(--danger); color:white; padding:2px 6px; font-size:10px; margin-right:6px; border-radius:4px;">RETRAS</span>'}
+            ${r.locatie}
+          </td>
+          <td style="text-align:left;">${r.cabinet || r.producator || '-'}</td>
+          <td style="text-align:left;">${r.tip}</td>
+          <td style="text-align:left;">${r.serial}</td>
+          <td style="text-align:center; color:#3b82f6;">${r.data_reset}</td>
+          <td style="text-align:center;">${r.zile}</td>
+          <td style="text-align:right;">${fmt(r.total_in, 2)}</td>
+          <td style="text-align:right;">${fmt(r.total_out, 2)}</td>
+          <td style="text-align:right; font-weight:bold; color:${r.ggr > 0 ? '#10b981' : '#ef4444'};">${fmt(r.ggr, 2)}</td>
+          <td style="text-align:right; color:#eab308; font-weight:bold;">${r.real_rtp.toFixed(2)}%</td>
+        </tr>
+      `;
+    });
+    
+    // Remove the manual setting of filteredRows and totals
+    // Call filterAnalizaResetsTable to apply the initial 'Doar În Sală' filter and calculate totals
+    filterAnalizaResetsTable();
+
+  } catch(err) {
+    console.error(err);
+    if (tbody) tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:red; padding:30px;">Eroare: ${err.message}</td></tr>`;
+  }
+};
+
+window.openMachineDetails = async function(serial) {
+  // Hide all other pages
+  document.querySelectorAll('.rep-page').forEach(p => p.style.display = 'none');
+  
+  const page = document.getElementById('analiza-machine-details');
+  if (!page) return;
+  page.style.display = 'block';
+  
+  // Reset contents and show loading
+  document.getElementById('md-serial').innerText = serial;
+  document.getElementById('md-mix').innerText = '...';
+  document.getElementById('md-loc').innerText = '...';
+  document.getElementById('md-stat-in').innerText = '0.00';
+  document.getElementById('md-stat-out').innerText = '0.00';
+  document.getElementById('md-stat-jp').innerText = '0.00';
+  
+  document.getElementById('body-md-loc').innerHTML = '<tr><td colspan="10" style="text-align:center;"><div class="spinner"></div></td></tr>';
+  document.getElementById('body-md-res').innerHTML = '<tr><td colspan="3" style="text-align:center;"><div class="spinner"></div></td></tr>';
+  document.getElementById('body-md-pay').innerHTML = '<tr><td colspan="6" style="text-align:center;"><div class="spinner"></div></td></tr>';
+  
+  try {
+    const data = await api(`/api/machine/${serial}/details`);
+    
+    // Quick stats
+    if (data.location_history && data.location_history.length > 0) {
+      document.getElementById('md-loc').innerText = data.location_history[0].location_name;
+    }
+    document.getElementById('md-stat-in').innerText = fmt(data.stats.total_in, 2);
+    document.getElementById('md-stat-out').innerText = fmt(data.stats.total_out, 2);
+    document.getElementById('md-stat-jp').innerText = fmt(data.stats.total_jp, 2);
+    
+    // Mix - find from original table or data
+    const row = tableStates['analiza-resets']?.rawData?.find(r => r.serial == serial);
+    if (row) document.getElementById('md-mix').innerText = row.tip;
+    
+    // Initialize Table States for the three tabs
+    tableStates['md-loc'] = { page: 1, limit: 10, tbody: 'body-md-loc', pagination: 'pg-md-loc', rows: [] };
+    tableStates['md-res'] = { page: 1, limit: 10, tbody: 'body-md-res', pagination: 'pg-md-res', rows: [] };
+    tableStates['md-pay'] = { page: 1, limit: 10, tbody: 'body-md-pay', pagination: 'pg-md-pay', rows: [] };
+    
+    // 1. Location History
+    let t_loc_in = 0, t_loc_out = 0, t_loc_jp = 0, t_loc_hh = 0, t_loc_ggr = 0;
+    if (data.location_history && data.location_history.length > 0) {
+      tableStates['md-loc'].rows = data.location_history.map((l, i) => {
+        const _in = parseFloat(l.total_in) || 0;
+        const _out = parseFloat(l.total_out) || 0;
+        const _jp = parseFloat(l.total_jp) || 0;
+        const _hh = parseFloat(l.total_hh) || 0;
+        const _ggr = _in - _out;
+        const _rtp = _in > 0 ? (_out / _in) * 100 : 0;
+        
+        t_loc_in += _in; t_loc_out += _out; t_loc_jp += _jp; t_loc_hh += _hh; t_loc_ggr += _ggr;
+        
+        return `
+          <tr>
+            <td style="text-align:center;">${i+1}</td>
+            <td style="text-align:left; font-weight:bold;">${l.location_name}</td>
+            <td style="text-align:center;">${l.created_at}</td>
+            <td style="text-align:center;">${l.deleted_at}</td>
+            <td style="text-align:right;">${fmt(_in, 2)}</td>
+            <td style="text-align:right;">${fmt(_out, 2)}</td>
+            <td style="text-align:right;">${fmt(_jp, 2)}</td>
+            <td style="text-align:right;">${fmt(_hh, 2)}</td>
+            <td style="text-align:right; font-weight:bold; color:${_ggr >= 0 ? 'var(--success)' : 'var(--danger)'};">${fmt(_ggr, 2)}</td>
+            <td style="text-align:right; font-weight:bold; color:var(--warning);">${_rtp.toFixed(2)}%</td>
+          </tr>
+        `;
+      });
+    }
+    document.getElementById('md-loc-tot-in').innerText = fmt(t_loc_in, 2);
+    document.getElementById('md-loc-tot-out').innerText = fmt(t_loc_out, 2);
+    document.getElementById('md-loc-tot-jp').innerText = fmt(t_loc_jp, 2);
+    document.getElementById('md-loc-tot-hh').innerText = fmt(t_loc_hh, 2);
+    document.getElementById('md-loc-tot-ggr').innerText = fmt(t_loc_ggr, 2);
+    document.getElementById('md-loc-tot-rtp').innerText = (t_loc_in > 0 ? ((t_loc_out/t_loc_in)*100).toFixed(2) : '0.00') + '%';
+    renderTablePaginated('md-loc');
+    
+    // 2. Resets History
+    if (data.resets_history && data.resets_history.length > 0) {
+      tableStates['md-res'].rows = data.resets_history.map((r, i) => `
+        <tr>
+          <td style="text-align:center;">${i+1}</td>
+          <td style="text-align:center; color:var(--accent); font-weight:600;">${r.date}</td>
+          <td style="text-align:left;">${r.location_name}</td>
+        </tr>
+      `);
+      document.getElementById('md-res-tot').innerText = data.resets_history.length;
+    } else {
+      document.getElementById('md-res-tot').innerText = '0';
+    }
+    renderTablePaginated('md-res');
+    
+    // 3. Large Payouts
+    let t_pay_out = 0, t_pay_jp = 0, t_pay_hh = 0;
+    if (data.large_payouts && data.large_payouts.length > 0) {
+      tableStates['md-pay'].rows = data.large_payouts.map((p, i) => {
+        const _o = parseFloat(p.out) || 0;
+        const _j = parseFloat(p.jackpot) || 0;
+        const _h = parseFloat(p.hh) || 0;
+        t_pay_out += _o; t_pay_jp += _j; t_pay_hh += _h;
+        return `
+          <tr>
+            <td style="text-align:center;">${i+1}</td>
+            <td style="text-align:center;">${p.date}</td>
+            <td style="text-align:left;">${p.location_name}</td>
+            <td style="text-align:right; color:var(--danger); font-weight:bold;">${fmt(_o, 2)}</td>
+            <td style="text-align:right; color:var(--warning); font-weight:bold;">${fmt(_j, 2)}</td>
+            <td style="text-align:right; color:#a855f7; font-weight:bold;">${fmt(_h, 2)}</td>
+          </tr>
+        `;
+      });
+    }
+    document.getElementById('md-pay-tot-out').innerText = fmt(t_pay_out, 2);
+    document.getElementById('md-pay-tot-jp').innerText = fmt(t_pay_jp, 2);
+    document.getElementById('md-pay-tot-hh').innerText = fmt(t_pay_hh, 2);
+    renderTablePaginated('md-pay');
+    
+  } catch(err) {
+    console.error(err);
+    document.getElementById('body-md-loc').innerHTML = `<tr><td colspan="10" style="text-align:center; color:red;">Eroare: ${err.message}</td></tr>`;
+    document.getElementById('body-md-res').innerHTML = `<tr><td colspan="3" style="text-align:center; color:red;">Eroare: ${err.message}</td></tr>`;
+    document.getElementById('body-md-pay').innerHTML = `<tr><td colspan="6" style="text-align:center; color:red;">Eroare: ${err.message}</td></tr>`;
+  }
+};
+
+window.closeMachineDetails = function() {
+  document.getElementById('analiza-machine-details').style.display = 'none';
+  document.getElementById('analiza-resets').style.display = 'block';
+};
+
+window.filterAnalizaResetsTable = function() {
+  const fLoc = (document.getElementById('flt-resets-loc')?.value || '').toLowerCase();
+  const fMix = (document.getElementById('flt-resets-mix')?.value || '').toLowerCase();
+  const fSerial = (document.getElementById('flt-resets-serial')?.value || '').toLowerCase();
+  
+  if (!tableStates['analiza-resets'].rawData) return;
+  
+  const fActive = document.getElementById('flt-resets-active-only')?.checked;
+  
+  let tIn = 0, tOut = 0, tGgr = 0;
+  
+  if (!fLoc && !fMix && !fSerial && !fActive) {
+    tableStates['analiza-resets'].filteredRows = null;
+    
+    // Sum all if no filter
+    tableStates['analiza-resets'].rawData.forEach(r => {
+      tIn += r.total_in || 0;
+      tOut += r.total_out || 0;
+      tGgr += r.ggr || 0;
+    });
+  } else {
+    tableStates['analiza-resets'].filteredRows = tableStates['analiza-resets'].rawData.map((r, i) => {
+      const matchLoc = !fLoc || (r.locatie || '').toLowerCase().includes(fLoc);
+      const matchMix = !fMix || (r.tip || '').toLowerCase().includes(fMix);
+      const matchSerial = !fSerial || (r.serial || '').toLowerCase().includes(fSerial);
+      const matchActive = !fActive || r.is_active === true;
+      
+      if (matchLoc && matchMix && matchSerial && matchActive) {
+        tIn += r.total_in || 0;
+        tOut += r.total_out || 0;
+        tGgr += r.ggr || 0;
+        return tableStates['analiza-resets'].rows[i];
+      }
+      return null;
+    }).filter(row => row !== null);
+  }
+  
+  document.getElementById('analiza-resets-total-in').innerText = fmt(tIn, 2);
+  document.getElementById('analiza-resets-total-out').innerText = fmt(tOut, 2);
+  document.getElementById('analiza-resets-total-ggr').innerText = fmt(tGgr, 2);
+  document.getElementById('analiza-resets-total-rtp').innerText = (tIn > 0 ? ((tOut / tIn) * 100).toFixed(2) : '0.00') + '%';
+  
+  tableStates['analiza-resets'].page = 1;
+  renderTablePaginated('analiza-resets');
+};
+
+window.changeTableLimit = function(key) {
+  const select = document.getElementById(key + '-limit');
+  if (!select) return;
+  const val = select.value;
+  tableStates[key].limit = val === 'all' ? 'all' : parseInt(val, 10);
+  tableStates[key].page = 1;
+  renderTablePaginated(key);
+};
+
+window.prevTablePage = function(key) {
+  if (tableStates[key].page > 1) {
+    tableStates[key].page--;
+    renderTablePaginated(key);
+  }
+};
+
+window.nextTablePage = function(key) {
+  const st = tableStates[key];
+  const dataLen = st.filteredRows ? st.filteredRows.length : (st.rows ? st.rows.length : 0);
+  if (st.limit === 'all') return;
+  const totalPages = Math.ceil(dataLen / st.limit);
+  if (st.page < totalPages) {
+    st.page++;
+    renderTablePaginated(key);
+  }
+};
+
+// Patch renderTablePaginated to update custom page info span if it exists
+const originalRenderTablePaginated = renderTablePaginated;
+renderTablePaginated = function(key) {
+  originalRenderTablePaginated(key);
+  const st = tableStates[key];
+  if (!st) return;
+  const customInfo = document.getElementById(key + '-page-info');
+  if (customInfo) {
+    const dataLen = st.filteredRows ? st.filteredRows.length : (st.rows ? st.rows.length : 0);
+    const totalPages = st.limit === 'all' ? 1 : Math.ceil(dataLen / st.limit);
+    customInfo.innerText = `Pagina ${st.page} din ${totalPages > 0 ? totalPages : 1}`;
+  }
+};
+
+window.switchMdTab = function(tab, event) {
+  const tabs = document.getElementById('analiza-machine-details').querySelectorAll('.md-tab');
+  tabs.forEach(t => {
+    t.style.borderBottomColor = 'transparent';
+    t.style.color = 'var(--text-muted)';
+  });
+  event.target.style.borderBottomColor = 'var(--accent)';
+  event.target.style.color = 'var(--accent)';
+
+  document.getElementById('md-content-loc').style.display = 'none';
+  document.getElementById('md-content-res').style.display = 'none';
+  document.getElementById('md-content-pay').style.display = 'none';
+  document.getElementById('md-content-' + tab).style.display = 'block';
+};
+async function copyLunareTable(btn) {
+  if (!btn || !(btn instanceof Element)) {
+    btn = document.querySelector('button[title="Copiază Tabelul (Google Sheets)"]');
+  }
+
+  if (typeof _lunareData === 'undefined' || !_lunareData || _lunareData.length === 0) {
+    showToast('Nu există date pentru a fi copiate!', 'error');
+    return;
+  }
+  
+  const originalHtml = btn ? btn.innerHTML : '';
+  const originalColor = btn ? btn.style.color : '';
+  const originalBorder = btn ? btn.style.borderColor : '';
+
+  const showSuccessState = () => {
+    if (btn) {
+      btn.innerHTML = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+      btn.style.color = '#10b981';
+      btn.style.borderColor = '#10b981';
+      setTimeout(() => {
+        btn.innerHTML = originalHtml;
+        btn.style.color = originalColor;
+        btn.style.borderColor = originalBorder;
+      }, 3000);
+    }
+  };
+  
+  // Re-build dataTotal just like exportLunareExcel
+  const monthlyData = {};
+  _lunareData.forEach(r => {
+    const m = r.month || 'Necunoscut';
+    const loc = r.location_name || 'Necunoscut';
+    if (!monthlyData[m]) {
+      monthlyData[m] = { in: 0, out: 0, ggr: 0, ngr: 0, mkt: 0, win: 0, bet: 0, serials: new Set(), locs: {} };
+    }
+    if (!monthlyData[m].locs[loc]) {
+      monthlyData[m].locs[loc] = { in: 0, out: 0, ggr: 0, ngr: 0, mkt: 0, win: 0, bet: 0, serials: new Set() };
+    }
+    
+    monthlyData[m].in += (+r.in_val || 0);
+    monthlyData[m].out += (+r.out_val || 0);
+    monthlyData[m].ggr += (+r.ggr || 0);
+    monthlyData[m].ngr += (+r.ngr || 0);
+    monthlyData[m].mkt += (+r.marketing || 0);
+    monthlyData[m].win += (+r.win || 0);
+    monthlyData[m].bet += (+r.bet || 0);
+    
+    const daysActive = (+r.days_active || 0);
+    if (r.serial_nr && daysActive >= 3) {
+      monthlyData[m].serials.add(r.serial_nr);
+      monthlyData[m].locs[loc].serials.add(r.serial_nr);
+    }
+    
+    monthlyData[m].locs[loc].in += (+r.in_val || 0);
+    monthlyData[m].locs[loc].out += (+r.out_val || 0);
+    monthlyData[m].locs[loc].ggr += (+r.ggr || 0);
+    monthlyData[m].locs[loc].ngr += (+r.ngr || 0);
+    monthlyData[m].locs[loc].mkt += (+r.marketing || 0);
+    monthlyData[m].locs[loc].win += (+r.win || 0);
+    monthlyData[m].locs[loc].bet += (+r.bet || 0);
+  });
+
+  const dataTotal = [];
+  const sortedMonths = Object.keys(monthlyData).sort((a,b) => b.localeCompare(a));
+  
+  sortedMonths.forEach(m => {
+    const sortedLocs = Object.keys(monthlyData[m].locs).sort();
+    dataTotal.push({
+      'Lună / Locație': `${m} (TOTAL)`,
+      'Aparate': monthlyData[m].serials.size,
+      'IN': monthlyData[m].in,
+      'IN Mediu': monthlyData[m].serials.size > 0 ? (monthlyData[m].in / monthlyData[m].serials.size) : 0,
+      'OUT': monthlyData[m].out,
+      'GGR': monthlyData[m].ggr,
+      'GGR Mediu': monthlyData[m].serials.size > 0 ? (monthlyData[m].ggr / monthlyData[m].serials.size) : 0,
+      'NGR': monthlyData[m].ngr,
+      'MKT Cost': monthlyData[m].mkt,
+      'WIN/BET %': monthlyData[m].bet > 0 ? (monthlyData[m].win / monthlyData[m].bet * 100).toFixed(2) + '%' : '0.00%',
+      'WIN/BET NGR %': monthlyData[m].bet > 0 ? ((monthlyData[m].win - monthlyData[m].mkt) / monthlyData[m].bet * 100).toFixed(2) + '%' : '0.00%'
+    });
+    
+    sortedLocs.forEach(loc => {
+      const ld = monthlyData[m].locs[loc];
+      if (!ld) return;
+      if (ld.in === 0 && ld.out === 0 && ld.ggr === 0 && ld.mkt === 0 && (!ld.serials || ld.serials.size === 0)) return;
+
+      dataTotal.push({
+        'Lună / Locație': `  ${loc}`,
+        'Aparate': ld.serials ? ld.serials.size : 0,
+        'IN': ld.in,
+        'IN Mediu': (ld.serials && ld.serials.size > 0) ? (ld.in / ld.serials.size) : 0,
+        'OUT': ld.out,
+        'GGR': ld.ggr,
+        'GGR Mediu': (ld.serials && ld.serials.size > 0) ? (ld.ggr / ld.serials.size) : 0,
+        'NGR': ld.ngr,
+        'MKT Cost': ld.mkt,
+        'WIN/BET %': ld.bet > 0 ? (ld.win / ld.bet * 100).toFixed(2) + '%' : '0.00%',
+        'WIN/BET NGR %': ld.bet > 0 ? ((ld.win - ld.mkt) / ld.bet * 100).toFixed(2) + '%' : '0.00%'
+      });
+    });
+  });
+
+  let html = `<table style="border-collapse: collapse; font-family: Arial, sans-serif; font-size: 11px;">`;
+  html += `<thead><tr>`;
+  const headers = Object.keys(dataTotal[0]);
+  headers.forEach(h => {
+     html += `<th style="background-color: #F8FAFC; color: #1E293B; font-weight: bold; border: 1px solid #E2E8F0; padding: 4px;">${h}</th>`;
+  });
+  html += `</tr></thead><tbody>`;
+  
+  const roFormat = new Intl.NumberFormat('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const roFormatInt = new Intl.NumberFormat('ro-RO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  
+  dataTotal.forEach(row => {
+     const isTotal = row['Lună / Locație'].includes('(TOTAL)');
+     const bg = isTotal ? '#F1F5F9' : '#FFFFFF';
+     const fw = isTotal ? 'bold' : 'normal';
+     html += `<tr style="background-color: ${bg}; font-weight: ${fw};">`;
+     headers.forEach(h => {
+       let val = row[h];
+       let v = parseFloat(val);
+       let color = '#000000';
+       if (!isNaN(v) && (h.includes('GGR') || h.includes('NGR') || h.includes('WIN'))) {
+         if (v > 0) color = '#059669'; // green
+         else if (v < 0) color = '#DC2626'; // red
+       }
+       
+       let text = val;
+       if (typeof val === 'number') {
+         if (h === 'Aparate') text = roFormatInt.format(val);
+         else text = roFormat.format(val);
+       }
+       
+       html += `<td style="border: 1px solid #E2E8F0; padding: 4px; color: ${color}; text-align: ${typeof val === 'number' || val.toString().includes('%') ? 'right' : 'left'}">${text}</td>`;
+     });
+     html += `</tr>`;
+  });
+  html += `</tbody></table>`;
+  
+  let textStr = headers.join('\t') + '\n' + dataTotal.map(r => headers.map(h => {
+       let val = r[h];
+       if (typeof val === 'number' && h !== 'Aparate') return roFormat.format(val).replace(/\./g, '');
+       return val;
+  }).join('\t')).join('\n');
+  
+  let clipboardApiSupported = !!(navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== 'undefined');
+
+  if (clipboardApiSupported) {
+    try {
+      const blobHtml = new Blob([html], { type: 'text/html' });
+      const blobText = new Blob([textStr], { type: 'text/plain' });
+      const data = [new ClipboardItem({ 'text/html': blobHtml, 'text/plain': blobText })];
+      
+      navigator.clipboard.write(data).then(() => {
+        showToast('Tabelul a fost copiat în memorie (cu formatare)! Poți da Paste direct în Google Sheets.', 'success');
+        showSuccessState();
+      }).catch(err => {
+        console.error('Clipboard API a eșuat...', err);
+        showToast('Eroare la copiere. Încearcă direct din Excel.', 'error');
+      });
+      return;
+    } catch (err) {
+      console.error('ClipboardItem error, falling back to execCommand...', err);
+      clipboardApiSupported = false;
+    }
+  }
+  
+  if (!clipboardApiSupported) {
+    // Fallback (pentru browsere mai vechi sau HTTP/Localhost) - Sincron!
+    try {
+      const div = document.createElement('div');
+      div.innerHTML = html;
+      div.style.position = 'fixed';
+      div.style.pointerEvents = 'none';
+      div.style.opacity = 0;
+      div.style.left = '-9999px';
+      document.body.appendChild(div);
+      
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      const range = document.createRange();
+      range.selectNode(div);
+      sel.addRange(range);
+      
+      const ok = document.execCommand('copy');
+      sel.removeAllRanges();
+      document.body.removeChild(div);
+      
+      if (ok) {
+         showToast('Tabelul a fost copiat în memorie (cu formatare)! Poți da Paste.', 'success');
+         showSuccessState();
+      } else {
+         showToast('Browserul a blocat copierea.', 'error');
+      }
+    } catch(e) {
+      showToast('Eroare la copiere (drepturi insuficiente).', 'error');
+    }
+  }
+}
+
+window.updateLocSelectText = function() {
+  const cbs = document.querySelectorAll('.lunare-loc-cb:checked');
+  const span = document.getElementById('loc-select-text');
+  if (!span) return;
+  if (cbs.length === 0) span.innerText = 'Toate locațiile';
+  else if (cbs.length === 1) span.innerText = '1 locație selectată';
+  else span.innerText = `${cbs.length} locații selectate`;
+};
+
+window.updateExpLocSelectText = function() {
+  const cbs = document.querySelectorAll('.exp-loc-cb:checked');
+  const span = document.getElementById('exp-loc-select-text');
+  if (!span) return;
+  if (cbs.length === 0) span.innerText = 'Toate locațiile';
+  else if (cbs.length === 1) span.innerText = '1 locație selectată';
+  else span.innerText = `${cbs.length} locații selectate`;
+  applyExpFilters();
+};
+
+document.addEventListener('click', (e) => {
+  const trigger = document.getElementById('loc-select-trigger');
+  const dd = document.getElementById('loc-dropdown');
+  if (trigger && dd) {
+    if (!trigger.contains(e.target) && !dd.contains(e.target)) {
+      dd.style.display = 'none';
+    }
+  }
+
+  const expTrigger = document.getElementById('exp-loc-select-trigger');
+  const expDd = document.getElementById('exp-loc-dropdown');
+  if (expTrigger && expDd) {
+    if (!expTrigger.contains(e.target) && !expDd.contains(e.target)) {
+      expDd.style.display = 'none';
+    }
+  }
+});
+
+
+// --- CONTRACTS MODULE ---
+let _contractsData = [];
+
+window.loadContracts = async function() {
+  if (typeof showLoader === 'function') showLoader(true);
+  try {
+    const res = await api('/api/contracts');
+    _contractsData = res || [];
+    populateContractFilters();
+    renderContractsTable();
+  } catch (e) {
+    if (typeof showAlert === 'function') showAlert('Eroare încărcare contracte: ' + e);
+  } finally {
+    if (typeof showLoader === 'function') showLoader(false);
+  }
+}
+
+window.renderContractsTable = function() {
+  const tb = document.getElementById('contracts-tbody');
+  if (!tb) return;
+  
+  const filterLoc = document.getElementById('filter-contract-location').value;
+  const filterType = document.getElementById('filter-contract-type').value;
+
+  let filteredContracts = _contractsData;
+  if (filterLoc) {
+    filteredContracts = filteredContracts.filter(c => (c.locations || []).some(l => String(l.location_id) === String(filterLoc)));
+  }
+  if (filterType) {
+    filteredContracts = filteredContracts.filter(c => c.type === filterType);
+  }
+
+  let totalEur = 0;
+  let totalRon = 0;
+  
+  if (filteredContracts.length === 0) {
+    tb.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text-muted)">Niciun contract găsit</td></tr>';
+    document.getElementById('kpi-contract-count').innerText = '0';
+    document.getElementById('kpi-contract-lei').innerText = '0 RON';
+    document.getElementById('kpi-contract-eur').innerText = '0 €';
+    const countEl = document.getElementById('contracts-record-count');
+    if (countEl) countEl.innerText = 'Total înregistrări: 0';
+    return;
+  }
+  
+  let html = '';
+  filteredContracts.forEach((c, idx) => {
+    if (c.currency === 'RON') totalRon += parseFloat(c.total_amount) || 0;
+    else if (c.currency === 'EUR') totalEur += parseFloat(c.total_amount) || 0;
+
+    // Format locations summary
+    const locNames = (c.locations || []).map(l => {
+      const locObj = ((typeof filtersData !== 'undefined' && filtersData.locations) || []).find(x => x.id === l.location_id);
+      const name = locObj ? locObj.name : 'Loc necunoscut';
+      return (c.locations.length > 1) ? `${name} (${fmt(l.amount)})` : name;
+    });
+    const locSummary = locNames.length > 0 ? locNames.join('<br>') : '<span style="color:var(--text-muted)">Neasignat</span>';
+    
+    // Remaining time logic
+    let remainingStr = '-';
+    if (c.end_date) {
+      const end = new Date(c.end_date);
+      const now = new Date();
+      if (end > now) {
+        const diffTime = Math.abs(end - now);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        if (diffDays > 60) {
+          remainingStr = `${Math.floor(diffDays / 30)} luni rămase`;
+        } else {
+          remainingStr = `${diffDays} zile rămase`;
+        }
+      } else {
+        remainingStr = `<span style="color:var(--red); font-weight:bold;">Expirat</span>`;
+      }
+    }
+    
+    let typeHtml = `<strong>${c.type || '-'}</strong>`;
+    if (c.owner_name) typeHtml += `<br><span style="font-size:11px; color:var(--muted)">Proprietar: ${c.owner_name}</span>`;
+
+    let locHtml = `<strong>${locSummary}</strong>`;
+    if (c.address) locHtml += `<br><span style="font-size:11px; color:var(--text)">Adresă: ${c.address}</span>`;
+
+    let detaliiContractHtml = '';
+    if (c.contract_number) detaliiContractHtml += `<span style="font-size:11px; font-weight:600; color:var(--text)">Nr. ${c.contract_number}</span>`;
+    if (c.m2) detaliiContractHtml += `${c.contract_number ? '<br>' : ''}<span style="font-size:11px; color:var(--muted)">${c.m2} m²</span>`;
+    if (!detaliiContractHtml) detaliiContractHtml = '-';
+
+    let valabilHtml = `<span style="font-size:0.9em;">De la: ${c.start_date || '-'} <br> Până la: ${c.end_date || '-'}</span>`;
+
+    let statusHtml = '';
+    if (remainingStr !== '-') statusHtml += `<strong style="color:var(--accent); font-size:11px;">⏱ ${remainingStr}</strong>`;
+    if (c.notice_period_months) statusHtml += `<br><span style="font-size:11px; color:var(--muted)">Preaviz: ${c.notice_period_months} luni</span>`;
+
+    const mainFiles = (c.files || []).filter(f => !f.is_annex);
+    const annexFiles = (c.files || []).filter(f => f.is_annex);
+    
+    html += `
+      <tr>
+        <td style="width:40px; text-align:center;"><input type="checkbox" class="contract-chk" value="${c.id}" onchange="checkBulkDeleteBtn()"></td>
+        <td style="color:var(--text-muted);width:40px;">${idx + 1}</td>
+        <td>${typeHtml}</td>
+        <td>${locHtml}</td>
+        <td>${detaliiContractHtml}</td>
+        <td>${valabilHtml}</td>
+        <td>${statusHtml}</td>
+        <td class="num" style="font-weight:700">${fmt(c.total_amount)} ${c.currency === 'EUR' ? '€' : c.currency}</td>
+        <td style="font-size:0.85em; max-width:200px; white-space:normal;">${(c.details || '')}</td>
+        <td style="text-align:center;">
+          <div style="display:flex; justify-content:center; gap:8px;">
+            ${(c.files && c.files.length > 0) ? `
+            <button onclick="viewContractPdfs('${c.id}')" style="width:32px; height:32px; border-radius:50%; background:var(--red); border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; color:white; transition:0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'" title="Vezi PDF-uri (${c.files.length})">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            </button>` : ''}
+            <button onclick="openContractFilesModal('${c.id}')" style="width:32px; height:32px; border-radius:50%; border:1px solid var(--border); background:var(--surface); display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--accent); transition:0.2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'" title="Gestionează Fișiere">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+            </button>
+            <button onclick="openContractModal('${c.id}')" style="width:32px; height:32px; border-radius:50%; border:1px solid var(--border); background:var(--surface); display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--text); transition:0.2s;" onmouseover="this.style.borderColor='var(--text)'" onmouseout="this.style.borderColor='var(--border)'" title="Modifică">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+            </button>
+            <button onclick="deleteContract('${c.id}')" style="width:32px; height:32px; border-radius:50%; border:1px solid var(--border); background:var(--surface); display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--red); transition:0.2s;" onmouseover="this.style.borderColor='var(--red)'" onmouseout="this.style.borderColor='var(--border)'" title="Șterge">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  });
+  
+  document.getElementById('kpi-contract-count').innerText = filteredContracts.length;
+  document.getElementById('kpi-contract-lei').innerText = fmt(totalRon) + ' RON';
+  document.getElementById('kpi-contract-eur').innerText = fmt(totalEur) + ' €';
+  
+  tb.innerHTML = html;
+  
+  const countEl = document.getElementById('contracts-record-count');
+  if (countEl) countEl.innerText = `Total înregistrări: ${filteredContracts.length}`;
+}
+
+window.populateContractFilters = function() {
+  const locSel = document.getElementById('filter-contract-location');
+  const typeSel = document.getElementById('filter-contract-type');
+  if (!locSel || !typeSel) return;
+  
+  // preserve selections
+  const curLoc = locSel.value;
+  const curType = typeSel.value;
+  
+  locSel.innerHTML = '<option value="">Toate Locațiile</option>';
+  typeSel.innerHTML = '<option value="">Toate Tipurile</option>';
+  
+  if (typeof filtersData !== 'undefined' && filtersData.locations) {
+    filtersData.locations.forEach(l => {
+      locSel.innerHTML += `<option value="${l.id}">${l.name}</option>`;
+    });
+  }
+  
+  const uniqueTypes = [...new Set(_contractsData.map(c => c.type).filter(Boolean))];
+  uniqueTypes.forEach(t => {
+    typeSel.innerHTML += `<option value="${t}">${t}</option>`;
+  });
+  
+  locSel.value = curLoc;
+  typeSel.value = curType;
+};
+
+window.toggleAllContracts = function(cb) {
+  const chks = document.querySelectorAll('.contract-chk');
+  chks.forEach(c => c.checked = cb.checked);
+  window.checkBulkDeleteBtn();
+};
+
+window.checkBulkDeleteBtn = function() {
+  const chks = document.querySelectorAll('.contract-chk:checked');
+  const btn = document.getElementById('btn-bulk-delete');
+  if (btn) btn.style.display = chks.length > 0 ? 'inline-block' : 'none';
+};
+
+window.bulkDeleteContracts = async function() {
+  const chks = document.querySelectorAll('.contract-chk:checked');
+  if (!chks.length) return;
+  const ok = await customConfirm(`Sigur ștergi ${chks.length} contracte selectate?`);
+  if (!ok) return;
+  
+  for (const c of chks) {
+    try {
+      await api(`/api/contracts/${c.value}`, 'DELETE');
+    } catch(e) { console.error(e); }
+  }
+  
+  const sa = document.getElementById('contract-select-all');
+  if (sa) sa.checked = false;
+  window.checkBulkDeleteBtn();
+  loadContracts();
+};
+
+window.exportContractsExcel = function() {
+  let csv = "Nr,Tip,Locatii,Valoare,Moneda,Start,End,Detalii\n";
+  _contractsData.forEach((c, idx) => {
+    let locs = (c.locations || []).map(l => {
+      let lo = ((typeof filtersData !== 'undefined' && filtersData.locations) || []).find(x => x.id === l.location_id);
+      return lo ? lo.name : 'Unknown';
+    }).join(';');
+    csv += `${idx+1},"${c.type||''}","${locs}",${c.total_amount||0},"${c.currency||''}","${c.start_date||''}","${c.end_date||''}","${(c.details||'').replace(/"/g, '""')}"\\n`;
+  });
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'contracte.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+};
+
+window.openContractModal = function(id = null) {
+  try {
+    if (id && typeof id === 'object') id = null; // Ignore Event objects
+    
+    const modal = document.getElementById('contract-modal');
+    if (!modal) {
+      alert('Eroare: modalul contract-modal nu a fost găsit în pagină.');
+      return;
+    }
+    
+    const form = document.getElementById('contract-form');
+    if (form) form.reset();
+    else alert('Eroare: contract-form nu a fost găsit.');
+    
+    const idField = document.getElementById('contract-id');
+    if (idField) idField.value = id || '';
+  
+  const fileInput = document.getElementById('contract-upload-file');
+  if (fileInput) fileInput.value = '';
+  const fileSpan = document.getElementById('contract-upload-filename');
+  if (fileSpan) fileSpan.innerText = '';
+  
+  // Build location select options
+  const locSelect = document.getElementById('contract-location');
+  let locHtml = '<option value="">-- Fără locație specifică --</option>';
+  ((typeof filtersData !== 'undefined' && filtersData.locations) || []).forEach(loc => {
+    locHtml += `<option value="${loc.id}">${loc.name}</option>`;
+  });
+  locSelect.innerHTML = locHtml;
+  
+  if (id) {
+    document.getElementById('contract-modal-title').innerText = 'Modifică Contract';
+    const c = _contractsData.find(x => x.id === id);
+    if (c) {
+      document.getElementById('contract-type').value = c.type || '';
+      if (document.getElementById('contract-number')) {
+        document.getElementById('contract-number').value = c.contract_number || '';
+      }
+      if (document.getElementById('contract-address')) {
+        document.getElementById('contract-address').value = c.address || '';
+      }
+      document.getElementById('contract-currency').value = c.currency || 'LEI';
+      if (document.getElementById('contract-currency-label')) {
+        document.getElementById('contract-currency-label').innerText = c.currency || 'LEI';
+      }
+      document.getElementById('contract-start').value = c.start_date || '';
+      document.getElementById('contract-end').value = c.end_date || '';
+      document.getElementById('contract-details').value = c.details || '';
+      document.getElementById('contract-total').value = window.formatNumberValue(c.total_amount || 0);
+      if (document.getElementById('contract-m2')) {
+        document.getElementById('contract-m2').value = c.m2 || '';
+      }
+      if (document.getElementById('contract-notice')) {
+        document.getElementById('contract-notice').value = c.notice_period_months || '';
+      }
+      if (document.getElementById('contract-sublease')) {
+        document.getElementById('contract-sublease').value = (c.sublease_agreement === true) ? 'true' : (c.sublease_agreement === false ? 'false' : '');
+      }
+      if (document.getElementById('contract-auto-expense')) {
+        document.getElementById('contract-auto-expense').checked = c.auto_expense === true;
+      }
+      if (document.getElementById('contract-owner')) {
+        document.getElementById('contract-owner').value = c.owner_name || '';
+      }
+      
+      if (c.locations && c.locations.length > 0) {
+        locSelect.value = c.locations[0].location_id;
+      }
+    }
+  } else {
+    document.getElementById('contract-modal-title').innerText = 'Adaugă Contract';
+    if (document.getElementById('contract-currency-label')) {
+      document.getElementById('contract-currency-label').innerText = 'LEI';
+    }
+  }
+  
+  modal.classList.add('show');
+  } catch (e) {
+    alert('Eroare JS în openContractModal: ' + e.message);
+  }
+}
+
+window.saveContract = async function() {
+  const id = document.getElementById('contract-id').value;
+  const payload = {
+    type: document.getElementById('contract-type').value,
+    currency: document.getElementById('contract-currency').value,
+    start_date: document.getElementById('contract-start').value,
+    end_date: document.getElementById('contract-end').value,
+    details: document.getElementById('contract-details').value,
+    contract_number: document.getElementById('contract-number') ? document.getElementById('contract-number').value : null,
+    address: document.getElementById('contract-address') ? document.getElementById('contract-address').value : null,
+    total_amount: window.parseNumberInput(document.getElementById('contract-total').value),
+    m2: document.getElementById('contract-m2') ? document.getElementById('contract-m2').value : null,
+    notice_period_months: document.getElementById('contract-notice') ? document.getElementById('contract-notice').value : null,
+    sublease_agreement: document.getElementById('contract-sublease') ? document.getElementById('contract-sublease').value : null,
+    auto_expense: document.getElementById('contract-auto-expense') ? document.getElementById('contract-auto-expense').checked : false,
+    owner_name: document.getElementById('contract-owner') ? document.getElementById('contract-owner').value : null,
+    locations: []
+  };
+  
+  const locVal = document.getElementById('contract-location').value;
+  if (locVal) {
+    payload.locations.push({
+      location_id: locVal,
+      amount: parseFloat(payload.total_amount) || 0
+    });
+  }
+  
+  try {
+    const url = id ? '/api/contracts/' + id : '/api/contracts';
+    const method = id ? 'PUT' : 'POST';
+    const res = await api(url, { 
+      method, 
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload) 
+    });
+    if (res.success) {
+      const finalId = id || res.id;
+      
+      // Handle file upload if selected
+      const fileInput = document.getElementById('contract-upload-file');
+      if (fileInput && fileInput.files.length > 0 && finalId) {
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        formData.append('is_annex', 'false');
+        
+        try {
+          const fRes = await fetch(`/api/contracts/${finalId}/files`, {
+            method: 'POST',
+            body: formData
+          });
+          const fData = await fRes.json();
+          if (!fData.success) {
+            showAlert('Contractul a fost salvat, dar fișierul nu a putut fi încărcat: ' + (fData.error || 'Necunoscut'));
+          }
+        } catch (e) {
+          showAlert('Eroare rețea la încărcare fișier: ' + e);
+        }
+      }
+      
+      document.getElementById('contract-modal').classList.remove('show');
+      loadContracts();
+    } else {
+      showAlert('Eroare salvare: ' + (res.error || 'Necunoscută'));
+    }
+  } catch (e) {
+    showAlert('Eroare rețea: ' + e);
+  }
+}
+
+window.deleteContract = async function(id) {
+  const ok = await customConfirm('Sigur dorești să ștergi acest contract?');
+  if (!ok) return;
+  try {
+    const res = await api('/api/contracts/' + id, { method: 'DELETE' });
+    if (res.success) {
+      loadContracts();
+    } else {
+      showAlert('Eroare ștergere: ' + (res.error || 'Necunoscută'));
+    }
+  } catch (e) {
+    showAlert('Eroare rețea: ' + e);
+  }
+}
+
+// === FILES MANAGEMENT ===
+
+let _currentContractFilesId = null;
+
+window.openContractFilesModal = function(id) {
+  _currentContractFilesId = id;
+  const modal = document.getElementById('contract-files-modal');
+  if (!modal) return;
+  
+  renderContractFilesList();
+  modal.classList.add('show');
+}
+
+window.renderContractFilesList = function() {
+  const list = document.getElementById('contract-files-list');
+  if (!list) return;
+  
+  const c = _contractsData.find(x => x.id === _currentContractFilesId);
+  if (!c || !c.files || c.files.length === 0) {
+    list.innerHTML = '<div style="padding:20px; text-align:center; color:var(--text-muted)">Niciun fișier atașat</div>';
+    return;
+  }
+  
+  let html = '';
+  const sortedFiles = [...c.files].sort((a, b) => (a.is_annex === b.is_annex ? 0 : a.is_annex ? 1 : -1));
+  sortedFiles.forEach(f => {
+    const badge = f.is_annex ? '<span style="background:var(--surface); padding:2px 6px; border-radius:4px; font-size:0.8em; margin-right:10px;">Anexă</span>' : '<span style="background:var(--accent); color:white; padding:2px 6px; border-radius:4px; font-size:0.8em; margin-right:10px;">Contract</span>';
+    
+    html += `
+      <div style="display:flex; align-items:center; justify-content:space-between; padding:12px; border-bottom:1px solid var(--border); gap:12px;">
+        <div style="display:flex; align-items:center; flex:1; min-width:0;">
+          ${badge}
+          <a href="/api/contracts/files/${f.id}/download" target="_blank" style="color:var(--text); text-decoration:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; font-size:13px;" title="${f.filename}">${(f.filename)}</a>
+        </div>
+        <button onclick="deleteContractFile('${f.id}')" style="background:var(--surface); border:1px solid var(--border); border-radius:50%; width:32px; height:32px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--red); transition:0.2s; flex-shrink:0;" onmouseover="this.style.borderColor='var(--red)'" onmouseout="this.style.borderColor='var(--border)'" title="Șterge fișier">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        </button>
+      </div>
+    `;
+  });
+  list.innerHTML = html;
+}
+
+window.uploadContractFile = async function() {
+  if (!_currentContractFilesId) return;
+  
+  const fileInput = document.getElementById('contract-file-input');
+  if (!fileInput.files || fileInput.files.length === 0) {
+    showAlert('Selectează un fișier mai întâi.');
+    return;
+  }
+  
+  const isAnnex = document.getElementById('contract-file-is-annex').checked;
+  
+  let hasError = false;
+  let lastError = '';
+  
+  fileInput.disabled = true;
+  
+  for (let i = 0; i < fileInput.files.length; i++) {
+    const formData = new FormData();
+    formData.append('file', fileInput.files[i]);
+    formData.append('is_annex', isAnnex);
+    
+    try {
+      const res = await fetch('/api/contracts/' + _currentContractFilesId + '/files', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (!data.success) {
+        hasError = true;
+        lastError = data.error || 'Necunoscută';
+      }
+    } catch (e) {
+      hasError = true;
+      lastError = e.message;
+    }
+  }
+  
+  fileInput.disabled = false;
+  fileInput.value = '';
+  
+  if (hasError) {
+    showAlert('Eroare la încărcarea unuia sau mai multor fișiere: ' + lastError);
+  }
+  
+  await loadContracts();
+  renderContractFilesList();
+}
+
+window.deleteContractFile = async function(fileId) {
+  const ok = await customConfirm('Sigur dorești să ștergi acest fișier?');
+  if (!ok) return;
+  try {
+    const res = await api('/api/contracts/files/' + fileId, { method: 'DELETE' });
+    if (res.success) {
+      await loadContracts();
+      renderContractFilesList();
+    } else {
+      showAlert('Eroare ștergere fișier: ' + (res.error || 'Necunoscută'));
+    }
+  } catch (e) {
+    showAlert('Eroare rețea: ' + e);
+  }
+}
+
+// === PDF IN-APP VIEWER ===
+let _currentPdfFiles = [];
+let _currentPdfIndex = 0;
+
+window.viewContractPdfs = function(contractId) {
+  const c = _contractsData.find(x => x.id === contractId);
+  if (!c || !c.files || c.files.length === 0) return;
+  
+  _currentPdfFiles = [...c.files].sort((a, b) => (a.is_annex === b.is_annex ? 0 : a.is_annex ? 1 : -1));
+  _currentPdfIndex = 0;
+  
+  updatePdfViewer();
+  const modal = document.getElementById('pdf-viewer-modal');
+  if (modal) modal.classList.add('show');
+}
+
+window.changePdf = function(dir) {
+  _currentPdfIndex += dir;
+  if (_currentPdfIndex < 0) _currentPdfIndex = 0;
+  if (_currentPdfIndex >= _currentPdfFiles.length) _currentPdfIndex = _currentPdfFiles.length - 1;
+  updatePdfViewer();
+}
+
+window.updatePdfViewer = function() {
+  const f = _currentPdfFiles[_currentPdfIndex];
+  if (!f) return;
+  
+  const titleEl = document.getElementById('pdf-viewer-title');
+  if (titleEl) titleEl.innerText = f.filename || 'Document PDF';
+  
+  const iframe = document.getElementById('pdf-iframe');
+  if (iframe) iframe.src = '/api/contracts/files/' + f.id + '/download';
+  
+  const counter = document.getElementById('pdf-counter');
+  const btnPrev = document.getElementById('pdf-prev-btn');
+  const btnNext = document.getElementById('pdf-next-btn');
+  
+  if (_currentPdfFiles.length > 1) {
+    if (counter) {
+      counter.style.display = 'inline-block';
+      counter.innerText = `${_currentPdfIndex + 1} / ${_currentPdfFiles.length}`;
+    }
+    if (btnPrev) {
+      btnPrev.style.display = 'inline-block';
+      btnPrev.disabled = (_currentPdfIndex === 0);
+      btnPrev.style.opacity = btnPrev.disabled ? '0.3' : '1';
+      btnPrev.style.cursor = btnPrev.disabled ? 'default' : 'pointer';
+    }
+    if (btnNext) {
+      btnNext.style.display = 'inline-block';
+      btnNext.disabled = (_currentPdfIndex === _currentPdfFiles.length - 1);
+      btnNext.style.opacity = btnNext.disabled ? '0.3' : '1';
+      btnNext.style.cursor = btnNext.disabled ? 'default' : 'pointer';
+    }
+  } else {
+    if (counter) counter.style.display = 'none';
+    if (btnPrev) btnPrev.style.display = 'none';
+    if (btnNext) btnNext.style.display = 'none';
+  }
+}
+
+window.deleteCurrentPdf = async function() {
+  const f = _currentPdfFiles[_currentPdfIndex];
+  if (!f) return;
+  
+  const ok = await customConfirm('Sigur dorești să ștergi acest PDF?');
+  if (!ok) return;
+  
+  try {
+    const res = await api('/api/contracts/files/' + f.id, { method: 'DELETE' });
+    if (res.success) {
+      await loadContracts(); // update _contractsData in background
+      _currentPdfFiles.splice(_currentPdfIndex, 1);
+      
+      if (_currentPdfFiles.length === 0) {
+        document.getElementById('pdf-viewer-modal').classList.remove('show');
+      } else {
+        if (_currentPdfIndex >= _currentPdfFiles.length) {
+          _currentPdfIndex = _currentPdfFiles.length - 1;
+        }
+        updatePdfViewer();
+      }
+      
+      // Update the other modal if it happens to be open
+      if (document.getElementById('contract-files-modal').classList.contains('show')) {
+        renderContractFilesList();
+      }
+    } else {
+      showAlert('Eroare ștergere PDF: ' + (res.error || 'Necunoscută'));
+    }
+  } catch (e) {
+    showAlert('Eroare rețea: ' + e);
+  }
+}
 

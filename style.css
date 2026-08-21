@@ -228,6 +228,8 @@ body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); 
 select.glass-select { padding-right: 30px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 10px center; }
 .glass-input { background:rgba(255,255,255,0.05); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid var(--border); color:var(--text); padding: 0 14px;; height:32px; box-sizing:border-box; border-radius:var(--radius-full); font-size:12px; outline:none; font-family:inherit; transition:border-color 0.2s; }
 .glass-input:focus { border-color:var(--accent); }
+input[type="file"]::file-selector-button { border: none; border-radius: var(--radius-full); background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 4px 12px; cursor: pointer; transition: 0.2s; font-family: inherit; font-size: 12px; font-weight: 500; margin-right: 12px; }
+input[type="file"]::file-selector-button:hover { background: var(--border); }
 .glass-panel { background:rgba(17,24,39,0.7); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px); border:1px solid var(--border); border-radius:var(--radius); box-shadow:0 8px 32px rgba(0,0,0,0.1); }
 .data-table { width:100%; border-collapse:collapse; font-size:12px; }
 .data-table thead th { background:var(--surface2); color:var(--text-subtle); padding:9px 12px; text-align:center; font-weight:600; text-transform:uppercase; letter-spacing:0.05em; font-size:10px; white-space:nowrap; position:sticky; top:0; z-index:2; box-shadow: 0 1px 0 var(--border); }
@@ -611,4 +613,44 @@ td.cell-neg-3 { background:rgba(239,68,68,.38) !important; }
 
 #fp-dropzone, #global-fp-container, #ld-floorplan-container {
   container-type: inline-size;
+}
+/* Toggle Switch */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 20px;
+}
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.toggle-switch .slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--border);
+  transition: .3s;
+  border-radius: 20px;
+}
+.toggle-switch .slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: .3s;
+  border-radius: 50%;
+}
+.toggle-switch input:checked + .slider {
+  background-color: var(--accent);
+}
+.toggle-switch input:checked + .slider:before {
+  transform: translateX(20px);
 }

@@ -8,8 +8,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="chart.umd.min.js?v=149"></script>
 <script src="chartjs-plugin-datalabels.min.js?v=149"></script>
-<script src="xlsx.full.min.js?v=149"></script>
-<link rel="stylesheet" href="style.css?v=149">
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.min.js"></script>
+<link rel="stylesheet" href="style.css?v=150">
 <script>
   if (window.location.hash.startsWith('#invite')) {
     document.write('<style>#app-container, #view-login { display: none !important; } #view-register { display: flex !important; }</style>');
@@ -220,6 +220,10 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
             Cheltuieli
           </a>
+          <a href="#contracte" class="nav-item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            Contracte
+          </a>
           <a href="#pl" class="nav-item">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
             Profit & Loss
@@ -271,6 +275,40 @@
           </a>
         </div>
   
+        <a href="#analiza" class="nav-item" onclick="document.getElementById('subnav-analiza').style.display = document.getElementById('subnav-analiza').style.display === 'none' ? 'block' : 'none';">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+          Analiză
+        </a>
+        <div id="subnav-analiza" class="subnav-group" style="display:none; padding-left: 12px; margin-bottom: 8px;">
+          <a href="#analiza/alerte" class="nav-item sub-item active">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+            Alerte & Fraudă
+          </a>
+          <a href="#analiza/rtp" class="nav-item sub-item">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+            Analiză RTP Net
+          </a>
+          <a href="#analiza/resets" class="nav-item sub-item">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+            Performanță Reset
+          </a>
+          <a href="#analiza/optimizare" class="nav-item sub-item">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg>
+            Optimizare Sală
+          </a>
+          <a href="#analiza/clienti" class="nav-item sub-item">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            Predicții Clienți
+          </a>
+          <a href="#analiza/staff" class="nav-item sub-item">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            Performanță Staff
+          </a>
+          <a href="#analiza/mentenanta" class="nav-item sub-item">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            Mentenanță
+          </a>
+        </div>
         <a href="#dispozitive" class="nav-item">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
           Dispozitive
@@ -815,8 +853,7 @@
   </section>
 
     <!-- ═══ PAGE: CHELTUIELI ═══ -->
-        
-  </section>
+
   </div> <!-- /view-dashboard -->
 
 <div id="view-cheltuieli" class="view-panel" style="overflow-y:auto;">
@@ -835,9 +872,16 @@
                 <div style="width:1px; height:24px; background:var(--border); margin:0 4px;"></div>
                 
                 <!-- FILTRE -->
-                <select id="exp-filter-loc" class="glass-select" style="min-width:130px;" onchange="applyExpFilters()">
-                  <option value="">Toate locațiile</option>
-                </select>
+                <div class="custom-multi-select" style="position:relative; min-width:160px;">
+                  <div id="exp-loc-select-trigger" class="glass-input" style="height:32px; border-radius:16px; padding:0 16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer; font-size:12px; user-select:none;" onclick="document.getElementById('exp-loc-dropdown').style.display = document.getElementById('exp-loc-dropdown').style.display === 'none' ? 'block' : 'none';">
+                    <span id="exp-loc-select-text" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Toate locațiile</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0; margin-left:8px;"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                  </div>
+                  <div id="exp-loc-dropdown" class="card" style="display:none; position:absolute; top:36px; left:0; width:100%; max-height:220px; overflow-y:auto; z-index:100; padding:8px; border-radius:12px; box-shadow:0 10px 25px rgba(0,0,0,0.1); background:var(--surface); backdrop-filter:none;">
+                     <div id="exp-filter-loc" style="display:flex; flex-direction:column; gap:2px;">
+                     </div>
+                  </div>
+                </div>
                 <select id="exp-filter-dep" class="glass-select" style="min-width:150px;" onchange="applyExpFilters()">
                   <option value="">Toate departamentele</option>
                 </select>
@@ -856,9 +900,12 @@
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
                   Importă G-Sheets
                 </button>
-                <button class="btn-primary" onclick="exportExpensesCSV()" style="display:flex; align-items:center; gap:6px;  padding: 0 16px;">
+                <button class="btn-primary" onclick="exportExpensesExcel()" style="display:flex; align-items:center; gap:6px;  padding: 0 16px;">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
                   Export Excel
+                </button>
+                <button class="btn-ghost" onclick="copyExpSummaryTable(this)" style="height:32px; width:32px; flex-shrink:0; padding:0; display:flex; align-items:center; justify-content:center; border:1px solid var(--border); border-radius:16px; transition:all 0.3s;" title="Copiază Tabelul Centralizator">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
                 </button>
                 <button class="settings-btn" id="btn-exp-settings" onclick="openExpensesSettings()" style="display:none; align-items:center; gap:6px; padding: 0 14px;">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
@@ -870,6 +917,7 @@
             <div style="display:flex; border-bottom:1px solid var(--border); background:var(--surface);">
               <div id="exp-tab-btn-summary" onclick="switchExpTab('summary')" style="padding: 14px 24px; font-size: 12px; font-weight: 700; cursor: pointer; border-bottom: 2px solid var(--accent); color: var(--accent); text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s;">Centralizator</div>
               <div id="exp-tab-btn-details" onclick="switchExpTab('details')" style="padding: 14px 24px; font-size: 12px; font-weight: 700; cursor: pointer; border-bottom: 2px solid transparent; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s;">Lista Cheltuieli</div>
+
               <div id="exp-tab-btn-fixed" onclick="switchExpTab('fixed')" style="padding: 14px 24px; font-size: 12px; font-weight: 700; cursor: pointer; border-bottom: 2px solid transparent; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; transition: all 0.2s;">Cheltuieli Recurente</div>
             </div>
 
@@ -994,7 +1042,7 @@
                   </tbody>
                   <tfoot>
                     <tr style="background:var(--surface2); font-weight:800; border-top:2px solid var(--border);">
-                      <td colspan="8" style="text-align:right;">TOTAL GENERAL:</td>
+                      <td colspan="7" style="text-align:right;">TOTAL GENERAL:</td>
                       <td class="num" id="fixed-expenses-total" style="color:var(--accent);">0.00</td>
                       <td></td>
                     </tr>
@@ -1044,7 +1092,7 @@
               </tr>
             </thead>
             <tbody id="body-pl">
-              <tr><td colspan="8" style="text-align:center; color:var(--muted);">Încărcare date P&L...</td></tr>
+              <tr><td colspan="7" style="text-align:center; color:var(--muted);">Încărcare date P&L...</td></tr>
             </tbody>
             <tfoot id="foot-pl">
             </tfoot>
@@ -1107,7 +1155,354 @@
     </section>
   </div>
 </div>
+  <div id="view-analiza" class="view-panel" style="overflow-y:auto;">
+    <div style="padding:16px;">
+      
+      <!-- Landing Analiza -->
+      <div id="analiza-landing" class="rep-page" style="display:block; text-align:center; padding:100px 20px;">
+        <div style="font-size:48px; margin-bottom:24px; opacity:0.5;">🧠</div>
+        <h2 style="font-size:24px; font-weight:800; color:var(--text); margin-bottom:12px;">Modul Analiză B2B</h2>
+        <p style="font-size:14px; color:var(--muted); max-width:400px; margin:0 auto;">Selectați un raport de analiză din meniul lateral pentru a continua.</p>
+      </div>
 
+      <!-- Alerte Fraudă -->
+      <div id="analiza-alerte" class="rep-page" style="display:none; animation: fadeIn 0.3s ease;">
+        <h3 class="glass-title" style="margin-bottom:16px;">Alerte & Fraudă</h3>
+        <div class="glass-card" style="padding:32px; text-align:center;">
+          <div style="font-size:32px; margin-bottom:16px;">🚨</div>
+          <h4 style="color:var(--text); font-size:16px; margin-bottom:8px;">Sistem Monitorizare Anomalii</h4>
+          <p style="color:var(--muted); font-size:12px;">Detectează RTP neobișnuit, carduri folosite fraudulos și discrepanțe la casierie.</p>
+          <div style="margin-top:24px; padding:12px; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.3); border-radius:8px; color:#ef4444; font-size:12px;">Se conectează la data stream...</div>
+        </div>
+      </div>
+
+      <!-- Analiză RTP -->
+      <div id="analiza-rtp" class="rep-page" style="display:none; animation: fadeIn 0.3s ease;">
+        <!-- Content -->
+        <h3 class="glass-title" style="margin-bottom:16px;">Analiză RTP Teoretic vs Real Net</h3>
+        <div class="glass-card" style="padding:0; display:flex; flex-direction:column; height:calc(100vh - 120px);">
+          
+          <div style="padding:16px 20px; border-bottom:1px solid var(--border); display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end;">
+            <div style="display:flex; gap:16px; flex:1;">
+              <div style="flex:1; min-width:150px;">
+                <label style="display:block; font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Locație</label>
+                <select id="flt-rtp-loc" class="glass-select" style="width:100%;" onchange="filterRtpTable()">
+                  <option value="">Toate</option>
+                </select>
+              </div>
+              <div style="flex:1; min-width:150px;">
+                <label style="display:block; font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Mix / Producător</label>
+                <select id="flt-rtp-prod" class="glass-select" style="width:100%;" onchange="filterRtpTable()">
+                  <option value="">Toate</option>
+                </select>
+              </div>
+              <div style="flex:1; min-width:150px;">
+                <label style="display:block; font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Aparat (Serial)</label>
+                <input type="text" id="flt-rtp-serial" class="glass-select" style="width:100%;" placeholder="Ex: 149604" onkeyup="filterRtpTable()">
+              </div>
+              <div style="flex:1; min-width:150px;">
+                <label style="display:block; font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Zile</label>
+                <input type="text" id="flt-rtp-zile" class="glass-select" style="width:100%;" placeholder="Ex: 100" onkeyup="filterRtpTable()">
+              </div>
+            </div> 
+            <div>
+              <button class="btn btn-primary" onclick="loadAnalizaRtpData()">Actualizează Date</button>
+            </div>
+          </div>
+
+          <div class="table-container" style="flex:1; padding:0; border-radius:12px; overflow:hidden;">
+            <table class="data-table" id="analiza-rtp-tbl">
+              <thead>
+                <tr>
+                  <th style="width:50px; text-align:center;">Nr. Crt.</th>
+                  <th style="text-align:left;">Locație ⇅</th>
+                  <th style="text-align:left;">Cabinet ⇅</th>
+                  <th style="text-align:left;">Mix ⇅</th>
+                  <th style="text-align:left;">Serial ⇅</th>
+                  <th style="text-align:center;">Zile ⇅</th>
+                  <th style="text-align:right;">Total IN ⇅</th>
+                  <th style="text-align:right;">Total OUT ⇅</th>
+                  <th style="text-align:right;">Marketing ⇅</th>
+                  <th style="text-align:right;">GGR (Net) ⇅</th>
+                  <th style="color:#eab308; text-align:right;">RTP Real % ⇅</th>
+                  <th style="color:#3b82f6; text-align:right;">RTP Teoretic % ⇅</th>
+                  <th style="text-align:right;">Diferență % ⇅</th>
+                </tr>
+                
+              </thead>
+              <tbody id="body-analiza-rtp">
+                <!-- Rows -->
+                <tr><td colspan="13" style="text-align:center; padding:30px; color:var(--muted);">Se încarcă matricea RTP...</td></tr>
+              </tbody>
+              <tfoot id="foot-analiza-rtp" style="font-weight:bold; background:var(--bg-lighter);">
+                <!-- Totals -->
+              </tfoot>
+            </table>
+          <!-- Table Footer Pagination -->
+          <div id="pg-analiza-rtp" style="border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;"></div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Performanță Reset -->
+      <div id="analiza-resets" class="rep-page" style="display:none; animation: fadeIn 0.3s ease;">
+        <h3 class="glass-title" style="margin-bottom:16px;">Performanță Reset</h3>
+        <div class="glass-card" style="padding:0; display:flex; flex-direction:column; min-height:calc(100vh - 120px);">
+          
+          <!-- Filter Header -->
+          <div style="padding:16px 20px; border-bottom:1px solid var(--border); display:flex; flex-wrap:wrap; gap:16px; align-items:flex-end;">
+            <div style="display:flex; gap:16px; flex:1; flex-wrap:wrap;">
+              <div style="flex:1; min-width:150px;">
+                <label style="display:block; font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Locație</label>
+                <select id="flt-resets-loc" class="glass-select" style="width:100%;" onchange="filterAnalizaResetsTable()">
+                  <option value="">Toate</option>
+                </select>
+              </div>
+              <div style="flex:1; min-width:150px;">
+                <label style="display:block; font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Mix / Cabinet</label>
+                <select id="flt-resets-mix" class="glass-select" style="width:100%;" onchange="filterAnalizaResetsTable()">
+                  <option value="">Toate</option>
+                </select>
+              </div>
+              <div style="flex:1; min-width:150px;">
+                <label style="display:block; font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px;">Aparat (Serial)</label>
+                <input type="text" id="flt-resets-serial" class="glass-select" style="width:100%;" placeholder="Ex: 5040" onkeyup="filterAnalizaResetsTable()">
+              </div>
+            </div>
+            
+            <div style="display:flex; gap:12px; align-items:center;">
+                <div style="display:flex; align-items:center; gap:8px; margin-right:16px;">
+                  <span style="font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase;">Aparate Active</span>
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="flt-resets-active-only" checked onchange="filterAnalizaResetsTable()">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+                <button class="settings-btn" onclick="exportTableToExcel('analiza-resets-tbl', 'Performanta_Reset_Aparate.xlsx')" title="Export Excel" style="padding: 0 16px; gap: 8px;">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg> Export
+                </button>
+                <button class="btn btn-primary" onclick="loadAnalizaResetsData()">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg> Reîncarcă
+                </button>
+            </div>
+          </div>
+          <!-- Table Container -->
+          <div class="table-container" style="flex:1; padding:0; border-radius:12px; overflow:hidden;">
+            <table class="data-table" id="analiza-resets-tbl">
+              <thead>
+                <tr>
+                  <th>Nr. Crt.</th>
+                  <th>Locație</th>
+                  <th>Cabinet</th>
+                  <th>Mix</th>
+                  <th>Seria</th>
+                  <th>Data Reset</th>
+                  <th>Zile</th>
+                  <th class="numeric">IN (Total)</th>
+                  <th class="numeric">OUT (Total)</th>
+                  <th class="numeric">Profit (GGR)</th>
+                  <th class="numeric">RTP Real</th>
+                </tr>
+              </thead>
+              <tbody id="body-analiza-resets">
+                <tr><td colspan="11" style="text-align:center; padding:40px;">Apăsați Reîncarcă pentru a genera raportul (poate dura câteva secunde)</td></tr>
+              </tbody>
+              <tfoot id="analiza-resets-footer">
+                <tr>
+                  <td colspan="7" style="text-align:right; font-weight:700;">TOTAL GENERAL:</td>
+                  <td class="numeric" style="font-weight:700; color:var(--text);" id="analiza-resets-total-in">0.00</td>
+                  <td class="numeric" style="font-weight:700; color:var(--text);" id="analiza-resets-total-out">0.00</td>
+                  <td class="numeric" style="font-weight:700; color:var(--text);" id="analiza-resets-total-ggr">0.00</td>
+                  <td class="numeric" style="font-weight:700; color:var(--text);" id="analiza-resets-total-rtp">0.00%</td>
+                </tr>
+              </tfoot>
+            </table>
+          <!-- Table Footer Pagination -->
+          <div id="pg-analiza-resets" style="border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;"></div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Optimizare Sală -->
+      <div id="analiza-optimizare" class="rep-page" style="display:none; animation: fadeIn 0.3s ease;">
+        <h3 class="glass-title" style="margin-bottom:16px;">Optimizare Sală</h3>
+        <div class="glass-card" style="padding:32px; text-align:center;">
+          <div style="font-size:32px; margin-bottom:16px;">🗺️</div>
+          <h4 style="color:var(--text); font-size:16px; margin-bottom:8px;">Micro-management Podea</h4>
+          <p style="color:var(--muted); font-size:12px;">A/B testing așezare aparate, P&L net per aparat și Heatmaps de trafic.</p>
+          <div style="margin-top:24px; padding:12px; background:rgba(168,85,247,0.1); border:1px solid rgba(168,85,247,0.3); border-radius:8px; color:#a855f7; font-size:12px;">Se calculează randamentul / mp...</div>
+        </div>
+      </div>
+
+      <!-- Predicții Clienți -->
+      <div id="analiza-clienti" class="rep-page" style="display:none; animation: fadeIn 0.3s ease;">
+        <h3 class="glass-title" style="margin-bottom:16px;">Predicții Clienți & CRM</h3>
+        <div class="glass-card" style="padding:32px; text-align:center;">
+          <div style="font-size:32px; margin-bottom:16px;">🎯</div>
+          <h4 style="color:var(--text); font-size:16px; margin-bottom:8px;">Inteligența Jucătorilor (RFM)</h4>
+          <p style="color:var(--muted); font-size:12px;">Identificare automată jucători VIP la risc (Churn Prediction) și oportunități de recuperare.</p>
+          <div style="margin-top:24px; padding:12px; background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.3); border-radius:8px; color:#3b82f6; font-size:12px;">Rulare model Machine Learning pe loguri...</div>
+        </div>
+      </div>
+
+      <!-- Performanță Staff -->
+      <div id="analiza-staff" class="rep-page" style="display:none; animation: fadeIn 0.3s ease;">
+        <h3 class="glass-title" style="margin-bottom:16px;">Performanță Personal</h3>
+        <div class="glass-card" style="padding:32px; text-align:center;">
+          <div style="font-size:32px; margin-bottom:16px;">👥</div>
+          <h4 style="color:var(--text); font-size:16px; margin-bottom:8px;">Analiză Ture & Eficiență</h4>
+          <p style="color:var(--muted); font-size:12px;">Măsurarea conversiei cardurilor noi, eficienței acordării promoțiilor și corelarea turelor cu GGR.</p>
+          <div style="margin-top:24px; padding:12px; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.3); border-radius:8px; color:#10b981; font-size:12px;">Agregare date pontaj...</div>
+        </div>
+      </div>
+
+      <!-- Mentenanță -->
+      <div id="analiza-mentenanta" class="rep-page" style="display:none; animation: fadeIn 0.3s ease;">
+        <h3 class="glass-title" style="margin-bottom:16px;">Downtime & Mentenanță</h3>
+        <div class="glass-card" style="padding:32px; text-align:center;">
+          <div style="font-size:32px; margin-bottom:16px;">🔧</div>
+          <h4 style="color:var(--text); font-size:16px; margin-bottom:8px;">Alarme Zero-Play</h4>
+          <p style="color:var(--muted); font-size:12px;">Detectare automată downtime (ex: aparat cu 0 jocuri vineri seara) și eficiența reparațiilor tehnice.</p>
+          <div style="margin-top:24px; padding:12px; background:rgba(249,115,22,0.1); border:1px solid rgba(249,115,22,0.3); border-radius:8px; color:#f97316; font-size:12px;">Scanare istoric conexiuni...</div>
+        </div>
+      </div>
+
+    </div>
+  <!-- Machine Full Details Page -->
+  <div id="analiza-machine-details" class="rep-page" style="display:none; animation: fadeIn 0.3s ease;">
+  <div class="glass-card" style="padding: 24px;">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px;">
+        <div>
+            <button onclick="closeMachineDetails()" class="btn-primary" style="margin-bottom:12px; display:flex; align-items:center; gap:8px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                Înapoi la Performanță Reset
+            </button>
+            <h3 class="glass-title" style="margin-bottom:4px; font-size:28px;">Aparat <span id="md-serial" style="color:var(--accent);">...</span></h3>
+            <div style="display:flex; gap:16px; color:var(--text-muted); font-size:14px; font-weight:500;">
+                <span style="display:flex; align-items:center; gap:6px;">🕹️ <span id="md-mix" style="color:var(--text);">...</span></span>
+                <span style="display:flex; align-items:center; gap:6px;">📍 <strong id="md-loc" style="color:var(--text);">...</strong></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Stats -->
+    <div style="display:flex; gap:20px; margin-bottom:24px;">
+        <div style="flex:1; background:rgba(16,185,129,0.1); padding:20px; border-radius:12px; border:1px solid rgba(16,185,129,0.2);">
+            <div style="font-size:12px; color:var(--success); text-transform:uppercase; letter-spacing:1px; font-weight:700; margin-bottom:4px;">Lifetime IN</div>
+            <div id="md-stat-in" style="font-size:28px; font-weight:800; color:var(--text);">0.00</div>
+        </div>
+        <div style="flex:1; background:rgba(239,68,68,0.1); padding:20px; border-radius:12px; border:1px solid rgba(239,68,68,0.2);">
+            <div style="font-size:12px; color:var(--danger); text-transform:uppercase; letter-spacing:1px; font-weight:700; margin-bottom:4px;">Lifetime OUT</div>
+            <div id="md-stat-out" style="font-size:28px; font-weight:800; color:var(--text);">0.00</div>
+        </div>
+        <div style="flex:1; background:rgba(234,179,8,0.1); padding:20px; border-radius:12px; border:1px solid rgba(234,179,8,0.2);">
+            <div style="font-size:12px; color:#eab308; text-transform:uppercase; letter-spacing:1px; font-weight:700; margin-bottom:4px;">Total Jackpot</div>
+            <div id="md-stat-jp" style="font-size:28px; font-weight:800; color:var(--text);">0.00</div>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div style="display:flex; border-bottom:1px solid var(--border); margin-bottom:24px; gap:8px;">
+        <div class="md-tab active" onclick="switchMdTab('loc', event)" style="padding:12px 24px; cursor:pointer; font-weight:700; font-size:14px; border-bottom:3px solid var(--accent); color:var(--accent); letter-spacing:0.5px;">ISTORIC SĂLI</div>
+        <div class="md-tab" onclick="switchMdTab('res', event)" style="padding:12px 24px; cursor:pointer; font-weight:700; font-size:14px; border-bottom:3px solid transparent; color:var(--text-muted); letter-spacing:0.5px;">ISTORIC RESET-URI</div>
+        <div class="md-tab" onclick="switchMdTab('pay', event)" style="padding:12px 24px; cursor:pointer; font-weight:700; font-size:14px; border-bottom:3px solid transparent; color:var(--text-muted); letter-spacing:0.5px;">PLĂȚI MARI (>1000 RON)</div>
+    </div>
+
+    <!-- Content Area -->
+    <div style="flex:1;">
+        
+        <!-- Locatii -->
+        <div id="md-content-loc" style="display:block;">
+            <div class="table-container" style="padding:0; border-radius:12px; overflow:hidden;">
+                <table class="data-table" id="md-loc-table" style="margin:0;">
+                    <thead>
+                        <tr>
+                            <th>NR. CRT.</th>
+                            <th>LOCAȚIE</th>
+                            <th>DATA INTRĂRII</th>
+                            <th>DATA IEȘIRII</th>
+                            <th style="text-align:right;">IN</th>
+                            <th style="text-align:right;">OUT</th>
+                            <th style="text-align:right;">JACKPOT</th>
+                            <th style="text-align:right;">HAPPY HOUR</th>
+                            <th style="text-align:right;">GGR</th>
+                            <th style="text-align:right;">RTP %</th>
+                        </tr>
+                    </thead>
+                    <tbody id="body-md-loc"></tbody>
+                    <tfoot id="md-loc-tfoot">
+                        <tr>
+                            <th colspan="4" style="text-align:right;">TOTAL:</th>
+                            <th id="md-loc-tot-in" style="text-align:right;">0.00</th>
+                            <th id="md-loc-tot-out" style="text-align:right;">0.00</th>
+                            <th id="md-loc-tot-jp" style="text-align:right;">0.00</th>
+                            <th id="md-loc-tot-hh" style="text-align:right;">0.00</th>
+                            <th id="md-loc-tot-ggr" style="text-align:right;">0.00</th>
+                            <th id="md-loc-tot-rtp" style="text-align:right;">0.00%</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            <div id="pg-md-loc" class="pagination-container" style="padding:12px 20px;"></div>
+            </div>
+        </div>
+
+        <!-- Resets -->
+        <div id="md-content-res" style="display:none;">
+            <div class="table-container" style="padding:0; border-radius:12px; overflow:hidden;">
+                <table class="data-table" id="md-res-table" style="margin:0;">
+                    <thead>
+                        <tr>
+                            <th>NR. CRT.</th>
+                            <th>DATA RESET</th>
+                            <th>LOCAȚIE</th>
+                        </tr>
+                    </thead>
+                    <tbody id="body-md-res"></tbody>
+                    <tfoot id="md-res-tfoot">
+                        <tr>
+                            <th colspan="3" style="text-align:right;">TOTAL: <span id="md-res-tot">0</span></th>
+                        </tr>
+                    </tfoot>
+                </table>
+            <div id="pg-md-res" class="pagination-container" style="padding:12px 20px;"></div>
+            </div>
+        </div>
+
+        <!-- Payouts -->
+        <div id="md-content-pay" style="display:none;">
+            <div class="table-container" style="padding:0; border-radius:12px; overflow:hidden;">
+                <table class="data-table" id="md-pay-table" style="margin:0;">
+                    <thead>
+                        <tr>
+                            <th>NR. CRT.</th>
+                            <th>DATA</th>
+                            <th>LOCAȚIE</th>
+                            <th style="text-align:right;">OUT CASH</th>
+                            <th style="text-align:right;">JACKPOT</th>
+                            <th style="text-align:right;">HAPPY HOUR</th>
+                        </tr>
+                    </thead>
+                    <tbody id="body-md-pay"></tbody>
+                    <tfoot id="md-pay-tfoot">
+                        <tr>
+                            <th colspan="3" style="text-align:right;">TOTAL:</th>
+                            <th id="md-pay-tot-out" style="text-align:right;">0.00</th>
+                            <th id="md-pay-tot-jp" style="text-align:right;">0.00</th>
+                            <th id="md-pay-tot-hh" style="text-align:right;">0.00</th>
+                        </tr>
+                    </tfoot>
+                </table>
+            <div id="pg-md-pay" class="pagination-container" style="padding:12px 20px;"></div>
+            </div>
+        </div>
+        
+    </div>
+  </div> <!-- /analiza-machine-details -->
+
+  </div>
+  </div> <!-- /view-analiza -->
 
   <div id="view-rapoarte" class="view-panel" style="overflow-y:auto;">
     <div style="padding:16px;">
@@ -1276,8 +1671,8 @@
         <div id="pg-rep-hh" class="pagination-wrapper"></div>
 
 
-            </div>
             </section>
+            </div>
             </div><!-- /rep-page-hh -->
 
         <!-- ═══ PAGE: MARKETING ═══ -->
@@ -1480,40 +1875,88 @@
             <section class="card" style="margin-top:0; border-top-left-radius:0; padding:0;">
               <div style="padding:16px 20px; border-bottom:1px solid var(--border);">
                 <div style="font-size:11px; font-weight:700; color:var(--text); text-transform:uppercase; letter-spacing:.05em; margin-bottom:12px;">Lunare</div>
-                <div style="display:flex; gap:12px; align-items:flex-start;">
-                  <textarea id="rep-lunare-serials" class="glass-input" placeholder="Introduceți seriile separate prin virgulă sau spațiu (ex: 1234, 5678)..." style="flex:1; height:60px; resize:vertical; font-family:monospace; font-size:12px;"></textarea>
-                  <div style="display:flex; flex-direction:column; gap:8px;">
-                    <button class="btn-primary" onclick="loadLunareReport()" style="height:32px; padding:0 24px; display:flex; align-items:center; gap:8px; font-size:12px;">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                      Aplică Filtru
-                    </button>
-                    <button class="btn-ghost" onclick="exportLunareExcel()" style="height:32px; padding:0 24px; display:flex; align-items:center; gap:8px; font-size:12px; border:1px solid var(--border);">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-                      Export EXCEL
-                    </button>
+                <div style="display:flex; gap:12px; align-items:center;">
+                  <input type="text" id="rep-lunare-serials" class="glass-input" placeholder="Introduceți seriile separate prin virgulă sau spațiu (ex: 1234, 5678)..." style="flex:1; height:32px; font-family:monospace; font-size:12px; padding:0 16px; border-radius:16px;">
+                  
+                  <div class="custom-multi-select" style="position:relative; width:200px;">
+                    <div id="loc-select-trigger" class="glass-input" style="height:32px; border-radius:16px; padding:0 16px; display:flex; align-items:center; justify-content:space-between; cursor:pointer; font-size:12px; user-select:none;" onclick="document.getElementById('loc-dropdown').style.display = document.getElementById('loc-dropdown').style.display === 'none' ? 'block' : 'none';">
+                      <span id="loc-select-text" style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Toate locațiile</span>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </div>
+                    <div id="loc-dropdown" class="card" style="display:none; position:absolute; top:36px; left:0; width:100%; max-height:220px; overflow-y:auto; z-index:100; padding:8px; border-radius:12px; box-shadow:0 10px 25px rgba(0,0,0,0.1); background:var(--surface); backdrop-filter:none;">
+                       <div id="rep-lunare-loc" style="display:flex; flex-direction:column; gap:2px;">
+                       </div>
+                    </div>
                   </div>
+
+                  <button class="btn-primary" onclick="loadLunareReport()" style="height:32px; padding:0 20px; display:flex; align-items:center; gap:6px; font-size:12px; white-space:nowrap; border-radius:16px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                    Aplică Filtru
+                  </button>
+                  <button class="btn-ghost" onclick="exportLunareExcel()" style="height:32px; padding:0 20px; display:flex; align-items:center; gap:6px; font-size:12px; border:1px solid var(--border); white-space:nowrap; border-radius:16px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    Export
+                  </button>
+                  <button class="btn-ghost" onclick="copyLunareTable(this)" style="height:32px; width:32px; flex-shrink:0; padding:0; display:flex; align-items:center; justify-content:center; border:1px solid var(--border); border-radius:16px; transition:all 0.3s;" title="Copiază Tabelul (Google Sheets)">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                  </button>
                 </div>
                 <div style="font-size:11px; color:var(--muted); margin-top:6px;">Dacă lăsați gol, se vor afișa rezultatele pentru toate aparatele.</div>
               </div>
-              <div class="table-scroll" style="max-height:60vh; overflow-y:auto;">
+              
+              <div style="font-size:11px; font-weight:700; color:var(--text); text-transform:uppercase; letter-spacing:.05em; margin:16px 20px 8px;">Total pe luni</div>
+              <div class="table-scroll" style="border-bottom:1px solid var(--border); margin-bottom:16px;">
                 <table class="data-table">
-                  <thead>
+                  <thead id="head-rep-lunare-total">
                     <tr>
-                      <th onclick="sortLunare(0, this)">Serie</th>
-                      <th onclick="sortLunare(1, this)">Lună</th>
-                      <th onclick="sortLunare(2, this)">Locație</th>
-                      <th onclick="sortLunare(3, this)">Provider</th>
-                      <th onclick="sortLunare(4, this)">Cabinet</th>
-                      <th class="num" onclick="sortLunare(5, this)">IN</th>
-                      <th class="num" onclick="sortLunare(6, this)">OUT</th>
-                      <th class="num" onclick="sortLunare(7, this)">GGR</th>
+                      <th>Lună / Locație</th>
+                      <th class="num">Aparate</th>
+                      <th class="num">IN</th>
+                      <th class="num">IN Mediu</th>
+                      <th class="num">OUT</th>
+                      <th class="num">GGR</th>
+                      <th class="num">GGR Mediu</th>
+                      <th class="num">NGR</th>
+                      <th class="num">MKT Cost</th>
+                      <th class="num">WIN/BET %</th>
+                      <th class="num">WIN/BET NGR %</th>
                     </tr>
                   </thead>
-                  <tbody id="body-rep-lunare"></tbody>
-                  <tfoot id="foot-rep-lunare"></tfoot>
+                  <tbody id="body-rep-lunare-total"></tbody>
+                  <tfoot id="foot-rep-lunare-total"></tfoot>
                 </table>
               </div>
-              <div id="pg-rep-lunare" class="pagination-wrapper" style="border-top:1px solid var(--border); padding:12px 20px; display:flex; justify-content:space-between; align-items:center; background:var(--surface2);"></div>
+              
+              <div style="display:flex; justify-content:space-between; align-items:center; margin:0 20px 8px;">
+                <div style="font-size:11px; font-weight:700; color:var(--text); text-transform:uppercase; letter-spacing:.05em;">Detaliat pe aparate</div>
+                <button id="btn-toggle-lunare-detaliat" class="btn-ghost" onclick="toggleLunareDetails()" style="height:28px; padding:0 12px; font-size:11px; border:1px solid var(--border);">Arată detaliat pe aparate</button>
+              </div>
+              
+              <div id="lunare-detaliat-container" style="display:none;">
+                <div class="table-scroll">
+                  <table class="data-table">
+                    <thead>
+                      <tr>
+                        <th onclick="sortLunare(0, this)">Serie</th>
+                        <th onclick="sortLunare(1, this)">Lună</th>
+                        <th onclick="sortLunare(2, this)">Locație</th>
+                        <th onclick="sortLunare(3, this)">Provider</th>
+                        <th onclick="sortLunare(4, this)">Cabinet</th>
+                        <th class="num" onclick="sortLunare(5, this)">IN</th>
+                        <th class="num" onclick="sortLunare(6, this)">OUT</th>
+                        <th class="num" onclick="sortLunare(7, this)">GGR</th>
+                        <th class="num" onclick="sortLunare(8, this)">NGR</th>
+                        <th class="num" onclick="sortLunare(9, this)">MKT Cost</th>
+                        <th class="num" onclick="sortLunare(10, this)">WIN/BET %</th>
+                        <th class="num" onclick="sortLunare(11, this)">WIN/BET NGR %</th>
+                      </tr>
+                    </thead>
+                    <tbody id="body-rep-lunare"></tbody>
+                    <tfoot id="foot-rep-lunare"></tfoot>
+                  </table>
+                </div>
+                <div id="pg-rep-lunare" class="pagination-wrapper" style="border-top:1px solid var(--border); padding:12px 20px; display:flex; justify-content:space-between; align-items:center; background:var(--surface2);"></div>
+              </div>
             </section>
           </div>
         </div>
@@ -2263,6 +2706,69 @@
     </div>
   </div>
 
+
+    <!-- VIEW: CONTRACTE -->
+    <div id="view-contracte" class="view-panel" style="padding:24px;">
+      <!-- KPI CONTRACTE -->
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin-bottom:24px;">
+        <div class="kpi-card" style="padding:16px; background:var(--surface); border:1px solid var(--border); border-radius:12px;">
+          <div style="font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Număr Contracte</div>
+          <div id="kpi-contract-count" style="font-size:24px; font-weight:800; color:var(--text);">0</div>
+        </div>
+        <div class="kpi-card" style="padding:16px; background:var(--surface); border:1px solid var(--border); border-radius:12px; border-left:4px solid var(--accent);">
+          <div style="font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Total Valoare (LEI)</div>
+          <div id="kpi-contract-lei" style="font-size:24px; font-weight:800; color:var(--text);">0 RON</div>
+        </div>
+        <div class="kpi-card" style="padding:16px; background:var(--surface); border:1px solid var(--border); border-radius:12px; border-left:4px solid var(--accent);">
+          <div style="font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Total Valoare (EUR)</div>
+          <div id="kpi-contract-eur" style="font-size:24px; font-weight:800; color:var(--text);">0 &euro;</div>
+        </div>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <div style="display:flex; align-items:center; gap:16px;">
+          <div style="font-size:18px; font-weight:700;">Lista Contracte</div>
+          <select id="filter-contract-location" onchange="loadContracts()" style="padding:6px 16px; border:1px solid var(--border); border-radius:9999px; background:var(--surface); color:var(--text); font-size:13px; outline:none; min-width:140px;">
+            <option value="">Toate Locațiile</option>
+          </select>
+          <select id="filter-contract-type" onchange="loadContracts()" style="padding:6px 16px; border:1px solid var(--border); border-radius:9999px; background:var(--surface); color:var(--text); font-size:13px; outline:none; min-width:140px;">
+            <option value="">Toate Tipurile</option>
+          </select>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <button onclick="bulkDeleteContracts()" class="btn-ghost" style="color:var(--red); padding:8px 16px; display:none;" id="btn-bulk-delete">Șterge Selectate</button>
+          <button onclick="exportContractsExcel()" class="btn-ghost" style="padding:8px 16px;">Export Excel</button>
+          <button onclick="openContractModal()" class="btn btn-primary" style="background:var(--accent); color:white; padding:8px 16px; border:none; border-radius:9999px; cursor:pointer; font-weight:600;">+ Adaugă Contract</button>
+        </div>
+      </div>
+      <div class="table-container" style="background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden;">
+        <table class="data-table" style="width:100%; border-collapse:collapse;">
+          <thead style="background:var(--surface2);">
+            <tr>
+              <th style="padding:12px; width:40px; border-bottom:1px solid var(--border);">
+                <input type="checkbox" id="contract-select-all" onclick="toggleAllContracts(this)">
+              </th>
+              <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Nr.</th>
+              <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Tip Contract</th>
+              <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Locații</th>
+              <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Detalii Contract</th>
+              <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Valabilitate</th>
+              <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Status</th>
+              <th style="padding:12px; text-align:right; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Total Valoare</th>
+              <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Detalii</th>
+              <th style="padding:12px; text-align:center; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Acțiuni</th>
+            </tr>
+          </thead>
+          <tbody id="contracts-tbody">
+            <tr><td colspan="9" style="text-align:center;padding:20px;">Se încarcă...</td></tr>
+          </tbody>
+        </table>
+        <div style="padding:12px 16px; background:var(--surface2); border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+          <div style="font-size:12px; color:var(--muted);" id="contracts-record-count">Total înregistrări: 0</div>
+          <div style="font-size:12px; color:var(--muted);">Pagina 1 / 1</div>
+        </div>
+      </div>
+    </div>
+
   </div> <!-- /app-content -->
 </div> <!-- /app-body -->
 </div> <!-- /app-wrapper -->
@@ -2630,7 +3136,7 @@
           </div>
           <div>
             <label style="display:block; font-size:11px; font-weight:700; color:var(--muted); margin-bottom:6px;">Suma Totală (RON)</label>
-            <input type="number" step="0.01" id="me-amount" class="glass-select" placeholder="ex: 150.50" style="width:100%; box-sizing:border-box;" required>
+            <input type="number" step="0.01" id="me-amount" class="glass-select" placeholder="ex: 150.50" style="width:100%; box-sizing:border-box;" required oninput="updateSplitPreview()">
           </div>
         </div>
 
@@ -2667,11 +3173,12 @@
         <div id="me-split-strategy" style="display:none; padding:12px; background:rgba(99,102,241,0.1); border:1px solid rgba(99,102,241,0.3); border-radius:8px; margin-bottom:16px;">
           <div style="font-size:11px; font-weight:700; color:var(--accent); margin-bottom:8px;">Ai selectat mai multe locații. Cum împărțim suma?</div>
           <label style="display:flex; align-items:center; gap:8px; margin-bottom:4px; font-size:12px;">
-            <input type="radio" name="split_mode" value="equal" checked> Împarte în mod egal pe locațiile selectate
+            <input type="radio" name="split_mode" value="slots" checked onchange="updateSplitPreview()"> Împarte proporțional cu numărul de sloturi din locațiile selectate
           </label>
           <label style="display:flex; align-items:center; gap:8px; font-size:12px;">
-            <input type="radio" name="split_mode" value="slots"> Împarte proporțional cu numărul de sloturi din locațiile selectate
+            <input type="radio" name="split_mode" value="equal" onchange="updateSplitPreview()"> Împarte în mod egal pe locațiile selectate
           </label>
+          <div id="me-split-preview" style="margin-top: 8px; font-size: 11px; color: var(--text); padding-top: 8px; border-top: 1px dashed rgba(99,102,241,0.3);"></div>
         </div>
 
         <div style="display:flex; justify-content:flex-end;">
@@ -2805,9 +3312,9 @@
 </div>
 
 <script src="game_uuids.js?v=1"></script>
-<script src="app.js?v=20260728_v16"></script>
+<script src="app.js?v=20260821_v65"></script>
 <!-- CUSTOM PROMPT MODAL -->
-<div class="settings-modal" id="modal-custom-prompt" onclick="if(event.target===this) { if(window.customPromptCancel) window.customPromptCancel(); }">
+<div class="settings-modal" id="modal-custom-prompt" style="z-index: 99999;" onclick="if(event.target===this) { if(window.customPromptCancel) window.customPromptCancel(); }">
   <div class="settings-panel" style="width:400px; max-width:90%; background:var(--surface);">
     <div class="settings-header">
       <div class="settings-title" id="custom-prompt-title">Introduceți valoarea</div>
@@ -2826,7 +3333,7 @@
 </div>
 
 <!-- CUSTOM CONFIRM MODAL -->
-<div class="settings-modal" id="modal-custom-confirm" onclick="if(event.target===this) { if(window.customConfirmCancel) window.customConfirmCancel(); }">
+<div class="settings-modal" id="modal-custom-confirm" style="z-index: 99999;" onclick="if(event.target===this) { if(window.customConfirmCancel) window.customConfirmCancel(); }">
   <div class="settings-panel" style="width:400px; max-width:90%; background:var(--surface);">
     <div class="settings-header">
       <div class="settings-title" style="color:var(--red);">Confirmare acțiune</div>
@@ -2932,5 +3439,174 @@
     </div>
   </div>
 
+
+
+  <!-- MODAL CONTRACT -->
+  <div class="settings-modal" id="contract-modal" onclick="if(event.target===this) this.classList.remove('show')">
+    <div class="settings-panel glass-panel" style="width:700px; max-width:90%;">
+      <div class="settings-header">
+        <div class="settings-title" id="contract-modal-title">Adaugă Contract</div>
+        <button class="settings-close" onclick="document.getElementById('contract-modal').classList.remove('show')">×</button>
+      </div>
+      <div class="settings-body" style="padding:24px; overflow-y:auto; max-height: 70vh;">
+        <form id="contract-form" onsubmit="event.preventDefault(); saveContract();">
+          <input type="hidden" id="contract-id">
+          
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
+            <div>
+              <label style="display:block; margin-bottom:8px; font-size:12px; color:var(--muted);">Număr Contract (Opțional)</label>
+              <input type="text" id="contract-number" class="glass-input" style="width:100%;" placeholder="Ex: 123/2024">
+            </div>
+            <div>
+              <label style="display:block; margin-bottom:8px; font-size:12px; color:var(--muted);">Adresă (Opțional)</label>
+              <input type="text" id="contract-address" class="glass-input" style="width:100%;" placeholder="Strada, Număr...">
+            </div>
+            <div>
+              <label style="display:block; margin-bottom:8px; font-size:12px; color:var(--muted);">Tip Contract *</label>
+              <select id="contract-type" class="glass-input" style="width:100%;" required>
+                <option value="Chirie Spațiu">Chirie Spațiu</option>
+                <option value="Curățenie">Curățenie</option>
+                <option value="Pază și Protecție">Pază și Protecție</option>
+                <option value="Mentenanță">Mentenanță</option>
+                <option value="Internet / Telecomunicații">Internet / Telecomunicații</option>
+                <option value="Utilități (Apă, Gaze, Curent)">Utilități (Apă, Gaze, Curent)</option>
+                <option value="Contabilitate / Consultanță">Contabilitate / Consultanță</option>
+                <option value="Asigurări">Asigurări</option>
+                <option value="Prestări Servicii">Prestări Servicii</option>
+                <option value="Altele">Altele...</option>
+              </select>
+            </div>
+            <div>
+              <label style="display:block; margin-bottom:8px; font-size:12px; color:var(--muted);">Valută *</label>
+              <select id="contract-currency" class="glass-input" style="width:100%;" required onchange="document.getElementById('contract-currency-label').innerText = this.value">
+                <option value="LEI">LEI</option>
+                <option value="EUR">EUR</option>
+              </select>
+            </div>
+            <div>
+              <label style="display:block; margin-bottom:8px; font-size:12px; color:var(--muted);">Dată Început</label>
+              <input type="date" id="contract-start" class="glass-input" style="width:100%;">
+            </div>
+            <div>
+              <label style="display:block; margin-bottom:8px; font-size:12px; color:var(--muted);">Dată Sfârșit</label>
+              <input type="date" id="contract-end" class="glass-input" style="width:100%;">
+            </div>
+            <div>
+              <label style="display:block; margin-bottom:8px; font-size:12px; color:var(--muted);">Locație (Opțional)</label>
+              <select id="contract-location" class="glass-input" style="width:100%;">
+                <option value="">-- Fără locație specifică --</option>
+                <!-- Generated via JS -->
+              </select>
+            </div>
+            <div>
+              <label style="display:block; margin-bottom:8px; font-size:12px; color:var(--muted);">Valoare Totală *</label>
+              <div style="position:relative;">
+                <input type="text" id="contract-total" class="glass-input" style="width:100%; font-weight:bold; color:var(--accent); padding-right: 40px;" required placeholder="Ex: 15.000" oninput="formatNumberInput(event)">
+                <span id="contract-currency-label" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); font-size:12px; font-weight:bold; color:var(--accent);">LEI</span>
+              </div>
+            </div>
+            <div>
+              <label style="display:block; margin-bottom:8px; font-size:12px; color:var(--muted);">Suprafață (m² - Opțional)</label>
+              <input type="number" id="contract-m2" class="glass-input" style="width:100%;" step="0.01" placeholder="Ex: 150.5">
+            </div>
+            <div>
+              <label style="display:block; margin-bottom:8px; font-size:12px; color:var(--muted);">Preaviz Reziliere (luni - Opțional)</label>
+              <input type="number" id="contract-notice" class="glass-input" style="width:100%;" min="1" step="1" placeholder="Ex: 2">
+            </div>
+            <div>
+              <label style="display:block; margin-bottom:8px; font-size:12px; color:var(--muted);">Nume Proprietar (Opțional)</label>
+              <input type="text" id="contract-owner" class="glass-input" style="width:100%;" placeholder="Ex: Popescu Ion">
+            </div>
+            <div>
+              <label style="display:block; margin-bottom:8px; font-size:12px; color:var(--muted);">Acord Subînchiriere (Opțional)</label>
+              <select id="contract-sublease" class="glass-input" style="width:100%;">
+                <option value="">-- Neselectat --</option>
+                <option value="true">Da</option>
+                <option value="false">Nu</option>
+              </select>
+            </div>
+          </div>
+          
+          <div style="margin-bottom:20px; display:flex; align-items:center; justify-content:space-between; gap:16px;">
+            <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
+              <label class="toggle" style="cursor:pointer;">
+                <input type="checkbox" id="contract-auto-expense">
+                <span class="toggle-slider"></span>
+              </label>
+              <label style="font-size:12px; color:var(--text); cursor:pointer;" for="contract-auto-expense">Sincronizare cu cheltuieli fixe</label>
+            </div>
+            
+            <div style="display:flex; align-items:center; gap:12px; flex-shrink:0;">
+              <span id="contract-upload-filename" style="font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:150px; text-align:right;"></span>
+              <label for="contract-upload-file" class="btn-ghost" style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; padding:6px 12px; margin:0; white-space:nowrap;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                <span>Atașează PDF</span>
+              </label>
+              <input type="file" id="contract-upload-file" accept="application/pdf" style="display:none;" onchange="document.getElementById('contract-upload-filename').innerText = this.files.length ? this.files[0].name : ''">
+            </div>
+          </div>
+          
+          <div style="margin-bottom:24px;">
+            <label style="display:block; margin-bottom:8px; font-size:12px; color:var(--muted);">Detalii/Observații</label>
+            <textarea id="contract-details" class="glass-input" style="width:100%; padding:10px; border-radius:10px; border:1px solid var(--border); background:var(--surface); color:var(--text); height:80px; resize:none;" placeholder="Detalii suplimentare..."></textarea>
+          </div>
+          
+          <div style="display:flex; justify-content:flex-end; gap:12px;">
+            <button type="button" onclick="document.getElementById('contract-modal').classList.remove('show')" class="btn-ghost">Anulează</button>
+            <button type="submit" class="btn-primary">Salvează Contract</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CONTRACT FILES -->
+  <div class="settings-modal" id="contract-files-modal" onclick="if(event.target===this) this.classList.remove('show')">
+    <div class="settings-panel glass-panel" style="width:500px; max-width:90%;">
+      <div class="settings-header">
+        <div class="settings-title">Fișiere Contract</div>
+        <button class="settings-close" onclick="document.getElementById('contract-files-modal').classList.remove('show')">×</button>
+      </div>
+      <div class="settings-body" style="padding:24px;">
+        <div id="contract-files-list" style="margin-bottom:24px; max-height:300px; overflow-y:auto; border:1px solid var(--border); border-radius:10px; background:var(--surface2);">
+          <!-- Generated via JS -->
+        </div>
+        
+        <div style="border-top:1px dashed var(--border); padding-top:20px;">
+          <div style="font-size:14px; font-weight:700; margin-bottom:16px;">Adaugă Document Nou</div>
+          <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:16px;">
+            <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer; font-weight:600;">
+              <input type="checkbox" id="contract-file-is-annex" style="width:16px; height:16px; accent-color:var(--accent);"> Bifează aici DACĂ fișierul este o anexă (înainte de a-l alege)
+            </label>
+            <input type="file" id="contract-file-input" class="glass-input" style="width:100%; padding:8px; font-size:12px;" multiple onchange="if(this.files.length) uploadContractFile()">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<!-- PDF VIEWER MODAL -->
+<div class="settings-modal" id="pdf-viewer-modal" onclick="if(event.target===this) this.classList.remove('show')">
+  <div class="settings-panel" style="width:900px; max-width:95%; height:90vh; display:flex; flex-direction:column; background:var(--bg);">
+    <div class="settings-header" style="gap:16px;">
+      <div class="settings-title" id="pdf-viewer-title" style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px;" title="Vizualizare PDF">Vizualizare PDF</div>
+      <div style="display:flex; gap:10px; align-items:center; flex-shrink:0;">
+        <button id="pdf-delete-btn" class="btn-ghost" style="padding:4px 12px; color:var(--red); display:flex; align-items:center; gap:6px; font-weight:600;" onclick="deleteCurrentPdf()">
+          <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          Șterge
+        </button>
+        <button id="pdf-prev-btn" class="btn-ghost" style="padding:4px 12px; display:none;" onclick="changePdf(-1)">⬅️ Precedentul</button>
+        <span id="pdf-counter" style="font-size:12px; font-weight:bold; display:none;">1 / 2</span>
+        <button id="pdf-next-btn" class="btn-ghost" style="padding:4px 12px; display:none;" onclick="changePdf(1)">Următorul ➡️</button>
+        <button class="settings-close" style="margin-left:8px;" onclick="document.getElementById('pdf-viewer-modal').classList.remove('show')">×</button>
+      </div>
+    </div>
+    <div class="settings-body" style="flex:1; padding:0; display:flex; flex-direction:column; overflow:hidden; border-radius:0 0 12px 12px;">
+      <iframe id="pdf-iframe" style="flex:1; width:100%; height:100%; border:none; background:#222;" src=""></iframe>
+    </div>
+  </div>
+</div>
+
 </body>
+
 </html>

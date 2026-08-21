@@ -595,6 +595,154 @@ def global_floorplan_settings():
         return jsonify(row['value'] if row and row['value'] else {})
 
 # ─── Per Locație ─────────────────────────────────────────────────────────────
+@app.route('/api/analiza/rtp')
+def analiza_rtp():
+    start = request.args.get('start', '')
+    end   = request.args.get('end', '')
+    loc   = request.args.get('location', '')
+
+    where = "mas.date BETWEEN %s AND %s"
+    params = [start, end]
+
+    if loc:
+        where += " AND mas.location_id = %s"
+        params.append(loc)
+
+    # Note: Theoretical RTP isn't easily mapped right now, we use a default of 95.00 for presentation
+    # The user can later point us to the exact column (e.g. from game_settings or machine_types)
+    sql = f"""
+        SELECT 
+            m.slot_machine_id AS serial,
+            l.display_code AS locatie,
+            mt.name AS tip,
+            mm.name AS manufacturer,
+            SUM(mas.`in`) AS total_in,
+            SUM(mas.`out`) AS total_out,
+            SUM(mas.`jackpot`) AS jackpot,
+            SUM(mas.`hh`) AS happy_hour,
+            SUM(mas.`cashback`) AS cashback,
+            SUM(mas.`in` - mas.`out`) AS ggr,
+            COUNT(DISTINCT mas.date) AS active_days,
+            m.created_at AS install_date,
+            MAX(CASE WHEN m.active = 1 THEN 1 ELSE 0 END) AS is_active
+        FROM machine_audit_summaries mas
+        JOIN machines m ON m.id = mas.machine_id
+        JOIN locations l ON l.id = mas.location_id
+        LEFT JOIN machine_types mt ON mt.id = mas.machine_type_id
+        LEFT JOIN machine_manufacturers mm ON mm.id = mt.manufacturer_id
+        WHERE {where}
+        GROUP BY m.id, m.slot_machine_id, l.display_code, mt.name, mm.name, m.created_at
+        HAVING SUM(mas.`in`) > 0
+    """
+    rows = qry(sql, params)
+
+    res = []
+    for r in rows:
+        t_in = float(r['total_in'] or 0)
+        t_out = float(r['total_out'] or 0)
+        jp = float(r['jackpot'] or 0)
+        hh = float(r['happy_hour'] or 0)
+        cb = float(r['cashback'] or 0)
+        
+        # Real RTP = (Total OUT + Marketing) / Total IN
+        marketing = jp + hh + cb
+        real_rtp = ((t_out + marketing) / t_in * 100) if t_in > 0 else 0
+        
+        # Default theoretical RTP
+        theoretical_rtp = 95.00
+        
+        diff = real_rtp - theoretical_rtp
+        
+        res.append({
+            'serial': r['serial'],
+            'locatie': r['locatie'],
+            'producator': r['manufacturer'] or 'Necunoscut',
+            'tip': r['tip'] or '-',
+            'total_in': t_in,
+            'total_out': t_out,
+            'marketing': marketing,
+            'ggr': float(r['ggr'] or 0),
+            'real_rtp': round(real_rtp, 2),
+            'theoretical_rtp': theoretical_rtp,
+            'diff': round(diff, 2),
+            'install_date': str(r['install_date']) if r['install_date'] else '-',
+            'is_active': bool(r['is_active'])
+        })
+
+    # Sort descending by Real RTP to spot anomalies easily
+    res.sort(key=lambda x: x['real_rtp'], reverse=True)
+    return jsonify(res)
+
+@app.route('/api/analiza/resets')
+def analiza_resets():
+    sql = """
+        SELECT 
+            m.slot_machine_id AS serial,
+            l.display_code AS locatie,
+            mt.name AS tip,
+            resets.last_ram_clear,
+            SUM(mas.`in`) AS total_in,
+            SUM(mas.`out`) AS total_out,
+            SUM(mas.`in` - mas.`out`) AS ggr,
+            COUNT(DISTINCT mas.date) AS zile_de_la_reset,
+            MAX(mas.date) AS max_date,
+            MAX(CASE WHEN m.active = 1 THEN 1 ELSE 0 END) AS is_active
+        FROM machines m
+        JOIN locations l ON l.id = m.location_id
+        LEFT JOIN machine_types mt ON mt.id = m.machine_type_id
+        LEFT JOIN (
+            SELECT m2.slot_machine_id, MAX(mr2.datetime) as last_ram_clear 
+            FROM machine_resets mr2
+            JOIN machines m2 ON m2.id = mr2.machine_id
+            WHERE mr2.reset_type = 0 
+            GROUP BY m2.slot_machine_id
+        ) resets ON resets.slot_machine_id = m.slot_machine_id
+        JOIN machine_audit_summaries mas ON mas.machine_id = m.id AND (resets.last_ram_clear IS NULL OR mas.date >= DATE(resets.last_ram_clear))
+        GROUP BY m.slot_machine_id, l.display_code, mt.name, resets.last_ram_clear
+        HAVING SUM(mas.`in`) > 0
+    """
+    rows = qry(sql)
+    
+    machines = {}
+    for r in rows:
+        serial = r['serial']
+        if serial not in machines:
+            machines[serial] = {
+                'serial': serial,
+                'locatie': r['locatie'],
+                'tip': r['tip'] or '-',
+                'data_reset': str(r['last_ram_clear']) if r['last_ram_clear'] else '-',
+                'total_in': 0,
+                'total_out': 0,
+                'ggr': 0,
+                'zile': 0,
+                'max_date': r['max_date'],
+                'is_active': bool(r['is_active'])
+            }
+        
+        m = machines[serial]
+        m['total_in'] += float(r['total_in'] or 0)
+        m['total_out'] += float(r['total_out'] or 0)
+        m['ggr'] += float(r['ggr'] or 0)
+        m['zile'] += int(r['zile_de_la_reset'] or 0)
+        
+        if r['max_date'] and m['max_date'] and r['max_date'] > m['max_date']:
+            m['locatie'] = r['locatie']
+            m['tip'] = r['tip'] or '-'
+            m['max_date'] = r['max_date']
+            m['is_active'] = bool(r['is_active'])
+
+    res = []
+    for m in machines.values():
+        t_in = m['total_in']
+        t_out = m['total_out']
+        m['real_rtp'] = round((t_out / t_in * 100), 2) if t_in > 0 else 0
+        del m['max_date']  # Nu mai avem nevoie să trimitem la frontend
+        res.append(m)
+
+    res.sort(key=lambda x: x['real_rtp'], reverse=True)
+    return jsonify(res)
+
 @app.route('/api/locations')
 def locations():
     start, end = period_params(request)
@@ -2294,8 +2442,13 @@ def rep_lunare():
             DATE_FORMAT(mas.date, '%%Y-%%m') as month,
             SUM(mas.`in`) as in_val,
             SUM(mas.`out`) as out_val,
-            SUM(mas.`in` - mas.`out`) as ggr
-        FROM machine_audit_summary_per_hours mas
+            SUM(mas.`in` - mas.`out`) as ggr,
+            SUM(mas.win) as win,
+            SUM(mas.bet) as bet,
+            SUM(COALESCE(mas.jackpot,0)+COALESCE(mas.cashback,0)+COALESCE(mas.hh,0)+COALESCE(mas.cb_birthday,0)+COALESCE(mas.cb_fortune_wheel,0)+COALESCE(mas.cb_raffle,0)) AS marketing,
+            SUM(mas.`in` - mas.`out` + COALESCE(mas.jackpot,0) + COALESCE(mas.cashback,0) + COALESCE(mas.hh,0) + COALESCE(mas.cb_birthday,0) + COALESCE(mas.cb_fortune_wheel,0) + COALESCE(mas.cb_raffle,0)) as ngr,
+            COUNT(DISTINCT DATE(mas.date)) as days_active
+        FROM machine_audit_summaries mas
         JOIN locations l ON l.id = mas.location_id
         JOIN machines m ON m.id = mas.machine_id
         JOIN machine_types mt ON m.machine_type_id = mt.id
@@ -3291,10 +3444,20 @@ def expense_form_data():
     pg_locs = pg_qry("SELECT id, name FROM casino_locations ORDER BY name")
     
     cfg = get_exp_config()
+    excl = set(cfg.get('excluded_types', []))
+    
     for ld in cfg.get('local_departments', []):
         deps.append({'id': ld['id'], 'name': ld['name']})
+        
+    filtered_types = []
+    for t in types:
+        if str(t['id']) not in excl:
+            filtered_types.append(t)
+    types = filtered_types
+            
     for lt in cfg.get('local_types', []):
-        types.append({'id': lt['id'], 'name': lt['name'], 'department_id': lt.get('department_id', '')})
+        if str(lt['id']) not in excl:
+            types.append({'id': lt['id'], 'name': lt['name'], 'department_id': lt.get('department_id', '')})
         
     deps.sort(key=lambda x: x['name'].lower())
     types.sort(key=lambda x: x['name'].lower())
@@ -3302,12 +3465,11 @@ def expense_form_data():
     mysql_locs = qry("SELECT id, code FROM locations")
     pg_name_to_id = {normalize_loc_name(l['name']): str(l['id']) for l in pg_locs}
     
-    # Check historical slots
     active_m = qry("SELECT location_id, COUNT(DISTINCT machine_id) as c FROM machine_daily_meters WHERE date=%s GROUP BY location_id", (date_param,))
     
     if not active_m:
-        # Fallback to the most recent date with actual meters
-        active_m = qry("SELECT location_id, COUNT(DISTINCT machine_id) as c FROM machine_daily_meters WHERE date = (SELECT MAX(date) FROM machine_daily_meters) GROUP BY location_id")
+        # Fallback to current active machines
+        active_m = qry("SELECT location_id, COUNT(id) as c FROM machines WHERE active=1 GROUP BY location_id")
         
     mysql_slot_counts = {str(r['location_id']): r['c'] for r in active_m}
     
@@ -3381,7 +3543,7 @@ def save_manual_expense():
         else:
             loc_amount = round(amount / len(loc_ids), 2)
             
-        if loc_amount <= 0: continue
+        if loc_amount == 0: continue
             
         import uuid
         pg_qry("""
@@ -3528,6 +3690,19 @@ def edit_expense(expense_id):
             data.get('expenditure_type_id'),
             expense_id
         ))
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/admin/expenses/<expense_id>/toggle_hide', methods=['POST'])
+def toggle_hide_expense(expense_id):
+    try:
+        # Toggle boolean: if NULL or false -> true, if true -> false
+        pg_qry("""
+            UPDATE casino_payments
+            SET is_hidden = NOT COALESCE(is_hidden, FALSE)
+            WHERE id = %s
+        """, (expense_id,))
         return jsonify({'success': True})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -3812,7 +3987,8 @@ def api_expenses():
             p.expenditure_type_id,
             p.details,
             u.first_name,
-            u.last_name
+            u.last_name,
+            p.is_hidden
         FROM casino_payments p
         LEFT JOIN casino_locations cl ON p.location_id = cl.id
         LEFT JOIN casino_departments cd ON p.department_id = cd.id
@@ -3858,7 +4034,8 @@ def api_expenses():
             'expenditure_type_name': t_name or '-',
             'vendor_name': r['vendor_name'] or '-',
             'added_by': added_by,
-            'is_manual': not bool(r['other_info'])
+            'is_manual': not bool(r['other_info']),
+            'is_hidden': bool(r['is_hidden'])
         })
         
     # FETCH AND APPEND FIXED EXPENSES
@@ -3921,6 +4098,42 @@ def api_expenses():
                         'added_by': 'Sistem (Automat)',
                         'is_manual': True
                     })
+
+    # FETCH AND APPEND ACTIVE CONTRACTS WITH AUTO EXPENSE
+    contracts_rows = pg_qry("""
+        SELECT
+            c.id,
+            c.type,
+            cl.amount,
+            cl.location_id,
+            c.owner_name,
+            c.details
+        FROM cp2_contracts c
+        JOIN cp2_contract_locations cl ON c.id = cl.contract_id
+        WHERE c.auto_expense = true
+          AND c.start_date <= %s
+          AND (c.end_date IS NULL OR c.end_date >= %s)
+    """, (end, start))
+
+    for r in contracts_rows:
+        lid = str(r['location_id'])
+        if lid in pg_loc_ids:
+            loc_name = next((l['name'] for l in pg_locs if str(l['id']) == lid), '-')
+            dep_name = 'Chirie' if r['type'] and r['type'].lower().startswith('chiri') else 'Contracte Automate'
+            
+            data.append({
+                'id': f"contract_{r['id']}_{lid}",
+                'date': start[:10],
+                'explanation': f"Contract: {r['type'] or ''}",
+                'amount': float(r['amount'] or 0),
+                'location_name': loc_name,
+                'department_name': dep_name,
+                'type_name': '-',
+                'expenditure_type_name': r['type'] or 'Contract',
+                'vendor_name': r['owner_name'] or '-',
+                'added_by': 'Sistem (Contract)',
+                'is_manual': True
+            })
 
     data.sort(key=lambda x: x['date'], reverse=True)
     return jsonify(data)
@@ -4220,6 +4433,261 @@ def api_fixed_expenses_single(expense_id):
         """, (expense_date, loc_json, department_id, type_id, quantity, unit_value, currency, eur_rate, total_ron, is_recurring, details, expense_id))
         
         return jsonify({'status': 'ok'})
+
+# ─── Machine Details ────────────────────────────────────────────────────────
+@app.route('/api/machine/<serial>/details')
+def api_machine_details(serial):
+    try:
+        conn = get_conn()
+        c = conn.cursor()
+        
+        # Basic Info & Location History
+        c.execute("""
+            SELECT 
+                l.display_code as location_name,
+                m.created_at,
+                m.deleted_at,
+                SUM(mas.`in`) as total_in,
+                SUM(mas.`out`) as total_out,
+                SUM(mas.jackpot) as total_jp,
+                SUM(mas.hh) as total_hh
+            FROM machines m
+            JOIN locations l ON m.location_id = l.id
+            LEFT JOIN machine_audit_summaries mas ON mas.machine_id = m.id
+            WHERE m.slot_machine_id = %s
+            GROUP BY m.id, l.display_code, m.created_at, m.deleted_at
+            ORDER BY m.created_at ASC
+        """, [serial])
+        loc_history = c.fetchall()
+        
+        # Resets History
+        c.execute("""
+            SELECT mr.datetime as date, mr.reset_type, l.display_code as location_name
+            FROM machine_resets mr
+            JOIN machines m ON mr.machine_id = m.id
+            JOIN locations l ON m.location_id = l.id
+            WHERE m.slot_machine_id = %s AND mr.reset_type = 0
+            ORDER BY mr.datetime ASC
+        """, [serial])
+        resets_history = c.fetchall()
+        
+        # Large Payouts (> 1000)
+        c.execute("""
+            SELECT mas.date, mas.`out`, mas.jackpot, mas.hh, l.display_code as location_name
+            FROM machine_audit_summaries mas
+            JOIN machines m ON mas.machine_id = m.id
+            JOIN locations l ON m.location_id = l.id
+            WHERE m.slot_machine_id = %s 
+              AND (mas.`out` >= 1000 OR mas.jackpot >= 1000 OR mas.hh >= 1000)
+            ORDER BY mas.date ASC
+        """, [serial])
+        large_payouts = c.fetchall()
+        
+        # Extra stats: total lifetime GGR across all locations
+        c.execute("""
+            SELECT 
+                SUM(mas.`in`) as total_in, 
+                SUM(mas.`out`) as total_out, 
+                SUM(mas.jackpot) as total_jp
+            FROM machine_audit_summaries mas
+            JOIN machines m ON mas.machine_id = m.id
+            WHERE m.slot_machine_id = %s
+        """, [serial])
+        stats = c.fetchone() or {}
+        
+        conn.close()
+        
+        for r in loc_history:
+            r['created_at'] = str(r['created_at']) if r.get('created_at') else '-'
+            r['deleted_at'] = str(r['deleted_at']) if r.get('deleted_at') else 'Prezent'
+            r['total_in'] = float(r['total_in']) if r.get('total_in') else 0
+            r['total_out'] = float(r['total_out']) if r.get('total_out') else 0
+            r['total_jp'] = float(r['total_jp']) if r.get('total_jp') else 0
+            r['total_hh'] = float(r['total_hh']) if r.get('total_hh') else 0
+        for r in resets_history:
+            r['date'] = str(r['date']) if r.get('date') else '-'
+        for r in large_payouts:
+            r['date'] = str(r['date']) if r.get('date') else '-'
+            
+        return jsonify({
+            'serial': serial,
+            'stats': {
+                'total_in': float(stats.get('total_in') or 0),
+                'total_out': float(stats.get('total_out') or 0),
+                'total_jp': float(stats.get('total_jp') or 0)
+            },
+            'location_history': loc_history,
+            'resets_history': resets_history,
+            'large_payouts': large_payouts
+        })
+    except Exception as e:
+        print(f"Error in /api/machine/{serial}/details: {e}")
+        return jsonify({"error": str(e)}), 500
+
+# ================= CONTRACTS MODULE =================
+
+@app.route('/api/contracts', methods=['GET'])
+def get_contracts():
+    contracts_raw = pg_qry("""
+        SELECT 
+            c.*,
+            COALESCE(
+                json_agg(DISTINCT jsonb_build_object('location_id', cl.location_id, 'amount', cl.amount)) 
+                FILTER (WHERE cl.location_id IS NOT NULL), '[]'
+            ) as locations,
+            COALESCE(
+                json_agg(DISTINCT jsonb_build_object('id', cf.id, 'is_annex', cf.is_annex, 'filename', cf.filename)) 
+                FILTER (WHERE cf.id IS NOT NULL), '[]'
+            ) as files
+        FROM cp2_contracts c
+        LEFT JOIN cp2_contract_locations cl ON c.id = cl.contract_id
+        LEFT JOIN cp2_contract_files cf ON c.id = cf.contract_id
+        GROUP BY c.id
+        ORDER BY c.created_at DESC
+    """)
+    
+    # Format dates to string
+    res = []
+    for r in contracts_raw:
+        r_dict = dict(r)
+        if r_dict.get('start_date'):
+            r_dict['start_date'] = str(r_dict['start_date'])
+        if r_dict.get('end_date'):
+            r_dict['end_date'] = str(r_dict['end_date'])
+        if r_dict.get('created_at'):
+            r_dict['created_at'] = str(r_dict['created_at'])
+        if r_dict.get('updated_at'):
+            r_dict['updated_at'] = str(r_dict['updated_at'])
+        res.append(r_dict)
+        
+    return jsonify(res)
+
+@app.route('/api/contracts', methods=['POST'])
+def create_contract():
+    data = request.json
+    import uuid
+    cid = str(uuid.uuid4())
+    
+    pg_qry("""
+        INSERT INTO cp2_contracts (id, type, currency, total_amount, start_date, end_date, details, m2, notice_period_months, sublease_agreement, auto_expense, owner_name, contract_number, address)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """, (
+        cid,
+        data.get('type'),
+        data.get('currency', 'LEI'),
+        float(data.get('total_amount', 0)),
+        data.get('start_date') or None,
+        data.get('end_date') or None,
+        data.get('details'),
+        float(data.get('m2')) if data.get('m2') else None,
+        int(data.get('notice_period_months')) if data.get('notice_period_months') else None,
+        str(data.get('sublease_agreement')).lower() == 'true' if data.get('sublease_agreement') is not None and data.get('sublease_agreement') != '' else None,
+        str(data.get('auto_expense')).lower() == 'true',
+        data.get('owner_name') or None,
+        data.get('contract_number') or None,
+        data.get('address') or None
+    ))
+    
+    locs = data.get('locations', [])
+    for loc in locs:
+        pg_qry("""
+            INSERT INTO cp2_contract_locations (contract_id, location_id, amount)
+            VALUES (%s, %s, %s)
+        """, (cid, loc.get('location_id'), float(loc.get('amount', 0))))
+        
+    return jsonify({"success": True, "id": cid})
+
+@app.route('/api/contracts/<contract_id>', methods=['PUT'])
+def update_contract(contract_id):
+    data = request.json
+    pg_qry("""
+        UPDATE cp2_contracts 
+        SET type = %s, currency = %s, total_amount = %s, start_date = %s, end_date = %s, details = %s, m2 = %s, notice_period_months = %s, sublease_agreement = %s, auto_expense = %s, owner_name = %s, contract_number = %s, address = %s, updated_at = CURRENT_TIMESTAMP
+        WHERE id = %s
+    """, (
+        data.get('type'),
+        data.get('currency', 'LEI'),
+        float(data.get('total_amount', 0)),
+        data.get('start_date') or None,
+        data.get('end_date') or None,
+        data.get('details'),
+        float(data.get('m2')) if data.get('m2') else None,
+        int(data.get('notice_period_months')) if data.get('notice_period_months') else None,
+        str(data.get('sublease_agreement')).lower() == 'true' if data.get('sublease_agreement') is not None and data.get('sublease_agreement') != '' else None,
+        str(data.get('auto_expense')).lower() == 'true',
+        data.get('owner_name') or None,
+        data.get('contract_number') or None,
+        data.get('address') or None,
+        contract_id
+    ))
+    
+    pg_qry("DELETE FROM cp2_contract_locations WHERE contract_id = %s", (contract_id,))
+    
+    locs = data.get('locations', [])
+    for loc in locs:
+        pg_qry("""
+            INSERT INTO cp2_contract_locations (contract_id, location_id, amount)
+            VALUES (%s, %s, %s)
+        """, (contract_id, loc.get('location_id'), float(loc.get('amount', 0))))
+        
+    return jsonify({"success": True})
+
+@app.route('/api/contracts/<contract_id>', methods=['DELETE'])
+def delete_contract(contract_id):
+    pg_qry("DELETE FROM cp2_contracts WHERE id = %s", (contract_id,))
+    return jsonify({"success": True})
+
+@app.route('/api/contracts/<contract_id>/files', methods=['POST'])
+def upload_contract_file(contract_id):
+    if 'file' not in request.files: return jsonify({"error": "No file"}), 400
+    file = request.files['file']
+    if file.filename == '': return jsonify({"error": "Empty filename"}), 400
+    
+    is_annex = str(request.form.get('is_annex', 'false')).lower() == 'true'
+    
+    os.makedirs('uploads/contracts', exist_ok=True)
+    import uuid
+    fid = str(uuid.uuid4())
+    # prepend fid to avoid collisions
+    filename = secure_filename(file.filename)
+    save_name = f"{fid}_{filename}"
+    filepath = os.path.join('uploads', 'contracts', save_name)
+    file.save(filepath)
+    
+    pg_qry("""
+        INSERT INTO cp2_contract_files (id, contract_id, is_annex, filename, filepath)
+        VALUES (%s, %s, %s, %s, %s)
+    """, (fid, contract_id, is_annex, filename, filepath))
+    
+    return jsonify({"success": True})
+
+@app.route('/api/contracts/files/<file_id>', methods=['DELETE'])
+def delete_contract_file(file_id):
+    rows = pg_qry("SELECT filepath FROM cp2_contract_files WHERE id = %s", (file_id,))
+    if rows:
+        filepath = rows[0]['filepath']
+        try:
+            if os.path.exists(filepath):
+                os.remove(filepath)
+        except Exception as e:
+            pass
+        pg_qry("DELETE FROM cp2_contract_files WHERE id = %s", (file_id,))
+    return jsonify({"success": True})
+
+@app.route('/api/contracts/files/<file_id>/download', methods=['GET'])
+def download_contract_file(file_id):
+    rows = pg_qry("SELECT filename, filepath FROM cp2_contract_files WHERE id = %s", (file_id,))
+    if not rows: return "File not found", 404
+    
+    fpath = rows[0]['filepath']
+    import os
+    if not os.path.exists(fpath): return "File not found on disk", 404
+    
+    directory = os.path.dirname(os.path.abspath(fpath))
+    fname = os.path.basename(fpath)
+    return send_from_directory(directory, fname, as_attachment=False)
+
+
 
 if __name__ == '__main__':
     import os
