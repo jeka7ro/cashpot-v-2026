@@ -224,6 +224,10 @@
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
             Contracte
           </a>
+          <a href="#onjn" class="nav-item">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            Conformitate ONJN
+          </a>
           <a href="#pl" class="nav-item">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
             Profit & Loss
@@ -345,7 +349,7 @@
     <div class="main-content" id="app-content" style="display:flex; height:100%;">
       
       <!-- PERIOD SELECTOR: CELL-BASED MONTH GRID -->
-      <div class="timeline-section">
+      <div class="timeline-section" style="display:none;">
     <div class="timeline-top-row">
       <div class="timeline-label" style="display:none; align-items:center;">
         <div><span id="tl-range-display" class="tl-range-text">—</span></div>
@@ -388,7 +392,7 @@
     <input type="hidden" id="date-end">
   </div>
     <!-- KPI CARDS -->
-    <section class="kpi-grid" id="kpi-section" style="grid-template-columns: repeat(5, 1fr);">
+    <section class="kpi-grid" id="kpi-section" style="display:none; grid-template-columns: repeat(5, 1fr);">
       <div class="kpi-card" id="kpi-in">
 
       <div class="kpi-label">Total IN</div>
@@ -661,7 +665,7 @@
     </div>
 
     <!-- MAIN DASHBOARD CONTENT -->
-    <div id="view-dashboard" class="view-panel active">
+    <div id="view-dashboard" class="view-panel">
 
   <!-- CALENDAR GGR WIDGET -->
   <div class="cal-wrapper-row" style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin: 0 24px 24px;">
@@ -1210,7 +1214,7 @@
             </div>
           </div>
 
-          <div class="table-container" style="flex:1; padding:0; border-radius:12px; overflow:hidden;">
+          <div class="table-container" style="flex:1; padding:0; border-radius:12px; overflow-x:auto;">
             <table class="data-table" id="analiza-rtp-tbl">
               <thead>
                 <tr>
@@ -1288,7 +1292,7 @@
             </div>
           </div>
           <!-- Table Container -->
-          <div class="table-container" style="flex:1; padding:0; border-radius:12px; overflow:hidden;">
+          <div class="table-container" style="flex:1; padding:0; border-radius:12px; overflow-x:auto;">
             <table class="data-table" id="analiza-resets-tbl">
               <thead>
                 <tr>
@@ -1408,6 +1412,7 @@
         <div class="md-tab active" onclick="switchMdTab('loc', event)" style="padding:12px 24px; cursor:pointer; font-weight:700; font-size:14px; border-bottom:3px solid var(--accent); color:var(--accent); letter-spacing:0.5px;">ISTORIC SĂLI</div>
         <div class="md-tab" onclick="switchMdTab('res', event)" style="padding:12px 24px; cursor:pointer; font-weight:700; font-size:14px; border-bottom:3px solid transparent; color:var(--text-muted); letter-spacing:0.5px;">ISTORIC RESET-URI</div>
         <div class="md-tab" onclick="switchMdTab('pay', event)" style="padding:12px 24px; cursor:pointer; font-weight:700; font-size:14px; border-bottom:3px solid transparent; color:var(--text-muted); letter-spacing:0.5px;">PLĂȚI MARI (>1000 RON)</div>
+        <div class="md-tab" onclick="switchMdTab('onjn', event)" style="padding:12px 24px; cursor:pointer; font-weight:700; font-size:14px; border-bottom:3px solid transparent; color:var(--text-muted); letter-spacing:0.5px;">ISTORIC ONJN</div>
     </div>
 
     <!-- Content Area -->
@@ -1415,7 +1420,7 @@
         
         <!-- Locatii -->
         <div id="md-content-loc" style="display:block;">
-            <div class="table-container" style="padding:0; border-radius:12px; overflow:hidden;">
+            <div class="table-container" style="padding:0; border-radius:12px; overflow-x:auto;">
                 <table class="data-table" id="md-loc-table" style="margin:0;">
                     <thead>
                         <tr>
@@ -1450,7 +1455,7 @@
 
         <!-- Resets -->
         <div id="md-content-res" style="display:none;">
-            <div class="table-container" style="padding:0; border-radius:12px; overflow:hidden;">
+            <div class="table-container" style="padding:0; border-radius:12px; overflow-x:auto;">
                 <table class="data-table" id="md-res-table" style="margin:0;">
                     <thead>
                         <tr>
@@ -1472,7 +1477,7 @@
 
         <!-- Payouts -->
         <div id="md-content-pay" style="display:none;">
-            <div class="table-container" style="padding:0; border-radius:12px; overflow:hidden;">
+            <div class="table-container" style="padding:0; border-radius:12px; overflow-x:auto;">
                 <table class="data-table" id="md-pay-table" style="margin:0;">
                     <thead>
                         <tr>
@@ -1497,11 +1502,15 @@
             <div id="pg-md-pay" class="pagination-container" style="padding:12px 20px;"></div>
             </div>
         </div>
-        
+            <!-- Istoric ONJN -->
+        <div id="md-content-onjn" style="display:none; padding:20px; background:var(--surface); border:1px solid var(--border); border-radius:12px;">
+            <div id="md-onjn-timeline" style="display:flex; flex-direction:column; gap:16px;"></div>
+        </div>
+
     </div>
+  </div> 
   </div> <!-- /analiza-machine-details -->
 
-  </div>
   </div> <!-- /view-analiza -->
 
   <div id="view-rapoarte" class="view-panel" style="overflow-y:auto;">
@@ -2737,36 +2746,40 @@
         <div style="display:flex; align-items:center; gap:8px;">
           <button onclick="bulkDeleteContracts()" class="btn-ghost" style="color:var(--red); padding:8px 16px; display:none;" id="btn-bulk-delete">Șterge Selectate</button>
           <button onclick="exportContractsExcel()" class="btn-ghost" style="padding:8px 16px;">Export Excel</button>
+
           <button onclick="openContractModal()" class="btn btn-primary" style="background:var(--accent); color:white; padding:8px 16px; border:none; border-radius:9999px; cursor:pointer; font-weight:600;">+ Adaugă Contract</button>
         </div>
       </div>
-      <div class="table-container" style="background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow:hidden;">
+      <div class="table-container" style="background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow-x:auto;">
         <table class="data-table" style="width:100%; border-collapse:collapse;">
           <thead style="background:var(--surface2);">
             <tr>
-              <th style="padding:12px; width:40px; border-bottom:1px solid var(--border);">
+              <th style="padding:12px; width:40px; border-bottom:1px solid var(--border); position:sticky; left:0; z-index:2; background:var(--surface2);">
                 <input type="checkbox" id="contract-select-all" onclick="toggleAllContracts(this)">
               </th>
               <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Nr.</th>
-              <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Tip Contract</th>
-              <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Locații</th>
-              <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Detalii Contract</th>
-              <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Valabilitate</th>
+              <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase; cursor:pointer;" onclick="sortContractsTable('tip')">Tip Contract <span id="sort-contracts-tip"></span></th>
+              <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase; cursor:pointer;" onclick="sortContractsTable('locatie')">Locații <span id="sort-contracts-locatie"></span></th>
+              <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase; cursor:pointer;" onclick="sortContractsTable('detalii')">Detalii Contract <span id="sort-contracts-detalii"></span></th>
+              <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase; cursor:pointer;" onclick="sortContractsTable('valabilitate')">Valabilitate <span id="sort-contracts-valabilitate"></span></th>
               <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Status</th>
-              <th style="padding:12px; text-align:right; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Total Valoare</th>
-              <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Detalii</th>
+              <th style="padding:12px; text-align:right; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase; cursor:pointer;" onclick="sortContractsTable('valoare')">Total Valoare <span id="sort-contracts-valoare"></span></th>
               <th style="padding:12px; text-align:center; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Acțiuni</th>
             </tr>
           </thead>
           <tbody id="contracts-tbody">
             <tr><td colspan="9" style="text-align:center;padding:20px;">Se încarcă...</td></tr>
           </tbody>
+          <tfoot id="contracts-tfoot"></tfoot>
         </table>
-        <div style="padding:12px 16px; background:var(--surface2); border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
-          <div style="font-size:12px; color:var(--muted);" id="contracts-record-count">Total înregistrări: 0</div>
-          <div style="font-size:12px; color:var(--muted);">Pagina 1 / 1</div>
-        </div>
+        <div id="pg-contracts" class="pagination-wrapper" style="border-top:1px solid var(--border); padding:12px 20px; display:flex; justify-content:space-between; align-items:center; background:var(--surface2);"></div>
       </div>
+    </div>
+
+    <!-- VIEW ONJN -->
+    <div id="view-onjn" class="view-panel" style="padding:24px;">
+      <!-- ONJN App container injected by JS -->
+      <div id="onjn-app-root"></div>
     </div>
 
   </div> <!-- /app-content -->
@@ -3312,7 +3325,8 @@
 </div>
 
 <script src="game_uuids.js?v=1"></script>
-<script src="app.js?v=20260821_v65"></script>
+<script src="app.js?v=20260821_v69"></script>
+<script src="onjn.js?v=4"></script>
 <!-- CUSTOM PROMPT MODAL -->
 <div class="settings-modal" id="modal-custom-prompt" style="z-index: 99999;" onclick="if(event.target===this) { if(window.customPromptCancel) window.customPromptCancel(); }">
   <div class="settings-panel" style="width:400px; max-width:90%; background:var(--surface);">
@@ -3463,18 +3477,27 @@
             </div>
             <div>
               <label style="display:block; margin-bottom:8px; font-size:12px; color:var(--muted);">Tip Contract *</label>
-              <select id="contract-type" class="glass-input" style="width:100%;" required>
-                <option value="Chirie Spațiu">Chirie Spațiu</option>
-                <option value="Curățenie">Curățenie</option>
-                <option value="Pază și Protecție">Pază și Protecție</option>
-                <option value="Mentenanță">Mentenanță</option>
-                <option value="Internet / Telecomunicații">Internet / Telecomunicații</option>
-                <option value="Utilități (Apă, Gaze, Curent)">Utilități (Apă, Gaze, Curent)</option>
-                <option value="Contabilitate / Consultanță">Contabilitate / Consultanță</option>
-                <option value="Asigurări">Asigurări</option>
-                <option value="Prestări Servicii">Prestări Servicii</option>
-                <option value="Altele">Altele...</option>
-              </select>
+              <div style="display:flex; gap:8px;">
+                <select id="contract-type" class="glass-input" style="width:100%;" required>
+                  <option value="Chirie Spațiu">Chirie Spațiu</option>
+                  <option value="Contract de Management">Contract de Management</option>
+                  <option value="Curățenie">Curățenie</option>
+                  <option value="Pază și Protecție">Pază și Protecție</option>
+                  <option value="Mentenanță">Mentenanță</option>
+                  <option value="Internet / Telecomunicații">Internet / Telecomunicații</option>
+                  <option value="Utilități (Apă, Gaze, Curent)">Utilități (Apă, Gaze, Curent)</option>
+                  <option value="Contabilitate / Consultanță">Contabilitate / Consultanță</option>
+                  <option value="Asigurări">Asigurări</option>
+                  <option value="Prestări Servicii">Prestări Servicii</option>
+                  <option value="Altele">Altele...</option>
+                </select>
+                <button type="button" id="btn-add-contract-type" onclick="document.getElementById('new-contract-type-container').style.display='flex'; this.style.display='none';" style="padding:0 14px; border-radius:8px; background:var(--accent); color:white; border:none; cursor:pointer; font-weight:bold; font-size:18px;" title="Adaugă tip de contract nou">+</button>
+                <div id="new-contract-type-container" style="display:none; gap:8px;">
+                  <input type="text" id="new-contract-type-input" class="glass-input" style="flex:1; padding: 4px 8px; min-width: 120px;" placeholder="Tip nou...">
+                  <button type="button" onclick="const t=document.getElementById('new-contract-type-input').value; if(t && t.trim()){ const s = document.getElementById('contract-type'); const o = document.createElement('option'); o.value = t.trim(); o.text = t.trim(); s.add(o); s.value = t.trim(); } document.getElementById('new-contract-type-container').style.display='none'; document.getElementById('btn-add-contract-type').style.display='block'; document.getElementById('new-contract-type-input').value='';" style="padding:0 14px; border-radius:8px; background:var(--success); color:white; border:none; cursor:pointer; font-weight:bold; font-size:14px;">✔</button>
+                  <button type="button" onclick="document.getElementById('new-contract-type-container').style.display='none'; document.getElementById('btn-add-contract-type').style.display='block'; document.getElementById('new-contract-type-input').value='';" style="padding:0 14px; border-radius:8px; background:#ef4444; color:white; border:none; cursor:pointer; font-weight:bold; font-size:14px;">✖</button>
+                </div>
+              </div>
             </div>
             <div>
               <label style="display:block; margin-bottom:8px; font-size:12px; color:var(--muted);">Valută *</label>
@@ -3556,6 +3579,56 @@
             <button type="submit" class="btn-primary">Salvează Contract</button>
           </div>
         </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Smart Import Modal -->
+  <div class="settings-modal" id="smart-import-modal" onclick="if(event.target===this) this.classList.remove('show')">
+    <div class="settings-modal-content" style="max-width:500px; padding:0;">
+      <div class="settings-modal-header" style="display:flex; justify-content:space-between; align-items:center; padding:16px 20px; border-bottom:1px solid var(--border);">
+        <div class="settings-title" style="display:flex; align-items:center; gap:8px;">
+          <span style="font-size:24px;">🤖</span> Import Inteligent PDF
+        </div>
+        <button class="settings-close" onclick="document.getElementById('smart-import-modal').classList.remove('show')">×</button>
+      </div>
+      <div style="padding:20px;">
+        <p style="font-size:13px; color:var(--muted); margin-bottom:20px; line-height:1.4;">
+          Încarcă contracte scanate. Inteligența Artificială va citi documentele, va extrage automat sumele, datele și părțile implicate și va atașa PDF-ul la fiecare contract creat.
+        </p>
+
+        <div style="margin-bottom:16px;">
+          <label style="display:block; margin-bottom:8px; font-size:12px; font-weight:600; color:var(--text);">Alege Locația (Sala) *</label>
+          <select id="smart-import-location" class="glass-input" style="width:100%;" required>
+            <option value="">-- Selectează Locația --</option>
+            <!-- Locations will be populated dynamically -->
+          </select>
+        </div>
+
+        <div style="margin-bottom:24px;">
+          <label style="display:block; margin-bottom:8px; font-size:12px; font-weight:600; color:var(--text);">Selectează Fișierele PDF *</label>
+          <div style="border: 2px dashed var(--border); border-radius:12px; padding:32px 16px; text-align:center; background:var(--surface2); position:relative;">
+            <input type="file" id="smart-import-files" multiple accept="application/pdf" style="position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer;" onchange="updateSmartImportFileCount(this)">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted); margin-bottom:12px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+            <div id="smart-import-file-label" style="font-size:14px; font-weight:500; color:var(--text);">Click sau trage fișierele aici (maxim 20)</div>
+            <div style="font-size:11px; color:var(--muted); margin-top:4px;">Doar fișiere format .PDF</div>
+          </div>
+        </div>
+
+        <div id="smart-import-progress-container" style="display:none; margin-bottom:20px; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:16px;">
+          <div style="display:flex; justify-content:space-between; font-size:12px; font-weight:600; margin-bottom:8px; color:var(--text);">
+            <span id="smart-import-status-text">Se pregătesc fișierele...</span>
+            <span id="smart-import-counter">0/0</span>
+          </div>
+          <div style="width:100%; height:6px; background:var(--border); border-radius:99px; overflow:hidden;">
+            <div id="smart-import-progress-bar" style="height:100%; width:0%; background:linear-gradient(90deg, #8A2BE2, #4B0082); transition:width 0.3s ease;"></div>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:12px; margin-top:32px;">
+          <button type="button" onclick="document.getElementById('smart-import-modal').classList.remove('show')" class="btn-ghost" id="smart-import-cancel-btn">Anulează</button>
+          <button type="button" onclick="uploadSmartContracts()" class="btn btn-primary" id="smart-import-submit-btn" style="background:linear-gradient(90deg, #8A2BE2, #4B0082); color:white; border:none; border-radius:8px; padding:10px 20px; font-weight:600; cursor:pointer;">Începe Extragerea AI</button>
+        </div>
       </div>
     </div>
   </div>

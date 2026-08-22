@@ -268,6 +268,7 @@ const savedLimit = localStorage.getItem('tableLimit') || 20;
 const dLimit = savedLimit === 'all' ? 'all' : parseInt(savedLimit, 10);
 const tableStates = {
   locatii: { page: 1, limit: 'all', rows: [] },
+  contracts: { page: 1, limit: 10, tbody: 'contracts-tbody', pagination: 'pg-contracts', rows: [] },
   provideri: { page: 1, limit: 'all', rows: [] },
   tipuri: { page: 1, limit: dLimit, rows: [] },
   cabinete: { page: 1, limit: dLimit, rows: [] },
@@ -2907,9 +2908,10 @@ window.addEventListener('hashchange', () => {
   }
 
   // Exceptii specifice pentru afisare header:
-  if (mainHash === 'contracte') {
+  if (mainHash === 'contracte' || mainHash === 'onjn') {
     if (kpiSection) kpiSection.style.display = 'none'; // hide general KPIs
     if (timelineSection) timelineSection.style.display = 'none'; // hide date picker
+    if (headerFilters) headerFilters.style.display = 'none'; // hide top location/type filters
   }
 
   const targetView = document.getElementById('view-' + mainHash);
@@ -2930,11 +2932,16 @@ window.addEventListener('hashchange', () => {
       window.loadContracts();
     }
   }
+  if (mainHash === 'onjn') {
+    if (typeof window.initOnjnApp === 'function') {
+      window.initOnjnApp();
+    }
+  }
 
   // Hide period selector on Live and Admin-Floorplan
   const tlSection = document.querySelector('.timeline-section');
   if(tlSection) {
-    if (mainHash === 'live' || mainHash === 'admin-floorplan' || mainHash === 'contracte') {
+    if (mainHash === 'live' || mainHash === 'admin-floorplan' || mainHash === 'contracte' || mainHash === 'onjn') {
       tlSection.style.display = 'none';
     } else {
       tlSection.style.display = 'flex';
@@ -2960,8 +2967,8 @@ window.addEventListener('hashchange', () => {
     loadExpensesReport();
     const btnExpSettings = document.getElementById('btn-exp-settings');
     if (btnExpSettings) btnExpSettings.style.display = (currentUser && currentUser.role === 'Super Admin') ? 'inline-flex' : 'none';
-  } else if (mainHash === 'contracte') {
-    // Hide ALL global KPIs for contracte, because they have their own inline KPIs
+  } else if (mainHash === 'contracte' || mainHash === 'onjn') {
+    // Hide ALL global KPIs for contracte/onjn, because they have their own inline KPIs
     ['kpi-in', 'kpi-ggr', 'kpi-profit', 'kpi-total-expenses', 'kpi-marketing', 'kpi-games', 'kpi-aparate', 'kpi-jp'].forEach(id => {
       const el = document.getElementById(id);
       if(el) el.style.display = 'none';
@@ -11513,6 +11520,45 @@ window.openMachineDetails = async function(serial) {
     document.getElementById('md-pay-tot-hh').innerText = fmt(t_pay_hh, 2);
     renderTablePaginated('md-pay');
     
+    
+    // 4. ONJN History
+    try {
+      const onjnData = await api(`/api/onjn/slots/${serial}/history`);
+      const timeline = document.getElementById('md-onjn-timeline');
+      if (!onjnData || onjnData.length === 0) {
+        timeline.innerHTML = '<div style="color:var(--muted); text-align:center;">Nu există istoric ONJN pentru acest aparat.</div>';
+      } else {
+        timeline.innerHTML = onjnData.map(ev => {
+          if (ev.history_event_type === 'decision') {
+            return `
+              <div style="padding:12px 0; border-bottom:1px solid var(--border); display:flex; align-items:flex-start; gap:12px;">
+                <div style="width:12px; height:12px; border-radius:50%; background:var(--success); margin-top:4px;"></div>
+                <div>
+                  <div style="font-weight:700; font-size:14px; color:var(--text);">Decizie: ${ev.decision_number || '-'}</div>
+                  <div style="font-size:12px; color:var(--muted); margin-bottom:4px;">Dată Decizie: ${ev.decision_date || '-'} | Tip: ${ev.type || '-'}</div>
+                  <div style="font-size:12px; color:var(--muted);">Total Sloturi Aprobate: ${ev.total_slots || 0}</div>
+                  ${ev.location_id ? `<div style="font-size:12px; color:var(--muted);">De la: ${ev.location_id} ${ev.location_id_dest ? `→ ${ev.location_id_dest}` : ''}</div>` : ''}
+                </div>
+              </div>
+            `;
+          } else if (ev.history_event_type === 'notification') {
+             return `
+              <div style="padding:12px 0; border-bottom:1px solid var(--border); display:flex; align-items:flex-start; gap:12px;">
+                <div style="width:12px; height:12px; border-radius:50%; background:var(--accent); margin-top:4px;"></div>
+                <div>
+                  <div style="font-weight:700; font-size:14px; color:var(--text);">Notificare (${ev.level}): ${ev.notification_number || '-'}</div>
+                  <div style="font-size:12px; color:var(--muted); margin-bottom:4px;">Tip: ${ev.type || '-'} | Dată: ${ev.date || '-'}</div>
+                  <div style="font-size:12px; color:var(--muted);">Transmisă la: ${ev.transmission_date || '-'} | Status: ${ev.status || '-'}</div>
+                </div>
+              </div>
+            `;
+          }
+        }).join('');
+      }
+    } catch(err) {
+      document.getElementById('md-onjn-timeline').innerHTML = `<div style="color:var(--danger); text-align:center;">Eroare la încărcarea istoricului ONJN: ${err.message}</div>`;
+    }
+    
   } catch(err) {
     console.error(err);
     document.getElementById('body-md-loc').innerHTML = `<tr><td colspan="10" style="text-align:center; color:red;">Eroare: ${err.message}</td></tr>`;
@@ -11882,6 +11928,26 @@ window.loadContracts = async function() {
   }
 }
 
+let _contractsSortCol = null;
+let _contractsSortAsc = true;
+
+window.sortContractsTable = function(col) {
+  if (_contractsSortCol === col) {
+    _contractsSortAsc = !_contractsSortAsc;
+  } else {
+    _contractsSortCol = col;
+    _contractsSortAsc = true;
+  }
+  
+  // Update header arrows
+  ['tip', 'locatie', 'detalii', 'valabilitate', 'valoare'].forEach(c => {
+    const el = document.getElementById('sort-contracts-' + c);
+    if (el) el.innerText = (c === _contractsSortCol) ? (_contractsSortAsc ? ' ↑' : ' ↓') : '';
+  });
+  
+  renderContractsTable();
+};
+
 window.renderContractsTable = function() {
   const tb = document.getElementById('contracts-tbody');
   if (!tb) return;
@@ -11897,11 +11963,40 @@ window.renderContractsTable = function() {
     filteredContracts = filteredContracts.filter(c => c.type === filterType);
   }
 
+  if (_contractsSortCol) {
+    filteredContracts.sort((a, b) => {
+      let va = a[_contractsSortCol];
+      let vb = b[_contractsSortCol];
+      
+      if (_contractsSortCol === 'tip') {
+        va = (a.type || '') + (a.owner_name || '');
+        vb = (b.type || '') + (b.owner_name || '');
+      } else if (_contractsSortCol === 'locatie') {
+        va = (a.locations && a.locations[0]) ? ((typeof filtersData !== 'undefined' && filtersData.locations) || []).find(x => x.id === a.locations[0].location_id)?.name || '' : '';
+        vb = (b.locations && b.locations[0]) ? ((typeof filtersData !== 'undefined' && filtersData.locations) || []).find(x => x.id === b.locations[0].location_id)?.name || '' : '';
+      } else if (_contractsSortCol === 'detalii') {
+        va = a.contract_number || ''; 
+        vb = b.contract_number || '';
+      } else if (_contractsSortCol === 'valabilitate') {
+        va = a.end_date || '9999-12-31'; 
+        vb = b.end_date || '9999-12-31';
+      } else if (_contractsSortCol === 'valoare') {
+        va = parseFloat(a.total_amount) || 0; 
+        vb = parseFloat(b.total_amount) || 0;
+      }
+
+      if (va < vb) return _contractsSortAsc ? -1 : 1;
+      if (va > vb) return _contractsSortAsc ? 1 : -1;
+      return 0;
+    });
+  }
+
   let totalEur = 0;
   let totalRon = 0;
+  let totalM2 = 0;
   
   if (filteredContracts.length === 0) {
-    tb.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text-muted)">Niciun contract găsit</td></tr>';
+    tb.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--text-muted)">Niciun contract găsit</td></tr>';
     document.getElementById('kpi-contract-count').innerText = '0';
     document.getElementById('kpi-contract-lei').innerText = '0 RON';
     document.getElementById('kpi-contract-eur').innerText = '0 €';
@@ -11910,18 +12005,22 @@ window.renderContractsTable = function() {
     return;
   }
   
-  let html = '';
-  filteredContracts.forEach((c, idx) => {
-    if (c.currency === 'RON') totalRon += parseFloat(c.total_amount) || 0;
+  tableStates.contracts.rows = filteredContracts.map((c, idx) => {
+    if (c.currency === 'RON' || c.currency === 'LEI') totalRon += parseFloat(c.total_amount) || 0;
     else if (c.currency === 'EUR') totalEur += parseFloat(c.total_amount) || 0;
+
+    totalM2 += parseFloat(c.m2) || 0;
 
     // Format locations summary
     const locNames = (c.locations || []).map(l => {
       const locObj = ((typeof filtersData !== 'undefined' && filtersData.locations) || []).find(x => x.id === l.location_id);
       const name = locObj ? locObj.name : 'Loc necunoscut';
-      return (c.locations.length > 1) ? `${name} (${fmt(l.amount)})` : name;
+      const addr = c.address ? c.address : (locObj && locObj.address ? locObj.address : null);
+      let html = (c.locations.length > 1) ? `<strong>${name}</strong> (${fmt(l.amount)})` : `<strong>${name}</strong>`;
+      if (addr) html += `<br><span style="font-size:11px; color:var(--text)">${addr}</span>`;
+      return html;
     });
-    const locSummary = locNames.length > 0 ? locNames.join('<br>') : '<span style="color:var(--text-muted)">Neasignat</span>';
+    const locSummary = locNames.length > 0 ? locNames.join('<br><br>') : '<span style="color:var(--text-muted)">Neasignat</span>';
     
     // Remaining time logic
     let remainingStr = '-';
@@ -11942,11 +12041,9 @@ window.renderContractsTable = function() {
     }
     
     let typeHtml = `<strong>${c.type || '-'}</strong>`;
-    if (c.owner_name) typeHtml += `<br><span style="font-size:11px; color:var(--muted)">Proprietar: ${c.owner_name}</span>`;
+    if (c.owner_name) typeHtml += `<br><span style="font-size:11px; color:var(--muted)">${c.owner_name}</span>`;
 
-    let locHtml = `<strong>${locSummary}</strong>`;
-    if (c.address) locHtml += `<br><span style="font-size:11px; color:var(--text)">Adresă: ${c.address}</span>`;
-
+    let locHtml = locSummary;
     let detaliiContractHtml = '';
     if (c.contract_number) detaliiContractHtml += `<span style="font-size:11px; font-weight:600; color:var(--text)">Nr. ${c.contract_number}</span>`;
     if (c.m2) detaliiContractHtml += `${c.contract_number ? '<br>' : ''}<span style="font-size:11px; color:var(--muted)">${c.m2} m²</span>`;
@@ -11956,24 +12053,26 @@ window.renderContractsTable = function() {
 
     let statusHtml = '';
     if (remainingStr !== '-') statusHtml += `<strong style="color:var(--accent); font-size:11px;">⏱ ${remainingStr}</strong>`;
-    if (c.notice_period_months) statusHtml += `<br><span style="font-size:11px; color:var(--muted)">Preaviz: ${c.notice_period_months} luni</span>`;
+    if (c.notice_period_months && c.notice_period_months > 0) statusHtml += `<br><span style="font-size:11px; color:var(--muted)">Preaviz: ${c.notice_period_months} luni</span>`;
 
     const mainFiles = (c.files || []).filter(f => !f.is_annex);
     const annexFiles = (c.files || []).filter(f => f.is_annex);
     
     html += `
       <tr>
-        <td style="width:40px; text-align:center;"><input type="checkbox" class="contract-chk" value="${c.id}" onchange="checkBulkDeleteBtn()"></td>
+        <td style="width:40px; text-align:center; position:sticky; left:0; z-index:1; background:var(--surface); border-right:1px solid var(--border);"><input type="checkbox" class="contract-chk" value="${c.id}" onchange="checkBulkDeleteBtn()"></td>
         <td style="color:var(--text-muted);width:40px;">${idx + 1}</td>
         <td>${typeHtml}</td>
         <td>${locHtml}</td>
         <td>${detaliiContractHtml}</td>
         <td>${valabilHtml}</td>
         <td>${statusHtml}</td>
-        <td class="num" style="font-weight:700">${fmt(c.total_amount)} ${c.currency === 'EUR' ? '€' : c.currency}</td>
-        <td style="font-size:0.85em; max-width:200px; white-space:normal;">${(c.details || '')}</td>
+        <td class="num" style="font-weight:700">
+          ${fmt(c.total_amount)} ${c.currency === 'EUR' ? '€' : c.currency}
+          ${c.currency === 'EUR' ? `<br><span style="font-size:10px; color:var(--muted); font-weight:normal;">(${fmt(c.total_amount * EUR_RATE)} RON)</span>` : ''}
+        </td>
         <td style="text-align:center;">
-          <div style="display:flex; justify-content:center; gap:8px;">
+          <div style="display:flex; justify-content:flex-end; gap:8px;">
             ${(c.files && c.files.length > 0) ? `
             <button onclick="viewContractPdfs('${c.id}')" style="width:32px; height:32px; border-radius:50%; background:var(--red); border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; color:white; transition:0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'" title="Vezi PDF-uri (${c.files.length})">
               <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
@@ -11995,10 +12094,27 @@ window.renderContractsTable = function() {
   
   document.getElementById('kpi-contract-count').innerText = filteredContracts.length;
   document.getElementById('kpi-contract-lei').innerText = fmt(totalRon) + ' RON';
-  document.getElementById('kpi-contract-eur').innerText = fmt(totalEur) + ' €';
+  document.getElementById('kpi-contract-eur').innerHTML = `${fmt(totalEur)} €<br><span style="font-size:12px; color:var(--muted); font-weight:normal;">(${fmt(totalEur * EUR_RATE)} RON)</span><br><span style="font-size:10px; color:var(--muted); font-weight:normal;">Curs BNR: ${EUR_RATE.toFixed(4)}</span>`;
   
   tb.innerHTML = html;
   
+  // Render footer
+  const tfootHtml = `
+    <tr>
+      <td colspan="4" style="text-align:right; font-weight:700;">TOTAL:</td>
+      <td style="font-weight:700; color:var(--text);">${fmt(totalM2)} m²</td>
+      <td colspan="2"></td>
+      <td class="num" style="font-weight:700; color:var(--text);">
+        <span style="color:var(--muted); font-size:10px;">LEI:</span> ${fmt(totalRon)} RON<br>
+        <span style="color:var(--muted); font-size:10px;">EUR:</span> ${fmt(totalEur)} €<br>
+        <span style="color:var(--muted); font-size:10px; font-weight:normal;">(${fmt(totalEur * EUR_RATE)} RON)</span>
+      </td>
+      <td></td>
+    </tr>
+  `;
+  const tfootEl = document.getElementById('contracts-tfoot');
+  if (tfootEl) tfootEl.innerHTML = tfootHtml;
+
   const countEl = document.getElementById('contracts-record-count');
   if (countEl) countEl.innerText = `Total înregistrări: ${filteredContracts.length}`;
 }
@@ -12061,22 +12177,36 @@ window.bulkDeleteContracts = async function() {
 };
 
 window.exportContractsExcel = function() {
-  let csv = "Nr,Tip,Locatii,Valoare,Moneda,Start,End,Detalii\n";
+  const data = [['Nr', 'Tip Contract', 'Furnizor/Client', 'Locatii', 'Adresa', 'Valoare', 'Moneda', 'Start', 'End', 'Detalii']];
+  
   _contractsData.forEach((c, idx) => {
     let locs = (c.locations || []).map(l => {
       let lo = ((typeof filtersData !== 'undefined' && filtersData.locations) || []).find(x => x.id === l.location_id);
-      return lo ? lo.name : 'Unknown';
-    }).join(';');
-    csv += `${idx+1},"${c.type||''}","${locs}",${c.total_amount||0},"${c.currency||''}","${c.start_date||''}","${c.end_date||''}","${(c.details||'').replace(/"/g, '""')}"\\n`;
+      return lo ? lo.name : 'Neasignat';
+    }).join('; ');
+    
+    data.push([
+      idx + 1,
+      c.type || '',
+      c.owner_name || '',
+      locs,
+      c.address || '',
+      c.total_amount || 0,
+      c.currency || 'LEI',
+      c.start_date || '',
+      c.end_date || '',
+      c.details || ''
+    ]);
   });
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'contracte.csv';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  
+  if (typeof XLSX !== 'undefined') {
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Contracte");
+    XLSX.writeFile(wb, `Contracte_${new Date().toISOString().split('T')[0]}.xlsx`);
+  } else {
+    alert("Librăria pentru Excel nu s-a încărcat!");
+  }
 };
 
 window.openContractModal = function(id = null) {
@@ -12447,3 +12577,90 @@ window.deleteCurrentPdf = async function() {
   }
 }
 
+window.openSmartImportModal = function() {
+  const locSelect = document.getElementById('smart-import-location');
+  if (locSelect && typeof filtersData !== 'undefined' && filtersData.locations) {
+    locSelect.innerHTML = '<option value="">-- Selectează Locația --</option>';
+    filtersData.locations.forEach(l => {
+      const opt = document.createElement('option');
+      opt.value = l.id;
+      opt.text = l.name;
+      locSelect.appendChild(opt);
+    });
+  }
+  document.getElementById('smart-import-files').value = '';
+  document.getElementById('smart-import-file-label').innerText = 'Click sau trage fișierele aici (maxim 20)';
+  document.getElementById('smart-import-progress-container').style.display = 'none';
+  document.getElementById('smart-import-submit-btn').disabled = false;
+  document.getElementById('smart-import-modal').classList.add('show');
+};
+
+window.updateSmartImportFileCount = function(input) {
+  const label = document.getElementById('smart-import-file-label');
+  if (input.files && input.files.length > 0) {
+    label.innerText = `${input.files.length} fișiere selectate`;
+    label.style.color = 'var(--accent)';
+  } else {
+    label.innerText = 'Click sau trage fișierele aici (maxim 20)';
+    label.style.color = 'var(--text)';
+  }
+};
+
+window.uploadSmartContracts = async function() {
+  const locId = document.getElementById('smart-import-location').value;
+  if (!locId) {
+    if (typeof showAlert === 'function') showAlert('Te rog să selectezi o locație.');
+    else alert('Te rog să selectezi o locație.');
+    return;
+  }
+  
+  const filesInput = document.getElementById('smart-import-files');
+  if (!filesInput.files || filesInput.files.length === 0) {
+    if (typeof showAlert === 'function') showAlert('Selectează cel puțin un fișier PDF.');
+    else alert('Selectează cel puțin un fișier PDF.');
+    return;
+  }
+  
+  const files = Array.from(filesInput.files);
+  const total = files.length;
+  
+  document.getElementById('smart-import-submit-btn').disabled = true;
+  document.getElementById('smart-import-progress-container').style.display = 'block';
+  
+  let successCount = 0;
+  
+  for (let i = 0; i < total; i++) {
+    const file = files[i];
+    document.getElementById('smart-import-status-text').innerText = `Analizăm: ${file.name}...`;
+    document.getElementById('smart-import-counter').innerText = `${i+1}/${total}`;
+    document.getElementById('smart-import-progress-bar').style.width = `${((i)/total)*100}%`;
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('location_id', locId);
+    
+    try {
+      const res = await fetch(`${API_BASE}/api/contracts/smart-import`, {
+        method: 'POST',
+        headers: getAuthHeaders(true),
+        body: formData
+      });
+      if (res.ok) {
+        successCount++;
+      } else {
+        const err = await res.json();
+        console.error('Smart Import Error:', err);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+  
+  document.getElementById('smart-import-progress-bar').style.width = `100%`;
+  document.getElementById('smart-import-status-text').innerText = `Finalizat! Extrase cu succes: ${successCount} din ${total}`;
+  
+  setTimeout(() => {
+    document.getElementById('smart-import-modal').classList.remove('show');
+    loadContractsData(); // Refresh table
+  }, 2000);
+};
