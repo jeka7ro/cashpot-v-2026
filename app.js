@@ -12058,7 +12058,7 @@ window.renderContractsTable = function() {
     const mainFiles = (c.files || []).filter(f => !f.is_annex);
     const annexFiles = (c.files || []).filter(f => f.is_annex);
     
-    html += `
+    return `
       <tr>
         <td style="width:40px; text-align:center; position:sticky; left:0; z-index:1; background:var(--surface); border-right:1px solid var(--border);"><input type="checkbox" class="contract-chk" value="${c.id}" onchange="checkBulkDeleteBtn()"></td>
         <td style="color:var(--text-muted);width:40px;">${idx + 1}</td>
@@ -12096,7 +12096,7 @@ window.renderContractsTable = function() {
   document.getElementById('kpi-contract-lei').innerText = fmt(totalRon) + ' RON';
   document.getElementById('kpi-contract-eur').innerHTML = `${fmt(totalEur)} €<br><span style="font-size:12px; color:var(--muted); font-weight:normal;">(${fmt(totalEur * EUR_RATE)} RON)</span><br><span style="font-size:10px; color:var(--muted); font-weight:normal;">Curs BNR: ${EUR_RATE.toFixed(4)}</span>`;
   
-  tb.innerHTML = html;
+  renderTablePaginated('contracts');
   
   // Render footer
   const tfootHtml = `
