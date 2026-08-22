@@ -246,7 +246,7 @@ def filters():
     # Only return canonical (parent) locations — E.S. are merged
     canonical_ids = [lid for lid in [1,3,4,5,6,7] ]  # parent IDs + Depozit
     locs_raw = qry("""
-        SELECT DISTINCT l.id, COALESCE(l.display_code, l.code) AS name, l.city 
+        SELECT DISTINCT l.id, COALESCE(l.display_code, l.code) AS name, l.city, l.address 
         FROM locations l
         JOIN machines m ON m.location_id = l.id
         WHERE l.deleted_at IS NULL AND m.deleted_at IS NULL
@@ -1351,16 +1351,14 @@ def eur_rate():
     today = str(datetime.now().date())
     if _bnr_cache['date'] != today:
         try:
-            r = req_lib.get('https://www.bnr.ro/nbrfxrates.xml', timeout=5)
-            tree = ET.fromstring(r.content)
-            ns = {'ns': 'http://www.bnr.ro/xsd'}
-            for rate in tree.findall('.//ns:Rate', ns):
-                if rate.get('currency') == 'EUR':
-                    _bnr_cache['rate'] = float(rate.text)
-                    _bnr_cache['date'] = today
-                    break
-        except:
-            pass
+            r = req_lib.get('https://www.cursbnr.ro/', timeout=5)
+            import re
+            match = re.search(r'1 EURO = ([\d\.]+) Lei', r.text)
+            if match:
+                _bnr_cache['rate'] = float(match.group(1))
+                _bnr_cache['date'] = today
+        except Exception as e:
+            print("Failed to fetch BNR rate:", e)
     return jsonify(rate=_bnr_cache['rate'], date=_bnr_cache['date'])
 
 # ─── Serve frontend ──────────────────────────────────────────────────────────
@@ -1382,6 +1380,10 @@ def serve_css():
 @app.route('/app.js')
 def serve_app_js():
     return send_from_directory(BASE_DIR, 'app.js')
+
+@app.route('/onjn.js')
+def serve_onjn_js():
+    return send_from_directory(BASE_DIR, 'onjn.js')
 
 @app.route('/game_uuids.js')
 def serve_game_uuids_js():
@@ -4524,6 +4526,10 @@ def api_machine_details(serial):
         print(f"Error in /api/machine/{serial}/details: {e}")
         return jsonify({"error": str(e)}), 500
 
+# ================= ONJN MODULE =================
+import onjn_server
+onjn_server.register_routes(app, pg_qry)
+
 # ================= CONTRACTS MODULE =================
 
 @app.route('/api/contracts', methods=['GET'])
@@ -4561,6 +4567,108 @@ def get_contracts():
         res.append(r_dict)
         
     return jsonify(res)
+
+try:
+    from google import genai
+    from google.genai import types
+    gemini_client = genai.Client() if os.environ.get("GEMINI_API_KEY") else None
+except Exception as e:
+    gemini_client = None
+    print("Google GenAI not initialized:", e)
+
+@app.route('/api/contracts/smart-import', methods=['POST'])
+def smart_import_contract():
+    if not gemini_client:
+        return jsonify({"success": False, "error": "GEMINI_API_KEY lipseste. Seteaza variabila de mediu GEMINI_API_KEY (export GEMINI_API_KEY='...') si reporneste serverul."}), 500
+
+    if 'file' not in request.files:
+        return jsonify({"success": False, "error": "No file uploaded"}), 400
+
+    file = request.files['file']
+    location_id = request.form.get('location_id')
+    
+    if file.filename == '':
+        return jsonify({"success": False, "error": "No selected file"}), 400
+
+    import uuid
+    import json
+    temp_path = os.path.join('/tmp', f"smart_{uuid.uuid4()}_{file.filename}")
+    file.save(temp_path)
+
+    try:
+        gemini_file = gemini_client.files.upload(file=temp_path)
+        
+        schema = {
+            "type": "OBJECT",
+            "properties": {
+                "contract_number": {"type": "STRING", "description": "Numărul contractului sau numărul actului adițional (dacă există)"},
+                "type": {"type": "STRING", "description": "Tipul contractului (ex: Chirie Spațiu, Prestări Servicii, Utilități, Pază)"},
+                "owner_name": {"type": "STRING", "description": "Numele companiei (furnizorului) cu care s-a încheiat contractul"},
+                "start_date": {"type": "STRING", "description": "Data de început în format YYYY-MM-DD"},
+                "end_date": {"type": "STRING", "description": "Data de expirare în format YYYY-MM-DD (lasă gol dacă nu e specificată/clară)"},
+                "total_amount": {"type": "NUMBER", "description": "Suma totală lunară calculată. Dacă este tarif pe oră sau pe zi, calculează pentru 30 de zile. Dacă nu este stipulat sau este variabil, pune 0."},
+                "currency": {"type": "STRING", "description": "Valuta (ex: LEI, EUR)"},
+                "details": {"type": "STRING", "description": "Descriere scurtă a obiectului contractului"},
+                "address": {"type": "STRING", "description": "Adresa exactă a spațiului sau sediului care face obiectul contractului (ex: str. Unirii nr. 5, Craiova)"},
+                "m2": {"type": "NUMBER", "description": "Suprafața spațiului în metri pătrați (m²) dacă este specificată în contract (altfel pune 0 sau lasă gol)"},
+                "notice_period_months": {"type": "NUMBER", "description": "Perioada de preaviz în luni (ex: 3) dacă este specificată (altfel pune 0)"}
+            },
+            "required": ["type", "owner_name", "total_amount", "currency"]
+        }
+        
+        prompt = "Te rog să analizezi acest contract scanat și să extragi datele esențiale folosind strict structura JSON cerută. Extrage cu precizie adresa spațiului/locației contractate (pentru coloana address), perioada de preaviz, suprafața m2, numărul contractului, prețul total/lunar și numele furnizorului."
+        
+        response = gemini_client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=[gemini_file, prompt],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=schema,
+            ),
+        )
+        
+        extracted = json.loads(response.text)
+        
+        contract_id = str(uuid.uuid4())
+        c_type = extracted.get('type') or 'Altele'
+        owner = extracted.get('owner_name') or 'Necunoscut'
+        amount = extracted.get('total_amount') or 0
+        curr = extracted.get('currency') or 'LEI'
+        s_date = extracted.get('start_date') or datetime.now().strftime('%Y-%m-%d')
+        e_date = extracted.get('end_date') or None
+        c_num = extracted.get('contract_number') or ''
+        c_det = extracted.get('details') or ''
+        c_addr = extracted.get('address') or None
+        c_m2 = extracted.get('m2') or None
+        c_notice = extracted.get('notice_period_months') or None
+        
+        if len(s_date) != 10: s_date = datetime.now().strftime('%Y-%m-%d')
+        if e_date and len(e_date) != 10: e_date = None
+        
+        q = '''INSERT INTO cp2_contracts (id, type, currency, total_amount, start_date, end_date, contract_number, details, owner_name, address, m2, notice_period_months)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)'''
+        pg_qry(q, (contract_id, c_type, curr, amount, s_date, e_date, c_num, c_det, owner, c_addr, c_m2, c_notice))
+        
+        if location_id:
+            pg_qry('INSERT INTO cp2_contract_locations (contract_id, location_id, amount) VALUES (%s, %s, %s)', (contract_id, location_id, amount))
+            
+        os.makedirs('uploads/contracts', exist_ok=True)
+        file_id = str(uuid.uuid4())
+        filename = secure_filename(file.filename)
+        save_name = f"{file_id}_{filename}"
+        final_path = os.path.join('uploads', 'contracts', save_name)
+        os.rename(temp_path, final_path)
+        
+        pg_qry('''INSERT INTO cp2_contract_files (id, contract_id, is_annex, filename, filepath)
+                      VALUES (%s, %s, %s, %s, %s)''',
+                   (file_id, contract_id, False, file.filename, final_path))
+        
+        return jsonify({"success": True, "contract_id": contract_id, "data": extracted})
+        
+    except Exception as e:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/api/contracts', methods=['POST'])
 def create_contract():

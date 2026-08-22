@@ -27,3 +27,8 @@ cashpot2.db
 *.sqlite3
 .DS_Store
 node_modules/
+
+Craiova/*.pdf
+Craiova/**/*.pdf
+
+uploads/contracts/*.pdf
