@@ -287,8 +287,8 @@ const tableStates = {
 function renderTablePaginated(key) {
   const st = tableStates[key];
   if(!st) return;
-  const tbody = document.getElementById('body-' + key);
-  const pgWrap = document.getElementById('pg-' + key);
+  const tbody = document.getElementById(st.tbody || ('body-' + key));
+  const pgWrap = document.getElementById(st.pagination || ('pg-' + key));
   
   const dataRows = st.filteredRows || st.rows;
   
