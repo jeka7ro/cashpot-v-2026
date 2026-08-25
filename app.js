@@ -299,6 +299,9 @@ function renderTablePaginated(key) {
   }
   if (thead && !thead.dataset.sortAttached) {
     thead.querySelectorAll('th').forEach((th, idx) => {
+      if (th.hasAttribute('onclick') || th.querySelector('input, button, select, .no-sort')) {
+        return; // Skip generic sort for custom/interactive headers
+      }
       th.style.cursor = 'pointer';
       th.title = 'Click to sort';
       th.addEventListener('click', () => sortTable(key, idx, th));
@@ -455,9 +458,15 @@ window.sortTable = function(key, colIndex, th) {
   const tbody = document.getElementById('body-' + key);
   const thead = tbody && tbody.closest('table') ? tbody.closest('table').querySelector('thead') : null;
   if(thead) {
-    thead.querySelectorAll('th').forEach(t => t.textContent = t.textContent.replace(/ [▼▲]$/, ''));
+    thead.querySelectorAll('th').forEach(t => {
+      if (!t.querySelector('input, button, select, span')) {
+        t.textContent = t.textContent.replace(/ [▼▲]/g, '').replace(/[▼▲]/g, '');
+      }
+    });
   }
-  th.textContent += st.sortDir === 'desc' ? ' ▼' : ' ▲';
+  if (!th.querySelector('input, button, select, span')) {
+    th.textContent = th.textContent.replace(/ [▼▲]/g, '').replace(/[▼▲]/g, '') + (st.sortDir === 'desc' ? ' ▼' : ' ▲');
+  }
   
   st.page = 1;
   renderTablePaginated(key);
@@ -12014,13 +12023,13 @@ window.renderContractsTable = function() {
     // Format locations summary
     const locNames = (c.locations || []).map(l => {
       const locObj = ((typeof filtersData !== 'undefined' && filtersData.locations) || []).find(x => x.id === l.location_id);
-      const name = locObj ? locObj.name : 'Loc necunoscut';
+      const name = l.name || (locObj ? locObj.name : 'Loc necunoscut');
       const addr = c.address ? c.address : (locObj && locObj.address ? locObj.address : null);
       let html = (c.locations.length > 1) ? `<strong>${name}</strong> (${fmt(l.amount)})` : `<strong>${name}</strong>`;
       if (addr) html += `<br><span style="font-size:11px; color:var(--text)">${addr}</span>`;
       return html;
     });
-    const locSummary = locNames.length > 0 ? locNames.join('<br><br>') : '<span style="color:var(--text-muted)">Neasignat</span>';
+    const locSummary = locNames.length > 0 ? locNames.join('<br><br>') : (c.address ? `<strong>${c.address}</strong>` : '<span style="color:var(--text-muted)">Neasignat</span>');
     
     // Remaining time logic
     let remainingStr = '-';
@@ -12094,7 +12103,7 @@ window.renderContractsTable = function() {
   
   document.getElementById('kpi-contract-count').innerText = filteredContracts.length;
   document.getElementById('kpi-contract-lei').innerText = fmt(totalRon) + ' RON';
-  document.getElementById('kpi-contract-eur').innerHTML = `${fmt(totalEur)} €<br><span style="font-size:12px; color:var(--muted); font-weight:normal;">(${fmt(totalEur * EUR_RATE)} RON)</span><br><span style="font-size:10px; color:var(--muted); font-weight:normal;">Curs BNR: ${EUR_RATE.toFixed(4)}</span>`;
+  document.getElementById('kpi-contract-eur').innerHTML = `<div style="display:flex; align-items:baseline; gap:8px;">${fmt(totalEur)} € <span style="font-size:12px; color:var(--muted); font-weight:normal;">(${fmt(totalEur * EUR_RATE)} RON)</span></div><div style="font-size:10px; color:var(--muted); font-weight:normal; margin-top:2px;">Curs BNR: ${EUR_RATE.toFixed(4)}</div>`;
   
   renderTablePaginated('contracts');
   
@@ -12142,6 +12151,22 @@ window.populateContractFilters = function() {
     typeSel.innerHTML += `<option value="${t}">${t}</option>`;
   });
   
+  // Sync missing types to modal dropdown
+  const modalTypeSel = document.getElementById('contract-type');
+  if (modalTypeSel) {
+    uniqueTypes.forEach(t => {
+      let exists = false;
+      for (let i = 0; i < modalTypeSel.options.length; i++) {
+        if (modalTypeSel.options[i].value === t) {
+          exists = true; break;
+        }
+      }
+      if (!exists) {
+        modalTypeSel.add(new Option(t, t));
+      }
+    });
+  }
+  
   locSel.value = curLoc;
   typeSel.value = curType;
 };
@@ -12177,13 +12202,17 @@ window.bulkDeleteContracts = async function() {
 };
 
 window.exportContractsExcel = function() {
-  const data = [['Nr', 'Tip Contract', 'Furnizor/Client', 'Locatii', 'Adresa', 'Valoare', 'Moneda', 'Start', 'End', 'Detalii']];
+  const data = [['Nr', 'Tip Contract', 'Furnizor/Client', 'Locatii', 'Adresa', 'Valoare', 'Moneda', 'Start', 'End', 'Detalii', 'Link Fisiere']];
   
   _contractsData.forEach((c, idx) => {
     let locs = (c.locations || []).map(l => {
       let lo = ((typeof filtersData !== 'undefined' && filtersData.locations) || []).find(x => x.id === l.location_id);
       return lo ? lo.name : 'Neasignat';
     }).join('; ');
+    
+    let fileLinks = (c.files || []).map(f => {
+      return window.location.origin + '/api/contracts/files/' + f.id + '/download';
+    }).join('\n');
     
     data.push([
       idx + 1,
@@ -12195,7 +12224,8 @@ window.exportContractsExcel = function() {
       c.currency || 'LEI',
       c.start_date || '',
       c.end_date || '',
-      c.details || ''
+      c.details || '',
+      fileLinks
     ]);
   });
   
@@ -12237,6 +12267,15 @@ window.openContractModal = function(id = null) {
   ((typeof filtersData !== 'undefined' && filtersData.locations) || []).forEach(loc => {
     locHtml += `<option value="${loc.id}">${loc.name}</option>`;
   });
+  
+  // Sync custom manual locations (contracts with address but no location_id)
+  if (typeof _contractsData !== 'undefined') {
+    const uniqueAddresses = [...new Set(_contractsData.map(c => (!c.locations || c.locations.length === 0) ? c.address : null).filter(Boolean))];
+    uniqueAddresses.forEach(addr => {
+      locHtml += `<option value="MANUAL_${addr}">${addr}</option>`;
+    });
+  }
+  
   locSelect.innerHTML = locHtml;
   
   if (id) {
@@ -12312,10 +12351,15 @@ window.saveContract = async function() {
   
   const locVal = document.getElementById('contract-location').value;
   if (locVal) {
-    payload.locations.push({
-      location_id: locVal,
-      amount: parseFloat(payload.total_amount) || 0
-    });
+    if (locVal.startsWith('MANUAL_')) {
+      // User added a manual location string; put it in the address field
+      payload.address = locVal.replace('MANUAL_', '');
+    } else {
+      payload.locations.push({
+        location_id: locVal,
+        amount: parseFloat(payload.total_amount) || 0
+      });
+    }
   }
   
   try {

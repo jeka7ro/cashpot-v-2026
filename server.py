@@ -4552,10 +4552,17 @@ def get_contracts():
         ORDER BY c.created_at DESC
     """)
     
+    # Fetch all locations from SQLite to map names
+    all_locs = qry("SELECT id, display_code, code FROM locations")
+    loc_map = {l['id']: l.get('display_code') or l.get('code') for l in all_locs}
+    
     # Format dates to string
     res = []
     for r in contracts_raw:
         r_dict = dict(r)
+        if 'locations' in r_dict and isinstance(r_dict['locations'], list):
+            for loc in r_dict['locations']:
+                loc['name'] = loc_map.get(loc['location_id'], 'Loc necunoscut')
         if r_dict.get('start_date'):
             r_dict['start_date'] = str(r_dict['start_date'])
         if r_dict.get('end_date'):

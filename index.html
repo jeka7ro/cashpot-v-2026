@@ -2719,18 +2719,18 @@
     <!-- VIEW: CONTRACTE -->
     <div id="view-contracte" class="view-panel" style="padding:24px;">
       <!-- KPI CONTRACTE -->
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:16px; margin-bottom:24px;">
-        <div class="kpi-card" style="padding:16px; background:var(--surface); border:1px solid var(--border); border-radius:12px;">
-          <div style="font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Număr Contracte</div>
-          <div id="kpi-contract-count" style="font-size:24px; font-weight:800; color:var(--text);">0</div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-bottom:16px;">
+        <div class="kpi-card" style="padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:8px; display:flex; flex-direction:column; justify-content:center;">
+          <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Număr Contracte</div>
+          <div id="kpi-contract-count" style="font-size:20px; font-weight:800; color:var(--text); line-height:1.2;">0</div>
         </div>
-        <div class="kpi-card" style="padding:16px; background:var(--surface); border:1px solid var(--border); border-radius:12px; border-left:4px solid var(--accent);">
-          <div style="font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Total Valoare (LEI)</div>
-          <div id="kpi-contract-lei" style="font-size:24px; font-weight:800; color:var(--text);">0 RON</div>
+        <div class="kpi-card" style="padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:8px; border-left:4px solid var(--accent); display:flex; flex-direction:column; justify-content:center;">
+          <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Total Valoare (LEI)</div>
+          <div id="kpi-contract-lei" style="font-size:20px; font-weight:800; color:var(--text); line-height:1.2;">0 RON</div>
         </div>
-        <div class="kpi-card" style="padding:16px; background:var(--surface); border:1px solid var(--border); border-radius:12px; border-left:4px solid var(--accent);">
-          <div style="font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px;">Total Valoare (EUR)</div>
-          <div id="kpi-contract-eur" style="font-size:24px; font-weight:800; color:var(--text);">0 &euro;</div>
+        <div class="kpi-card" style="padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:8px; border-left:4px solid var(--accent); display:flex; flex-direction:column; justify-content:center;">
+          <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Total Valoare (EUR)</div>
+          <div id="kpi-contract-eur" style="font-size:20px; font-weight:800; color:var(--text); line-height:1.2;">0 &euro;</div>
         </div>
       </div>
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
@@ -3325,7 +3325,7 @@
 </div>
 
 <script src="game_uuids.js?v=1"></script>
-<script src="app.js?v=20260821_v69"></script>
+<script src="app.js?v=4"></script>
 <script src="onjn.js?v=4"></script>
 <!-- CUSTOM PROMPT MODAL -->
 <div class="settings-modal" id="modal-custom-prompt" style="z-index: 99999;" onclick="if(event.target===this) { if(window.customPromptCancel) window.customPromptCancel(); }">
@@ -3456,7 +3456,7 @@
 
 
   <!-- MODAL CONTRACT -->
-  <div class="settings-modal" id="contract-modal" onclick="if(event.target===this) this.classList.remove('show')">
+  <div class="settings-modal" id="contract-modal">
     <div class="settings-panel glass-panel" style="width:700px; max-width:90%;">
       <div class="settings-header">
         <div class="settings-title" id="contract-modal-title">Adaugă Contract</div>
@@ -3494,7 +3494,7 @@
                 <button type="button" id="btn-add-contract-type" onclick="document.getElementById('new-contract-type-container').style.display='flex'; this.style.display='none';" style="padding:0 14px; border-radius:8px; background:var(--accent); color:white; border:none; cursor:pointer; font-weight:bold; font-size:18px;" title="Adaugă tip de contract nou">+</button>
                 <div id="new-contract-type-container" style="display:none; gap:8px;">
                   <input type="text" id="new-contract-type-input" class="glass-input" style="flex:1; padding: 4px 8px; min-width: 120px;" placeholder="Tip nou...">
-                  <button type="button" onclick="const t=document.getElementById('new-contract-type-input').value; if(t && t.trim()){ const s = document.getElementById('contract-type'); const o = document.createElement('option'); o.value = t.trim(); o.text = t.trim(); s.add(o); s.value = t.trim(); } document.getElementById('new-contract-type-container').style.display='none'; document.getElementById('btn-add-contract-type').style.display='block'; document.getElementById('new-contract-type-input').value='';" style="padding:0 14px; border-radius:8px; background:var(--success); color:white; border:none; cursor:pointer; font-weight:bold; font-size:14px;">✔</button>
+                  <button type="button" onclick="const t=document.getElementById('new-contract-type-input').value; if(t && t.trim()){ const s = document.getElementById('contract-type'); const o = document.createElement('option'); o.value = t.trim(); o.text = t.trim(); s.add(o); s.value = t.trim(); } document.getElementById('new-contract-type-container').style.display='none'; document.getElementById('btn-add-contract-type').style.display='block'; document.getElementById('new-contract-type-input').value='';" style="padding:0 14px; border-radius:8px; background:#10b981; color:white; border:none; cursor:pointer; font-weight:bold; font-size:14px;">✔</button>
                   <button type="button" onclick="document.getElementById('new-contract-type-container').style.display='none'; document.getElementById('btn-add-contract-type').style.display='block'; document.getElementById('new-contract-type-input').value='';" style="padding:0 14px; border-radius:8px; background:#ef4444; color:white; border:none; cursor:pointer; font-weight:bold; font-size:14px;">✖</button>
                 </div>
               </div>
@@ -3516,10 +3516,18 @@
             </div>
             <div>
               <label style="display:block; margin-bottom:8px; font-size:12px; color:var(--muted);">Locație (Opțional)</label>
-              <select id="contract-location" class="glass-input" style="width:100%;">
-                <option value="">-- Fără locație specifică --</option>
-                <!-- Generated via JS -->
-              </select>
+              <div style="display:flex; gap:8px;">
+                <select id="contract-location" class="glass-input" style="width:100%;">
+                  <option value="">-- Fără locație specifică --</option>
+                  <!-- Generated via JS -->
+                </select>
+                <button type="button" id="btn-add-contract-location" onclick="document.getElementById('new-contract-location-container').style.display='flex'; this.style.display='none';" style="padding:0 14px; border-radius:8px; background:var(--accent); color:white; border:none; cursor:pointer; font-weight:bold; font-size:18px;" title="Adaugă locație manuală">+</button>
+                <div id="new-contract-location-container" style="display:none; gap:8px;">
+                  <input type="text" id="new-contract-location-input" class="glass-input" style="flex:1; padding: 4px 8px; min-width: 120px;" placeholder="Locație nouă...">
+                  <button type="button" onclick="const t=document.getElementById('new-contract-location-input').value; if(t && t.trim()){ const s = document.getElementById('contract-location'); const o = document.createElement('option'); o.value = 'MANUAL_' + t.trim(); o.text = t.trim(); s.add(o); s.value = 'MANUAL_' + t.trim(); } document.getElementById('new-contract-location-container').style.display='none'; document.getElementById('btn-add-contract-location').style.display='block'; document.getElementById('new-contract-location-input').value='';" style="padding:0 14px; border-radius:8px; background:#10b981; color:white; border:none; cursor:pointer; font-weight:bold; font-size:14px;">✔</button>
+                  <button type="button" onclick="document.getElementById('new-contract-location-container').style.display='none'; document.getElementById('btn-add-contract-location').style.display='block'; document.getElementById('new-contract-location-input').value='';" style="padding:0 14px; border-radius:8px; background:#ef4444; color:white; border:none; cursor:pointer; font-weight:bold; font-size:14px;">✖</button>
+                </div>
+              </div>
             </div>
             <div>
               <label style="display:block; margin-bottom:8px; font-size:12px; color:var(--muted);">Valoare Totală *</label>
