@@ -276,7 +276,7 @@ async function fetchAndRenderSecondary(locId, dateFilter) {
             tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: (p) => `${p[0].name}<br/>GGR: ${Math.round(p[0].value).toLocaleString('ro-RO')} RON` },
             grid: { left: '3%', right: '4%', bottom: '3%', top: '5%', containLabel: true },
             xAxis: { type: 'value', axisLabel: { color: colors.textColor } },
-            yAxis: { type: 'category', data: top10.map(l => l.location), axisLabel: { color: colors.textColor, width: 100, overflow: 'truncate' } },
+            yAxis: { type: 'category', data: top10.map(l => l.locatie || l.location), axisLabel: { color: colors.textColor, width: 100, overflow: 'truncate' } },
             series: [{ type: 'bar', data: top10.map(l => l.ggr), itemStyle: { color: '#10b981', borderRadius: [0, 4, 4, 0] } }]
         }, true);
 
@@ -285,7 +285,7 @@ async function fetchAndRenderSecondary(locId, dateFilter) {
             tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: (p) => `${p[0].name}<br/>GGR: ${Math.round(p[0].value).toLocaleString('ro-RO')} RON` },
             grid: { left: '3%', right: '4%', bottom: '3%', top: '5%', containLabel: true },
             xAxis: { type: 'value', axisLabel: { color: colors.textColor } },
-            yAxis: { type: 'category', data: bot10.map(l => l.location), axisLabel: { color: colors.textColor, width: 100, overflow: 'truncate' } },
+            yAxis: { type: 'category', data: bot10.map(l => l.locatie || l.location), axisLabel: { color: colors.textColor, width: 100, overflow: 'truncate' } },
             series: [{ type: 'bar', data: bot10.map(l => l.ggr), itemStyle: { color: '#ef4444', borderRadius: [0, 4, 4, 0] } }]
         }, true);
     }
@@ -295,14 +295,14 @@ async function fetchAndRenderSecondary(locId, dateFilter) {
         let scatterData = locsData.filter(l => l.ggr !== null && l.location).map(l => {
             let exp = 0;
             if (expData) {
-                let normL = l.location.toLowerCase();
+                let normL = (l.locatie || l.location || '').toLowerCase();
                 expData.forEach(e => {
                     if (!e.is_hidden && e.location_name && e.location_name.toLowerCase() === normL) {
                         exp += parseFloat(e.amount) || 0;
                     }
                 });
             }
-            return [exp, l.ggr, l.total_in, l.location]; // x, y, size, name
+            return [exp, l.ggr, l.total_in, l.locatie || l.location]; // x, y, size, name
         });
         
         if (!echartsInstances['scatter-loc']) echartsInstances['scatter-loc'] = echarts.init(document.getElementById('echart-scatter-loc'));
@@ -343,8 +343,8 @@ async function fetchAndRenderSecondary(locId, dateFilter) {
 
     // --- 6. CALENDAR HEATMAP ---
     if (document.getElementById('echart-cal') && trendData) {
-        let calData = trendData.map(t => [t.date, Math.round(t.ggr)]);
-        let year = trendData.length ? trendData[0].date.substring(0,4) : new Date().getFullYear();
+        let calData = trendData.map(t => [t.date || t.zi, Math.round(t.ggr)]);
+        let year = trendData.length ? (trendData[0].date || trendData[0].zi || String(new Date().getFullYear())).substring(0,4) : new Date().getFullYear();
         if (!echartsInstances['cal']) echartsInstances['cal'] = echarts.init(document.getElementById('echart-cal'));
         echartsInstances['cal'].setOption({
             tooltip: { position: 'top', formatter: (p) => `${p.value[0]}: ${p.value[1].toLocaleString('ro-RO')} RON` },
@@ -386,7 +386,7 @@ async function fetchAndRenderSecondary(locId, dateFilter) {
         let daysGGR = Array(7).fill(0);
         let daysCount = Array(7).fill(0);
         trendData.forEach(t => {
-            let day = (new Date(t.date).getDay() + 6) % 7;
+            let day = (new Date(t.date || t.zi).getDay() + 6) % 7;
             daysGGR[day] += parseFloat(t.ggr) || 0;
             daysCount[day]++;
         });
@@ -408,15 +408,15 @@ async function fetchAndRenderSecondary(locId, dateFilter) {
 
     // --- 9. RTP VS HOLD ---
     if (document.getElementById('echart-rtp') && trendData) {
-        let rtpData = trendData.map(t => [t.date, t.total_in ? Math.round((t.total_out / t.total_in)*1000)/10 : 0]);
-        let holdData = trendData.map(t => [t.date, t.total_in ? Math.round((t.ggr / t.total_in)*1000)/10 : 0]);
+        let rtpData = trendData.map(t => [t.date || t.zi, t.total_in ? Math.round((t.total_out / t.total_in)*1000)/10 : 0]);
+        let holdData = trendData.map(t => [t.date || t.zi, t.total_in ? Math.round((t.ggr / t.total_in)*1000)/10 : 0]);
         
         if (!echartsInstances['rtp']) echartsInstances['rtp'] = echarts.init(document.getElementById('echart-rtp'));
         echartsInstances['rtp'].setOption({
             tooltip: { trigger: 'axis' },
             grid: { left: '3%', right: '4%', bottom: '5%', top: '15%', containLabel: true },
             legend: { data: ['RTP %', 'Hold %'], textStyle: { color: colors.textColor } },
-            xAxis: { type: 'category', data: trendData.map(t=>t.date.substring(5)), axisLabel: { color: colors.textColor } },
+            xAxis: { type: 'category', data: trendData.map(t=>(t.date || t.zi || '').substring(5)), axisLabel: { color: colors.textColor } },
             yAxis: { type: 'value', axisLabel: { color: colors.textColor, formatter: '{value}%' }, splitLine: { lineStyle: { color: colors.splitLineColor } } },
             series: [
                 { name: 'RTP %', type: 'line', smooth: true, data: rtpData.map(d=>d[1]), itemStyle: { color: '#ef4444' } },
@@ -427,7 +427,7 @@ async function fetchAndRenderSecondary(locId, dateFilter) {
 
     // --- 10. IMPACT JACKPOTS ---
     if (document.getElementById('echart-jackpot') && trendData) {
-        let dates = trendData.map(t => t.date.substring(5));
+        let dates = trendData.map(t => (t.date || t.zi || '').substring(5));
         let ggrSeries = trendData.map(t => Math.round(t.ggr));
         let jpSeries = trendData.map(t => Math.round(t.jackpot || 0));
         let taxSeries = trendData.map(t => Math.round((t.ggr || 0) * 0.1)); // Approximation if no taxes API
