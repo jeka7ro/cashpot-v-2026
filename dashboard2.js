@@ -231,7 +231,12 @@ async function fetchAndRenderSecondary(locId, dateFilter) {
                 }
             },
             grid: { left: '3%', right: '4%', bottom: '3%', top: '15%', containLabel: true },
-            xAxis: { type: 'category', splitLine: { show: false }, data: ['Total IN', 'Marketing/JP', 'Cheltuieli', 'Taxe', 'Profit Net'], axisLabel: { color: colors.textColor } },
+            xAxis: { 
+                type: 'category', 
+                splitLine: { show: false }, 
+                data: ['Total IN', 'Marketing/JP', 'Cheltuieli', 'Taxe', 'Profit Net'], 
+                axisLabel: { color: colors.textColor, interval: 0, fontSize: 11, width: 80, overflow: 'break' } 
+            },
             yAxis: { type: 'value', axisLabel: { color: colors.textColor, formatter: (val) => Math.round(val).toLocaleString('ro-RO') }, splitLine: { lineStyle: { color: colors.splitLineColor, type: 'dashed' } } },
             series: [
                 {
@@ -333,10 +338,12 @@ async function fetchAndRenderSecondary(locId, dateFilter) {
         expDepChart.setOption({
             tooltip: { trigger: 'item', backgroundColor: 'rgba(15,15,26,0.9)', textStyle: { color: '#fff' }, borderColor: '#f97316', formatter: (p) => `${p.name}: ${Math.round(p.value).toLocaleString('ro-RO')} RON (${p.percent}%)` },
             color: colors.colorPalette,
+            legend: { type: 'scroll', orient: 'vertical', right: '5%', top: 'middle', textStyle: { color: colors.textColor, fontSize: 11 } },
             series: [{
-                name: 'Cheltuieli Dep', type: 'pie', radius: ['40%', '70%'], avoidLabelOverlap: true,
+                name: 'Cheltuieli Dep', type: 'pie', radius: ['40%', '75%'], center: ['35%', '50%'], avoidLabelOverlap: false,
                 itemStyle: { borderRadius: 6, borderColor: colors.isDark ? '#0f0f1a' : '#fff', borderWidth: 2 },
-                label: { show: true, formatter: (p) => `${p.name}\n${Math.round(p.value).toLocaleString('ro-RO')} RON`, color: colors.textColor },
+                label: { show: false },
+                labelLine: { show: false },
                 data: depChartData, animationType: 'scale', animationEasing: 'elasticOut'
             }]
         }, true);
@@ -360,10 +367,12 @@ async function fetchAndRenderSecondary(locId, dateFilter) {
         expLocChart.setOption({
             tooltip: { trigger: 'item', backgroundColor: 'rgba(15,15,26,0.9)', textStyle: { color: '#fff' }, borderColor: '#3b82f6', formatter: (p) => `${p.name}: ${Math.round(p.value).toLocaleString('ro-RO')} RON (${p.percent}%)` },
             color: colors.colorPalette.slice(2).concat(colors.colorPalette.slice(0,2)),
+            legend: { type: 'scroll', orient: 'vertical', right: '5%', top: 'middle', textStyle: { color: colors.textColor, fontSize: 11 } },
             series: [{
-                name: 'Cheltuieli Loc', type: 'pie', radius: ['40%', '70%'], avoidLabelOverlap: true,
+                name: 'Cheltuieli Loc', type: 'pie', radius: ['40%', '75%'], center: ['35%', '50%'], avoidLabelOverlap: false,
                 itemStyle: { borderRadius: 6, borderColor: colors.isDark ? '#0f0f1a' : '#fff', borderWidth: 2 },
-                label: { show: true, formatter: (p) => `${p.name}\n${Math.round(p.value).toLocaleString('ro-RO')} RON`, color: colors.textColor },
+                label: { show: false },
+                labelLine: { show: false },
                 data: locChartData, animationType: 'scale', animationEasing: 'elasticOut'
             }]
         }, true);
