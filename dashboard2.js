@@ -149,8 +149,8 @@ async function fetchAndRenderSecondary(locId, dateFilter, targetChartId = null) 
     ]);
 
     // --- 2. COMBO CHART ---
-    const dom_echart_combo = document.getElementById('echart-combo');
-    if (dom_echart_combo && (!window.chartDateOverrides['echart-combo'] || targetChartId === 'echart-combo')) {
+    const domCombo = document.getElementById('echart-combo');
+    if (domCombo && (!window.chartDateOverrides['echart-combo'] || targetChartId === 'echart-combo')) {
         if (!echartsInstances['combo']) echartsInstances['combo'] = echarts.init(domCombo);
         const comboChart = echartsInstances['combo'];
         
@@ -209,8 +209,8 @@ async function fetchAndRenderSecondary(locId, dateFilter, targetChartId = null) 
     }
 
     // --- 3. WATERFALL CHART ---
-    const dom_echart_waterfall = document.getElementById('echart-waterfall');
-    if (dom_echart_waterfall && (!window.chartDateOverrides['echart-waterfall'] || targetChartId === 'echart-waterfall')) {
+    const domWaterfall = document.getElementById('echart-waterfall');
+    if (domWaterfall && (!window.chartDateOverrides['echart-waterfall'] || targetChartId === 'echart-waterfall')) {
         if (!echartsInstances['waterfall']) echartsInstances['waterfall'] = echarts.init(domWaterfall);
         const waterfallChart = echartsInstances['waterfall'];
 
@@ -452,8 +452,8 @@ async function fetchAndRenderSecondary(locId, dateFilter, targetChartId = null) 
 
 
     // --- 4. TIMELINE CHART ---
-    const dom_echart_timeline = document.getElementById('echart-timeline');
-    if (dom_echart_timeline && (!window.chartDateOverrides['echart-timeline'] || targetChartId === 'echart-timeline')) {
+    const domTimeline = document.getElementById('echart-timeline');
+    if (domTimeline && (!window.chartDateOverrides['echart-timeline'] || targetChartId === 'echart-timeline')) {
         if (!echartsInstances['timeline']) echartsInstances['timeline'] = echarts.init(domTimeline);
         const timelineChart = echartsInstances['timeline'];
 
