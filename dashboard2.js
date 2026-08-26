@@ -6,7 +6,7 @@ let currentDonutLevel = 1;
 let currentLevel1Data = []; // stocăm pentru reset
 
 function getCommonColors() {
-    const isDark = document.body.classList.contains('dark') || getComputedStyle(document.body).getPropertyValue('--bg').trim() === '#0f0f1a';
+    const isDark = !document.body.classList.contains('light-mode');
     return {
         textColor: isDark ? '#e2e8f0' : '#1e293b',
         splitLineColor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
