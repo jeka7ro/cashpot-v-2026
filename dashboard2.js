@@ -265,139 +265,6 @@ async function fetchAndRenderSecondary(locId, dateFilter) {
         }, true);
     }
 
-    // --- 4. TIMELINE CHART ---
-    const domTimeline = document.getElementById('echart-timeline');
-    if (domTimeline) {
-        if (!echartsInstances['timeline']) echartsInstances['timeline'] = echarts.init(domTimeline);
-        const timelineChart = echartsInstances['timeline'];
-
-        const tlDates = (timelineData || []).map(r => r.date || r.zi || '');
-        const tlGGR = (timelineData || []).map(r => Math.round(r.ggr || 0));
-
-        let tlTitle = `Evoluție GGR (90 Zile) ${s90} - ${eFilter}`;
-        if (locId) {
-            const activeLoc = currentLevel1Data.find(l => l.loc_id == locId);
-            if (activeLoc) tlTitle += ` - ${activeLoc.name}`;
-        }
-
-        timelineChart.setOption({
-            tooltip: { 
-                trigger: 'axis', position: function (pt) { return [pt[0], '10%']; }, backgroundColor: 'rgba(15,15,26,0.9)', textStyle: { color: '#fff' }, borderColor: 'rgba(255,255,255,0.2)',
-                formatter: function(params) {
-                    let p = params[0];
-                    return p.name + '<br/>' + p.marker + ' ' + p.seriesName + ': ' + Math.round(p.value).toLocaleString('ro-RO') + ' RON';
-                }
-            },
-            title: { left: 'center', text: tlTitle, textStyle: { color: colors.textColor, fontSize: 13 } },
-            grid: { left: '5%', right: '5%', bottom: '20%', top: '20%', containLabel: true },
-            xAxis: { type: 'category', boundaryGap: false, data: tlDates, axisLabel: { color: colors.textColor } },
-            yAxis: { type: 'value', boundaryGap: [0, '100%'], axisLabel: { color: colors.textColor, formatter: (val) => Math.round(val).toLocaleString('ro-RO') }, splitLine: { lineStyle: { color: colors.splitLineColor, type: 'dashed' } } },
-            dataZoom: [
-                { type: 'inside', start: 50, end: 100 },
-                { start: 50, end: 100, textStyle: { color: colors.textColor }, borderColor: colors.splitLineColor, fillerColor: 'rgba(234, 179, 8, 0.2)' }
-            ],
-            series: [
-                {
-                    name: 'GGR', type: 'line', symbol: 'none', sampling: 'lttb', itemStyle: { color: '#eab308' },
-                    areaStyle: {
-                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                            { offset: 0, color: 'rgba(234,179,8,0.8)' },
-                            { offset: 1, color: 'rgba(234,179,8,0)' }
-                        ])
-                    },
-                    data: tlGGR
-                }
-            ]
-        }, true);
-
-        // Click pe timeline filtreaza dupa data (la fel ca la combo)
-        timelineChart.off('click');
-        timelineChart.on('click', function(params) {
-            const clickedDate = params.name;
-            if (currentDate === clickedDate) {
-                currentDate = null;
-            } else {
-                currentDate = clickedDate;
-            }
-            fetchAndRenderDonut(currentDate);
-            fetchAndRenderSecondary(currentLocId, currentDate);
-        });
-    }
-
-    // --- 5. EXPENSES BY DEPARTMENT ---
-    const domExpDep = document.getElementById('echart-exp-dep');
-    if (domExpDep) {
-        if (!echartsInstances['exp-dep']) echartsInstances['exp-dep'] = echarts.init(domExpDep);
-        const expDepChart = echartsInstances['exp-dep'];
-
-        const depMap = {};
-        (expData || []).forEach(r => {
-            if (!r.is_hidden) {
-                const d = r.department_name || 'Necunoscut';
-                depMap[d] = (depMap[d] || 0) + (parseFloat(r.amount) || 0);
-            }
-        });
-        const depChartData = Object.keys(depMap).map(k => ({ name: k, value: Math.round(depMap[k]) })).sort((a,b) => b.value - a.value).slice(0, 15);
-
-        expDepChart.setOption({
-            tooltip: { trigger: 'item', backgroundColor: 'rgba(15,15,26,0.9)', textStyle: { color: '#fff' }, borderColor: '#f97316', formatter: (p) => `${p.name}: ${Math.round(p.value).toLocaleString('ro-RO')} RON (${p.percent}%)` },
-            color: colors.colorPalette,
-            legend: { 
-                type: 'scroll', orient: 'vertical', right: '5%', top: 'middle', textStyle: { color: colors.textColor, fontSize: 11 },
-                formatter: function(name) {
-                    let val = 0;
-                    depChartData.forEach(d => { if (d.name === name) val = d.value; });
-                    return name + '  ' + Math.round(val).toLocaleString('ro-RO') + ' RON';
-                }
-            },
-            series: [{
-                name: 'Cheltuieli Dep', type: 'pie', radius: ['40%', '75%'], center: ['35%', '50%'], avoidLabelOverlap: false,
-                itemStyle: { borderRadius: 6, borderColor: colors.isDark ? '#0f0f1a' : '#fff', borderWidth: 2 },
-                label: { show: false },
-                labelLine: { show: false },
-                data: depChartData, animationType: 'scale', animationEasing: 'elasticOut'
-            }]
-        }, true);
-    }
-
-    // --- 6. EXPENSES BY LOCATION ---
-    const domExpLoc = document.getElementById('echart-exp-loc');
-    if (domExpLoc) {
-        if (!echartsInstances['exp-loc']) echartsInstances['exp-loc'] = echarts.init(domExpLoc);
-        const expLocChart = echartsInstances['exp-loc'];
-
-        const locMap = {};
-        (expData || []).forEach(r => {
-            if (!r.is_hidden) {
-                const l = r.location_name || 'Central / Necunoscut';
-                locMap[l] = (locMap[l] || 0) + (parseFloat(r.amount) || 0);
-            }
-        });
-        const locChartData = Object.keys(locMap).map(k => ({ name: k, value: Math.round(locMap[k]) })).sort((a,b) => b.value - a.value).slice(0, 15);
-
-        expLocChart.setOption({
-            tooltip: { trigger: 'item', backgroundColor: 'rgba(15,15,26,0.9)', textStyle: { color: '#fff' }, borderColor: '#3b82f6', formatter: (p) => `${p.name}: ${Math.round(p.value).toLocaleString('ro-RO')} RON (${p.percent}%)` },
-            color: colors.colorPalette.slice(2).concat(colors.colorPalette.slice(0,2)),
-            legend: { 
-                type: 'scroll', orient: 'vertical', right: '5%', top: 'middle', textStyle: { color: colors.textColor, fontSize: 11 },
-                formatter: function(name) {
-                    let val = 0;
-                    locChartData.forEach(d => { if (d.name === name) val = d.value; });
-                    return name + '  ' + Math.round(val).toLocaleString('ro-RO') + ' RON';
-                }
-            },
-            series: [{
-                name: 'Cheltuieli Loc', type: 'pie', radius: ['40%', '75%'], center: ['35%', '50%'], avoidLabelOverlap: false,
-                itemStyle: { borderRadius: 6, borderColor: colors.isDark ? '#0f0f1a' : '#fff', borderWidth: 2 },
-                label: { show: false },
-                labelLine: { show: false },
-                data: locChartData, animationType: 'scale', animationEasing: 'elasticOut'
-            }]
-        }, true);
-    }
-}
-
-
     // --- 1. TOP & BOTTOM SĂLI ---
     if (document.getElementById('echart-top-loc') && locsData) {
         let locsSorted = [...locsData].filter(l => l.ggr !== null).sort((a,b) => b.ggr - a.ggr);
@@ -579,6 +446,140 @@ async function fetchAndRenderSecondary(locId, dateFilter) {
             ]
         }, true);
     }
+
+
+
+    // --- 4. TIMELINE CHART ---
+    const domTimeline = document.getElementById('echart-timeline');
+    if (domTimeline) {
+        if (!echartsInstances['timeline']) echartsInstances['timeline'] = echarts.init(domTimeline);
+        const timelineChart = echartsInstances['timeline'];
+
+        const tlDates = (timelineData || []).map(r => r.date || r.zi || '');
+        const tlGGR = (timelineData || []).map(r => Math.round(r.ggr || 0));
+
+        let tlTitle = `Evoluție GGR (90 Zile) ${s90} - ${eFilter}`;
+        if (locId) {
+            const activeLoc = currentLevel1Data.find(l => l.loc_id == locId);
+            if (activeLoc) tlTitle += ` - ${activeLoc.name}`;
+        }
+
+        timelineChart.setOption({
+            tooltip: { 
+                trigger: 'axis', position: function (pt) { return [pt[0], '10%']; }, backgroundColor: 'rgba(15,15,26,0.9)', textStyle: { color: '#fff' }, borderColor: 'rgba(255,255,255,0.2)',
+                formatter: function(params) {
+                    let p = params[0];
+                    return p.name + '<br/>' + p.marker + ' ' + p.seriesName + ': ' + Math.round(p.value).toLocaleString('ro-RO') + ' RON';
+                }
+            },
+            title: { left: 'center', text: tlTitle, textStyle: { color: colors.textColor, fontSize: 13 } },
+            grid: { left: '5%', right: '5%', bottom: '20%', top: '20%', containLabel: true },
+            xAxis: { type: 'category', boundaryGap: false, data: tlDates, axisLabel: { color: colors.textColor } },
+            yAxis: { type: 'value', boundaryGap: [0, '100%'], axisLabel: { color: colors.textColor, formatter: (val) => Math.round(val).toLocaleString('ro-RO') }, splitLine: { lineStyle: { color: colors.splitLineColor, type: 'dashed' } } },
+            dataZoom: [
+                { type: 'inside', start: 50, end: 100 },
+                { start: 50, end: 100, textStyle: { color: colors.textColor }, borderColor: colors.splitLineColor, fillerColor: 'rgba(234, 179, 8, 0.2)' }
+            ],
+            series: [
+                {
+                    name: 'GGR', type: 'line', symbol: 'none', sampling: 'lttb', itemStyle: { color: '#eab308' },
+                    areaStyle: {
+                        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                            { offset: 0, color: 'rgba(234,179,8,0.8)' },
+                            { offset: 1, color: 'rgba(234,179,8,0)' }
+                        ])
+                    },
+                    data: tlGGR
+                }
+            ]
+        }, true);
+
+        // Click pe timeline filtreaza dupa data (la fel ca la combo)
+        timelineChart.off('click');
+        timelineChart.on('click', function(params) {
+            const clickedDate = params.name;
+            if (currentDate === clickedDate) {
+                currentDate = null;
+            } else {
+                currentDate = clickedDate;
+            }
+            fetchAndRenderDonut(currentDate);
+            fetchAndRenderSecondary(currentLocId, currentDate);
+        });
+    }
+
+    // --- 5. EXPENSES BY DEPARTMENT ---
+    const domExpDep = document.getElementById('echart-exp-dep');
+    if (domExpDep) {
+        if (!echartsInstances['exp-dep']) echartsInstances['exp-dep'] = echarts.init(domExpDep);
+        const expDepChart = echartsInstances['exp-dep'];
+
+        const depMap = {};
+        (expData || []).forEach(r => {
+            if (!r.is_hidden) {
+                const d = r.department_name || 'Necunoscut';
+                depMap[d] = (depMap[d] || 0) + (parseFloat(r.amount) || 0);
+            }
+        });
+        const depChartData = Object.keys(depMap).map(k => ({ name: k, value: Math.round(depMap[k]) })).sort((a,b) => b.value - a.value).slice(0, 15);
+
+        expDepChart.setOption({
+            tooltip: { trigger: 'item', backgroundColor: 'rgba(15,15,26,0.9)', textStyle: { color: '#fff' }, borderColor: '#f97316', formatter: (p) => `${p.name}: ${Math.round(p.value).toLocaleString('ro-RO')} RON (${p.percent}%)` },
+            color: colors.colorPalette,
+            legend: { 
+                type: 'scroll', orient: 'vertical', right: '5%', top: 'middle', textStyle: { color: colors.textColor, fontSize: 11 },
+                formatter: function(name) {
+                    let val = 0;
+                    depChartData.forEach(d => { if (d.name === name) val = d.value; });
+                    return name + '  ' + Math.round(val).toLocaleString('ro-RO') + ' RON';
+                }
+            },
+            series: [{
+                name: 'Cheltuieli Dep', type: 'pie', radius: ['40%', '75%'], center: ['35%', '50%'], avoidLabelOverlap: false,
+                itemStyle: { borderRadius: 6, borderColor: colors.isDark ? '#0f0f1a' : '#fff', borderWidth: 2 },
+                label: { show: false },
+                labelLine: { show: false },
+                data: depChartData, animationType: 'scale', animationEasing: 'elasticOut'
+            }]
+        }, true);
+    }
+
+    // --- 6. EXPENSES BY LOCATION ---
+    const domExpLoc = document.getElementById('echart-exp-loc');
+    if (domExpLoc) {
+        if (!echartsInstances['exp-loc']) echartsInstances['exp-loc'] = echarts.init(domExpLoc);
+        const expLocChart = echartsInstances['exp-loc'];
+
+        const locMap = {};
+        (expData || []).forEach(r => {
+            if (!r.is_hidden) {
+                const l = r.location_name || 'Central / Necunoscut';
+                locMap[l] = (locMap[l] || 0) + (parseFloat(r.amount) || 0);
+            }
+        });
+        const locChartData = Object.keys(locMap).map(k => ({ name: k, value: Math.round(locMap[k]) })).sort((a,b) => b.value - a.value).slice(0, 15);
+
+        expLocChart.setOption({
+            tooltip: { trigger: 'item', backgroundColor: 'rgba(15,15,26,0.9)', textStyle: { color: '#fff' }, borderColor: '#3b82f6', formatter: (p) => `${p.name}: ${Math.round(p.value).toLocaleString('ro-RO')} RON (${p.percent}%)` },
+            color: colors.colorPalette.slice(2).concat(colors.colorPalette.slice(0,2)),
+            legend: { 
+                type: 'scroll', orient: 'vertical', right: '5%', top: 'middle', textStyle: { color: colors.textColor, fontSize: 11 },
+                formatter: function(name) {
+                    let val = 0;
+                    locChartData.forEach(d => { if (d.name === name) val = d.value; });
+                    return name + '  ' + Math.round(val).toLocaleString('ro-RO') + ' RON';
+                }
+            },
+            series: [{
+                name: 'Cheltuieli Loc', type: 'pie', radius: ['40%', '75%'], center: ['35%', '50%'], avoidLabelOverlap: false,
+                itemStyle: { borderRadius: 6, borderColor: colors.isDark ? '#0f0f1a' : '#fff', borderWidth: 2 },
+                label: { show: false },
+                labelLine: { show: false },
+                data: locChartData, animationType: 'scale', animationEasing: 'elasticOut'
+            }]
+        }, true);
+    }
+}
 
 
 async function initDashboard2() {
