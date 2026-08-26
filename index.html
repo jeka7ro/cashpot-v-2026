@@ -898,6 +898,68 @@
         <div id="echart-exp-loc" style="width: 100%; height: 350px;"></div>
       </div>
     </div>
+
+    <!-- 1. SĂLI & LOCAȚII -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+      <div class="card" style="margin:0; min-height: 400px; padding: 16px;">
+        <h3 style="font-size: 14px; color: var(--muted); text-transform: uppercase; margin-bottom: 16px;">Top Săli Profitabile (GGR)</h3>
+        <div id="echart-top-loc" style="width: 100%; height: 350px;"></div>
+      </div>
+      <div class="card" style="margin:0; min-height: 400px; padding: 16px;">
+        <h3 style="font-size: 14px; color: var(--muted); text-transform: uppercase; margin-bottom: 16px;">Săli Neperformante (Atenție)</h3>
+        <div id="echart-bot-loc" style="width: 100%; height: 350px;"></div>
+      </div>
+    </div>
+    
+    <div style="display: grid; grid-template-columns: 1fr; gap: 24px; margin-bottom: 24px;">
+      <div class="card" style="margin:0; min-height: 400px; padding: 16px;">
+        <h3 style="font-size: 14px; color: var(--muted); text-transform: uppercase; margin-bottom: 16px;">Analiza GGR vs Cheltuieli pe Săli</h3>
+        <div id="echart-scatter-loc" style="width: 100%; height: 400px;"></div>
+      </div>
+    </div>
+
+    <!-- 2. HARDWARE & PROVIDERI -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+      <div class="card" style="margin:0; min-height: 400px; padding: 16px;">
+        <h3 style="font-size: 14px; color: var(--muted); text-transform: uppercase; margin-bottom: 16px;">Top Performanță Cabinete (GGR)</h3>
+        <div id="echart-cab" style="width: 100%; height: 350px;"></div>
+      </div>
+      <div class="card" style="margin:0; min-height: 400px; padding: 16px;">
+        <h3 style="font-size: 14px; color: var(--muted); text-transform: uppercase; margin-bottom: 16px;">Cota de Piață Provideri (Total IN)</h3>
+        <div id="echart-prov" style="width: 100%; height: 350px;"></div>
+      </div>
+    </div>
+
+    <!-- 3. TIMP & CALENDAR -->
+    <div style="display: grid; grid-template-columns: 1fr; gap: 24px; margin-bottom: 24px;">
+      <div class="card" style="margin:0; min-height: 250px; padding: 16px;">
+        <h3 style="font-size: 14px; color: var(--muted); text-transform: uppercase; margin-bottom: 16px;">Calendar Heatmap (GGR Zilnic)</h3>
+        <div id="echart-cal" style="width: 100%; height: 200px;"></div>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 24px; margin-bottom: 24px;">
+      <div class="card" style="margin:0; min-height: 400px; padding: 16px;">
+        <h3 style="font-size: 14px; color: var(--muted); text-transform: uppercase; margin-bottom: 16px;">Heatmap Orar (Zile vs Ore)</h3>
+        <div id="echart-hourly" style="width: 100%; height: 350px;"></div>
+      </div>
+      <div class="card" style="margin:0; min-height: 400px; padding: 16px;">
+        <h3 style="font-size: 14px; color: var(--muted); text-transform: uppercase; margin-bottom: 16px;">Performanță Zilele Săptămânii</h3>
+        <div id="echart-radar" style="width: 100%; height: 350px;"></div>
+      </div>
+    </div>
+
+    <!-- 4. ANALIZA FINANCIARA AVANSATA -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+      <div class="card" style="margin:0; min-height: 400px; padding: 16px;">
+        <h3 style="font-size: 14px; color: var(--muted); text-transform: uppercase; margin-bottom: 16px;">Evoluție RTP vs Hold %</h3>
+        <div id="echart-rtp" style="width: 100%; height: 350px;"></div>
+      </div>
+      <div class="card" style="margin:0; min-height: 400px; padding: 16px;">
+        <h3 style="font-size: 14px; color: var(--muted); text-transform: uppercase; margin-bottom: 16px;">Impact Jackpots în Total IN</h3>
+        <div id="echart-jackpot" style="width: 100%; height: 350px;"></div>
+      </div>
+    </div>
   </div>
 
 <div id="view-cheltuieli" class="view-panel" style="overflow-y:auto;">
@@ -3734,5 +3796,5 @@
 
 </body>
 
-<script src="dashboard2.js?v=13"></script>
+<script src="dashboard2.js?v=14"></script>
 </html>
