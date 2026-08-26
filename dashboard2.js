@@ -1,5 +1,6 @@
 // dashboard2.js - ECharts implementation cu Cross-Filtering
 let echartsInstances = {};
+window.chartDateOverrides = {};
 let currentLocId = null;
 let currentDate = null;
 let currentDonutLevel = 1;
@@ -119,7 +120,8 @@ async function fetchAndRenderDonut(dateFilter) {
     }
 }
 
-async function fetchAndRenderSecondary(locId, dateFilter) {
+async function fetchAndRenderSecondary(locId, dateFilter, targetChartId = null) {
+    if (targetChartId && window.echartsInstances[targetChartId]) window.echartsInstances[targetChartId].showLoading({text: "Se descarcă datele...", color: "#3b82f6", textColor: "#fff", maskColor: "rgba(15, 15, 26, 0.8)"});
     const colors = getCommonColors();
     const { s, e } = getPeriod();
     const sFilter = dateFilter || s;
@@ -147,8 +149,8 @@ async function fetchAndRenderSecondary(locId, dateFilter) {
     ]);
 
     // --- 2. COMBO CHART ---
-    const domCombo = document.getElementById('echart-combo');
-    if (domCombo) {
+    const dom_echart_combo = document.getElementById('echart-combo');
+    if (dom_echart_combo && (!window.chartDateOverrides['echart-combo'] || targetChartId === 'echart-combo')) {
         if (!echartsInstances['combo']) echartsInstances['combo'] = echarts.init(domCombo);
         const comboChart = echartsInstances['combo'];
         
@@ -207,8 +209,8 @@ async function fetchAndRenderSecondary(locId, dateFilter) {
     }
 
     // --- 3. WATERFALL CHART ---
-    const domWaterfall = document.getElementById('echart-waterfall');
-    if (domWaterfall) {
+    const dom_echart_waterfall = document.getElementById('echart-waterfall');
+    if (dom_echart_waterfall && (!window.chartDateOverrides['echart-waterfall'] || targetChartId === 'echart-waterfall')) {
         if (!echartsInstances['waterfall']) echartsInstances['waterfall'] = echarts.init(domWaterfall);
         const waterfallChart = echartsInstances['waterfall'];
 
@@ -266,7 +268,7 @@ async function fetchAndRenderSecondary(locId, dateFilter) {
     }
 
     // --- 1. TOP & BOTTOM SĂLI ---
-    if (document.getElementById('echart-top-loc') && locsData) {
+    if (document.getElementById('echart-top-loc') && locsData && (!window.chartDateOverrides['echart-top-loc'] || targetChartId === 'echart-top-loc' || targetChartId === 'echart-bot-loc')) {
         let locsSorted = [...locsData].filter(l => l.ggr !== null).sort((a,b) => b.ggr - a.ggr);
         let top10 = locsSorted.slice(0, 10).reverse();
         let bot10 = locsSorted.slice(-10);
@@ -291,7 +293,7 @@ async function fetchAndRenderSecondary(locId, dateFilter) {
     }
 
     // --- 3. SCATTER GGR vs CHELTUIELI ---
-    if (document.getElementById('echart-scatter-loc') && locsData) {
+    if (document.getElementById('echart-scatter-loc') && locsData && (!window.chartDateOverrides['echart-scatter-loc'] || targetChartId === 'echart-scatter-loc')) {
         let scatterData = locsData.filter(l => l.ggr !== null && l.location).map(l => {
             let exp = 0;
             if (expData) {
@@ -322,7 +324,7 @@ async function fetchAndRenderSecondary(locId, dateFilter) {
     }
 
     // --- 4. CABINETE & 5. PROVIDERI ---
-    if (document.getElementById('echart-cab') && cabsData) {
+    if (document.getElementById('echart-cab') && cabsData && (!window.chartDateOverrides['echart-cab'] || targetChartId === 'echart-cab')) {
         let cabChartData = cabsData.slice(0,10).map(c => ({ name: c.cabinet, value: Math.round(c.ggr) }));
         if (!echartsInstances['cab']) echartsInstances['cab'] = echarts.init(document.getElementById('echart-cab'));
         echartsInstances['cab'].setOption({
@@ -331,7 +333,7 @@ async function fetchAndRenderSecondary(locId, dateFilter) {
             series: [{ type: 'pie', radius: '65%', center: ['35%', '50%'], data: cabChartData, label: { show: false } }]
         }, true);
     }
-    if (document.getElementById('echart-prov') && provsData) {
+    if (document.getElementById('echart-prov') && provsData && (!window.chartDateOverrides['echart-prov'] || targetChartId === 'echart-prov')) {
         let provChartData = provsData.map(p => ({ name: p.provider, value: Math.round(p.total_in) }));
         if (!echartsInstances['prov']) echartsInstances['prov'] = echarts.init(document.getElementById('echart-prov'));
         echartsInstances['prov'].setOption({
@@ -342,7 +344,7 @@ async function fetchAndRenderSecondary(locId, dateFilter) {
     }
 
     // --- 6. CALENDAR HEATMAP ---
-    if (document.getElementById('echart-cal') && trendData) {
+    if (document.getElementById('echart-cal') && trendData && (!window.chartDateOverrides['echart-cal'] || targetChartId === 'echart-cal')) {
         let calData = trendData.map(t => [t.date || t.zi, Math.round(t.ggr)]);
         let year = trendData.length ? (trendData[0].date || trendData[0].zi || String(new Date().getFullYear())).substring(0,4) : new Date().getFullYear();
         if (!echartsInstances['cal']) echartsInstances['cal'] = echarts.init(document.getElementById('echart-cal'));
@@ -355,7 +357,7 @@ async function fetchAndRenderSecondary(locId, dateFilter) {
     }
 
     // --- 7. HOURLY HEATMAP ---
-    if (document.getElementById('echart-hourly') && hourlyData && hourlyData.length) {
+    if (document.getElementById('echart-hourly') && hourlyData && hourlyData.length && (!window.chartDateOverrides['echart-hourly'] || targetChartId === 'echart-hourly')) {
         // Group by DayOfWeek (0-6, Mon-Sun) and Hour (0-23)
         let matrix = Array(7).fill(0).map(() => Array(24).fill(0));
         hourlyData.forEach(r => {
@@ -382,7 +384,7 @@ async function fetchAndRenderSecondary(locId, dateFilter) {
     }
 
     // --- 8. RADAR ZILE ---
-    if (document.getElementById('echart-radar') && trendData) {
+    if (document.getElementById('echart-radar') && trendData && (!window.chartDateOverrides['echart-radar'] || targetChartId === 'echart-radar')) {
         let daysGGR = Array(7).fill(0);
         let daysCount = Array(7).fill(0);
         trendData.forEach(t => {
@@ -407,7 +409,7 @@ async function fetchAndRenderSecondary(locId, dateFilter) {
     }
 
     // --- 9. RTP VS HOLD ---
-    if (document.getElementById('echart-rtp') && trendData) {
+    if (document.getElementById('echart-rtp') && trendData && (!window.chartDateOverrides['echart-rtp'] || targetChartId === 'echart-rtp')) {
         let rtpData = trendData.map(t => [t.date || t.zi, t.total_in ? Math.round((t.total_out / t.total_in)*1000)/10 : 0]);
         let holdData = trendData.map(t => [t.date || t.zi, t.total_in ? Math.round((t.ggr / t.total_in)*1000)/10 : 0]);
         
@@ -426,7 +428,7 @@ async function fetchAndRenderSecondary(locId, dateFilter) {
     }
 
     // --- 10. IMPACT JACKPOTS ---
-    if (document.getElementById('echart-jackpot') && trendData) {
+    if (document.getElementById('echart-jackpot') && trendData && (!window.chartDateOverrides['echart-jackpot'] || targetChartId === 'echart-jackpot')) {
         let dates = trendData.map(t => (t.date || t.zi || '').substring(5));
         let ggrSeries = trendData.map(t => Math.round(t.ggr));
         let jpSeries = trendData.map(t => Math.round(t.jackpot || 0));
@@ -450,8 +452,8 @@ async function fetchAndRenderSecondary(locId, dateFilter) {
 
 
     // --- 4. TIMELINE CHART ---
-    const domTimeline = document.getElementById('echart-timeline');
-    if (domTimeline) {
+    const dom_echart_timeline = document.getElementById('echart-timeline');
+    if (dom_echart_timeline && (!window.chartDateOverrides['echart-timeline'] || targetChartId === 'echart-timeline')) {
         if (!echartsInstances['timeline']) echartsInstances['timeline'] = echarts.init(domTimeline);
         const timelineChart = echartsInstances['timeline'];
 
@@ -662,19 +664,72 @@ function injectAiButtons() {
             titleEl.parentNode.insertBefore(wrapper, titleEl);
             wrapper.appendChild(titleEl);
             
-            const btn = document.createElement('button');
-            btn.className = 'btn btn-sm btn-outline ai-analyze-btn';
-            btn.innerText = 'Analiză AI';
-            btn.style.padding = '4px 12px';
-            btn.style.fontSize = '12px';
-            btn.style.borderRadius = '6px';
-            btn.style.cursor = 'pointer';
-            
+            const controlsDiv = document.createElement('div');
+            controlsDiv.style.display = 'flex';
+            controlsDiv.style.alignItems = 'center';
+            controlsDiv.style.gap = '12px';
+
             // Find the chart container inside this card to get its ID
             const chartDiv = card.querySelector('div[id^="echart-"]');
+            
             if (chartDiv) {
-                btn.onclick = () => runAiAnalysis(chartDiv.id, titleEl.innerText);
-                wrapper.appendChild(btn);
+                const chartId = chartDiv.id;
+                
+                // Toggle Checkbox
+                const toggleLabel = document.createElement('label');
+                toggleLabel.style.display = 'flex';
+                toggleLabel.style.alignItems = 'center';
+                toggleLabel.style.fontSize = '12px';
+                toggleLabel.style.color = 'var(--muted)';
+                toggleLabel.style.cursor = 'pointer';
+                toggleLabel.style.userSelect = 'none';
+                
+                const toggleInput = document.createElement('input');
+                toggleInput.type = 'checkbox';
+                toggleInput.style.marginRight = '6px';
+                toggleInput.checked = window.chartDateOverrides[chartId] || false;
+                
+                toggleInput.onchange = (e) => {
+                    const isFullYear = e.target.checked;
+                    window.chartDateOverrides[chartId] = isFullYear;
+                    
+                    let newStart = null;
+                    if (isFullYear) {
+                        newStart = new Date().getFullYear() + '-01-01';
+                    }
+                    // Extract locId and current eFilter from global state (if available) or assume defaults
+                    // We'll call fetchAndRenderSecondary with the custom dateFilter and targetChartId
+                    
+                    const currentE = typeof getPeriod === 'function' ? getPeriod().e : new Date().toISOString().split('T')[0];
+                    const currentS = typeof getPeriod === 'function' ? getPeriod().s : new Date().getFullYear() + '-01-01';
+                    
+                    const finalStart = isFullYear ? newStart : currentS;
+                    const finalDateFilter = isFullYear ? finalStart : null; // If null, uses global period
+                    
+                    let activeLoc = typeof currentLocId !== 'undefined' ? currentLocId : null;
+                    
+                    // We need a specific start/end range if overriden
+                    // Actually, if we pass newStart, we must modify fetchAndRenderSecondary to accept an explicit start/end
+                    // Or we just modify the global state variables locally.
+                    fetchAndRenderChartWithOverride(chartId, activeLoc, finalStart, currentE);
+                };
+                
+                toggleLabel.appendChild(toggleInput);
+                toggleLabel.appendChild(document.createTextNode('Tot Anul'));
+                controlsDiv.appendChild(toggleLabel);
+            
+                // AI Button
+                const btn = document.createElement('button');
+                btn.className = 'btn btn-sm btn-outline ai-analyze-btn';
+                btn.innerText = 'Analiză AI';
+                btn.style.padding = '4px 12px';
+                btn.style.fontSize = '12px';
+                btn.style.borderRadius = '6px';
+                btn.style.cursor = 'pointer';
+                btn.onclick = () => runAiAnalysis(chartId, titleEl.innerText);
+                
+                controlsDiv.appendChild(btn);
+                wrapper.appendChild(controlsDiv);
             }
         }
     });
@@ -755,3 +810,30 @@ async function runAiAnalysis(chartId, title) {
         content.innerHTML = `<div style="color:var(--danger)">Eroare rețea: ${e.message}</div>`;
     }
 }
+
+async function fetchAndRenderChartWithOverride(chartId, locId, start, end) {
+    if (echartsInstances[chartId]) {
+        echartsInstances[chartId].showLoading({text: 'Se descarcă...', color: '#3b82f6', textColor: '#fff', maskColor: 'rgba(15, 15, 26, 0.8)'});
+    }
+
+    try {
+        // Just call fetchAndRenderSecondary with targetChartId
+        // fetchAndRenderSecondary will use the provided date Filter (start)
+        // Wait, fetchAndRenderSecondary expects dateFilter (which maps to sFilter and eFilter).
+        // Since we want the override to be for the whole year (e.g. 2026-01-01 to end), 
+        // passing `start` to dateFilter will make BOTH sFilter and eFilter equal to `start`, which is wrong if it's the whole year!
+        // We need to modify fetchAndRenderSecondary slightly to accept explicit s and e.
+        // For now, let's just temporarily override the global getPeriod() function while we call it!
+        const originalGetPeriod = window.getPeriod;
+        window.getPeriod = () => ({ s: start, e: end });
+        
+        await fetchAndRenderSecondary(locId, null, chartId);
+        
+        window.getPeriod = originalGetPeriod;
+        if (echartsInstances[chartId]) echartsInstances[chartId].hideLoading();
+    } catch (e) {
+        console.error(e);
+        if (echartsInstances[chartId]) echartsInstances[chartId].hideLoading();
+    }
+}
+
