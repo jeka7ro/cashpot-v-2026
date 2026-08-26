@@ -1381,6 +1381,10 @@ def serve_css():
 def serve_app_js():
     return send_from_directory(BASE_DIR, 'app.js')
 
+@app.route('/dashboard2.js')
+def serve_dashboard2_js():
+    return send_from_directory(BASE_DIR, 'dashboard2.js')
+
 @app.route('/onjn.js')
 def serve_onjn_js():
     return send_from_directory(BASE_DIR, 'onjn.js')
@@ -4583,6 +4587,37 @@ except Exception as e:
     gemini_client = None
     print("Google GenAI not initialized:", e)
 
+@app.route('/api/ai/analyze-chart', methods=['POST'])
+def analyze_chart():
+    data = request.json
+    if not gemini_client:
+        return jsonify({"success": False, "error": "GEMINI_API_KEY lipseste. Seteaza variabila de mediu GEMINI_API_KEY (export GEMINI_API_KEY='...') si reporneste serverul."}), 500
+        
+    title = data.get('title', 'Grafic')
+    chart_data = data.get('data', [])
+    
+    prompt = f"""
+    Acționează ca un analist financiar expert în industria de gambling/cazinouri. 
+    Analizează pe scurt datele financiare/de performanță pentru graficul intitulat '{title}'.
+    Datele brute în format JSON:
+    {__import__('json').dumps(chart_data)}
+    
+    Te rog să oferi o analiză concisă, la obiect, fără emoji-uri, structurată astfel:
+    1. 3 Concluzii Cheie (ce spun cifrele)
+    2. Riscuri sau alerte (dacă e cazul)
+    3. Oportunități
+    Fii profesional, evită platitudinile și raportează-te strict la datele furnizate.
+    """
+    
+    try:
+        response = gemini_client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt,
+        )
+        return jsonify({"success": True, "analysis": response.text})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 @app.route('/api/contracts/smart-import', methods=['POST'])
 def smart_import_contract():
     if not gemini_client:
@@ -4684,8 +4719,8 @@ def create_contract():
     cid = str(uuid.uuid4())
     
     pg_qry("""
-        INSERT INTO cp2_contracts (id, type, currency, total_amount, start_date, end_date, details, m2, notice_period_months, sublease_agreement, auto_expense, owner_name, contract_number, address)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        INSERT INTO cp2_contracts (id, type, currency, total_amount, start_date, end_date, details, m2, notice_period_months, sublease_agreement, auto_expense, owner_name, contract_number, address, manual_location)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
     """, (
         cid,
         data.get('type'),
@@ -4700,7 +4735,8 @@ def create_contract():
         str(data.get('auto_expense')).lower() == 'true',
         data.get('owner_name') or None,
         data.get('contract_number') or None,
-        data.get('address') or None
+        data.get('address') or None,
+        data.get('manual_location') or None
     ))
     
     locs = data.get('locations', [])
@@ -4717,7 +4753,7 @@ def update_contract(contract_id):
     data = request.json
     pg_qry("""
         UPDATE cp2_contracts 
-        SET type = %s, currency = %s, total_amount = %s, start_date = %s, end_date = %s, details = %s, m2 = %s, notice_period_months = %s, sublease_agreement = %s, auto_expense = %s, owner_name = %s, contract_number = %s, address = %s, updated_at = CURRENT_TIMESTAMP
+        SET type = %s, currency = %s, total_amount = %s, start_date = %s, end_date = %s, details = %s, m2 = %s, notice_period_months = %s, sublease_agreement = %s, auto_expense = %s, owner_name = %s, contract_number = %s, address = %s, manual_location = %s, updated_at = CURRENT_TIMESTAMP
         WHERE id = %s
     """, (
         data.get('type'),
@@ -4733,6 +4769,7 @@ def update_contract(contract_id):
         data.get('owner_name') or None,
         data.get('contract_number') or None,
         data.get('address') or None,
+        data.get('manual_location') or None,
         contract_id
     ))
     

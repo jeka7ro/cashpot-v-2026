@@ -3794,7 +3794,23 @@
   </div>
 </div>
 
+<!-- Modal Analiză AI -->
+<div id="ai-analysis-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); backdrop-filter:blur(5px); z-index:999999; justify-content:center; align-items:center;">
+  <div style="background:var(--surface); width:90%; max-width:600px; border-radius:16px; border:1px solid var(--border); overflow:hidden; box-shadow:0 24px 48px rgba(0,0,0,0.5); display:flex; flex-direction:column; max-height:80vh;">
+    <div style="padding:20px 24px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:var(--surface2);">
+      <h3 id="ai-modal-title" style="margin:0; font-size:18px; color:var(--text); font-weight:600;">Analiză AI</h3>
+      <button class="btn-ghost" onclick="document.getElementById('ai-analysis-modal').style.display='none'" style="color:var(--muted); font-size:24px; line-height:1; padding:0; height:auto;">&times;</button>
+    </div>
+    <div style="padding:24px; overflow-y:auto; color:var(--text); line-height:1.6;" id="ai-modal-content">
+      Se analizează datele...
+    </div>
+    <div style="padding:16px 24px; border-top:1px solid var(--border); background:var(--surface2); text-align:right;">
+      <button class="btn btn-outline" onclick="document.getElementById('ai-analysis-modal').style.display='none'">Închide</button>
+    </div>
+  </div>
+</div>
+
 </body>
 
-<script src="dashboard2.js?v=16"></script>
+<script src="dashboard2.js?v=17"></script>
 </html>
