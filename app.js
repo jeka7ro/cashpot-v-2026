@@ -11966,11 +11966,31 @@ window.renderContractsTable = function() {
 
   let filteredContracts = _contractsData;
   if (filterLoc) {
-    filteredContracts = filteredContracts.filter(c => (c.locations || []).some(l => String(l.location_id) === String(filterLoc)));
+    if (filterLoc.startsWith('MANUAL_')) {
+      const manualName = filterLoc.replace('MANUAL_', '');
+      filteredContracts = filteredContracts.filter(c => c.manual_location === manualName);
+    } else {
+      filteredContracts = filteredContracts.filter(c => (c.locations || []).some(l => String(l.location_id) === String(filterLoc)));
+    }
   }
   if (filterType) {
     filteredContracts = filteredContracts.filter(c => c.type === filterType);
   }
+  
+  const filterSearch = document.getElementById('filter-contract-search') ? document.getElementById('filter-contract-search').value.toLowerCase().trim() : '';
+  if (filterSearch) {
+    filteredContracts = filteredContracts.filter(c => {
+       const str = [
+         c.type, c.owner_name, c.contract_number, c.details, c.currency, c.manual_location, c.address,
+         (c.locations || []).map(l => {
+           const locObj = ((typeof filtersData !== 'undefined' && filtersData.locations) || []).find(x => x.id === l.location_id);
+           return l.name || (locObj ? locObj.name : '');
+         }).join(' ')
+       ].filter(Boolean).join(' ').toLowerCase();
+       return str.includes(filterSearch);
+    });
+  }
+
 
   if (_contractsSortCol) {
     filteredContracts.sort((a, b) => {
@@ -12029,7 +12049,11 @@ window.renderContractsTable = function() {
       if (addr) html += `<br><span style="font-size:11px; color:var(--text)">${addr}</span>`;
       return html;
     });
-    const locSummary = locNames.length > 0 ? locNames.join('<br><br>') : (c.address ? `<strong>${c.address}</strong>` : '<span style="color:var(--text-muted)">Neasignat</span>');
+    const manualLocName = c.manual_location ? `<strong>${c.manual_location}</strong>` : null;
+    let fallbackHtml = manualLocName || '<span style="color:var(--text-muted)">Neasignat</span>';
+    if (c.locations.length === 0 && c.address) fallbackHtml += `<br><span style="font-size:11px; color:var(--text)">${c.address}</span>`;
+    
+    const locSummary = locNames.length > 0 ? locNames.join('<br><br>') : fallbackHtml;
     
     // Remaining time logic
     let remainingStr = '-';
@@ -12143,6 +12167,13 @@ window.populateContractFilters = function() {
   if (typeof filtersData !== 'undefined' && filtersData.locations) {
     filtersData.locations.forEach(l => {
       locSel.innerHTML += `<option value="${l.id}">${l.name}</option>`;
+    });
+  }
+  
+  if (typeof _contractsData !== 'undefined') {
+    const uniqueAddresses = [...new Set(_contractsData.map(c => c.manual_location).filter(Boolean))];
+    uniqueAddresses.forEach(addr => {
+      locSel.innerHTML += `<option value="MANUAL_${addr}">${addr}</option>`;
     });
   }
   
@@ -12268,9 +12299,9 @@ window.openContractModal = function(id = null) {
     locHtml += `<option value="${loc.id}">${loc.name}</option>`;
   });
   
-  // Sync custom manual locations (contracts with address but no location_id)
+  // Sync custom manual locations (contracts with manual_location set)
   if (typeof _contractsData !== 'undefined') {
-    const uniqueAddresses = [...new Set(_contractsData.map(c => (!c.locations || c.locations.length === 0) ? c.address : null).filter(Boolean))];
+    const uniqueAddresses = [...new Set(_contractsData.map(c => c.manual_location).filter(Boolean))];
     uniqueAddresses.forEach(addr => {
       locHtml += `<option value="MANUAL_${addr}">${addr}</option>`;
     });
@@ -12315,6 +12346,10 @@ window.openContractModal = function(id = null) {
       
       if (c.locations && c.locations.length > 0) {
         locSelect.value = c.locations[0].location_id;
+      } else if (c.manual_location) {
+        locSelect.value = 'MANUAL_' + c.manual_location;
+      } else {
+        locSelect.value = '';
       }
     }
   } else {
@@ -12352,8 +12387,8 @@ window.saveContract = async function() {
   const locVal = document.getElementById('contract-location').value;
   if (locVal) {
     if (locVal.startsWith('MANUAL_')) {
-      // User added a manual location string; put it in the address field
-      payload.address = locVal.replace('MANUAL_', '');
+      // User added a manual location string; put it in the manual_location field
+      payload.manual_location = locVal.replace('MANUAL_', '');
     } else {
       payload.locations.push({
         location_id: locVal,
