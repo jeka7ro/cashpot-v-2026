@@ -338,7 +338,14 @@ async function fetchAndRenderSecondary(locId, dateFilter) {
         expDepChart.setOption({
             tooltip: { trigger: 'item', backgroundColor: 'rgba(15,15,26,0.9)', textStyle: { color: '#fff' }, borderColor: '#f97316', formatter: (p) => `${p.name}: ${Math.round(p.value).toLocaleString('ro-RO')} RON (${p.percent}%)` },
             color: colors.colorPalette,
-            legend: { type: 'scroll', orient: 'vertical', right: '5%', top: 'middle', textStyle: { color: colors.textColor, fontSize: 11 } },
+            legend: { 
+                type: 'scroll', orient: 'vertical', right: '5%', top: 'middle', textStyle: { color: colors.textColor, fontSize: 11 },
+                formatter: function(name) {
+                    let val = 0;
+                    depChartData.forEach(d => { if (d.name === name) val = d.value; });
+                    return name + '  ' + Math.round(val).toLocaleString('ro-RO') + ' RON';
+                }
+            },
             series: [{
                 name: 'Cheltuieli Dep', type: 'pie', radius: ['40%', '75%'], center: ['35%', '50%'], avoidLabelOverlap: false,
                 itemStyle: { borderRadius: 6, borderColor: colors.isDark ? '#0f0f1a' : '#fff', borderWidth: 2 },
@@ -367,7 +374,14 @@ async function fetchAndRenderSecondary(locId, dateFilter) {
         expLocChart.setOption({
             tooltip: { trigger: 'item', backgroundColor: 'rgba(15,15,26,0.9)', textStyle: { color: '#fff' }, borderColor: '#3b82f6', formatter: (p) => `${p.name}: ${Math.round(p.value).toLocaleString('ro-RO')} RON (${p.percent}%)` },
             color: colors.colorPalette.slice(2).concat(colors.colorPalette.slice(0,2)),
-            legend: { type: 'scroll', orient: 'vertical', right: '5%', top: 'middle', textStyle: { color: colors.textColor, fontSize: 11 } },
+            legend: { 
+                type: 'scroll', orient: 'vertical', right: '5%', top: 'middle', textStyle: { color: colors.textColor, fontSize: 11 },
+                formatter: function(name) {
+                    let val = 0;
+                    locChartData.forEach(d => { if (d.name === name) val = d.value; });
+                    return name + '  ' + Math.round(val).toLocaleString('ro-RO') + ' RON';
+                }
+            },
             series: [{
                 name: 'Cheltuieli Loc', type: 'pie', radius: ['40%', '75%'], center: ['35%', '50%'], avoidLabelOverlap: false,
                 itemStyle: { borderRadius: 6, borderColor: colors.isDark ? '#0f0f1a' : '#fff', borderWidth: 2 },
