@@ -5432,40 +5432,44 @@ def get_contract_slots_details():
             if inv.get('contract_id'):
                 contracts_to_check.add(str(inv['contract_id']))
 
-        import fitz
+        try:
+            import fitz
+        except ImportError:
+            fitz = None
         import re
 
-        for cid in contracts_to_check:
-            c_files = pg_qry('SELECT id FROM cp2_contract_files WHERE contract_id = %s', (cid,))
-            for cf in c_files:
-                fdata = pg_qry('SELECT file_data FROM cp2_contract_file_data WHERE file_id = %s', (cf['id'],))
-                if fdata and fdata[0].get('file_data'):
-                    try:
-                        doc = fitz.open(stream=bytes(fdata[0]['file_data']), filetype='pdf')
-                        full_text = '\n'.join([page.get_text() for page in doc])
-                        pat_flexible = re.compile(
-                            r'(\d+)\.[\s\n]+([A-Za-z0-9\s]+?)\s+serie\s+([0-9]+)(?:[\s\n]+An[\s\n]+fabricatie[\s\n]+([0-9]{4}))?[\s\n]+([^\n]+)[\s\n]+([0-9]+)[\s\n]+([0-9]+(?:\.[0-9]+)?)[\s\n]+([0-9]+(?:\.[0-9]+)?)',
-                            re.IGNORECASE
-                        )
-                        for m in pat_flexible.finditer(full_text):
-                            s_nr = m.group(3).strip()
-                            v_name = m.group(2).strip()
-                            fab_yr = m.group(4)
-                            u_pr = float(m.group(7))
-                            price_map[s_nr] = u_pr
-                            if v_name:
-                                vendor_pdf_map[s_nr] = v_name
-                            if fab_yr:
-                                year_pdf_map[s_nr] = int(fab_yr)
-                            pdf_items.append({
-                                'nr_crt': int(m.group(1)),
-                                'serial_nr': s_nr,
-                                'vendor': v_name,
-                                'fabrication_year': int(fab_yr) if fab_yr else None,
-                                'unit_price': u_pr
-                            })
-                    except Exception as ex:
-                        pass
+        if fitz:
+            for cid in contracts_to_check:
+                c_files = pg_qry('SELECT id FROM cp2_contract_files WHERE contract_id = %s', (cid,))
+                for cf in c_files:
+                    fdata = pg_qry('SELECT file_data FROM cp2_contract_file_data WHERE file_id = %s', (cf['id'],))
+                    if fdata and fdata[0].get('file_data'):
+                        try:
+                            doc = fitz.open(stream=bytes(fdata[0]['file_data']), filetype='pdf')
+                            full_text = '\n'.join([page.get_text() for page in doc])
+                            pat_flexible = re.compile(
+                                r'(\d+)\.[\s\n]+([A-Za-z0-9\s]+?)\s+serie\s+([0-9]+)(?:[\s\n]+An[\s\n]+fabricatie[\s\n]+([0-9]{4}))?[\s\n]+([^\n]+)[\s\n]+([0-9]+)[\s\n]+([0-9]+(?:\.[0-9]+)?)[\s\n]+([0-9]+(?:\.[0-9]+)?)',
+                                re.IGNORECASE
+                            )
+                            for m in pat_flexible.finditer(full_text):
+                                s_nr = m.group(3).strip()
+                                v_name = m.group(2).strip()
+                                fab_yr = m.group(4)
+                                u_pr = float(m.group(7))
+                                price_map[s_nr] = u_pr
+                                if v_name:
+                                    vendor_pdf_map[s_nr] = v_name
+                                if fab_yr:
+                                    year_pdf_map[s_nr] = int(fab_yr)
+                                pdf_items.append({
+                                    'nr_crt': int(m.group(1)),
+                                    'serial_nr': s_nr,
+                                    'vendor': v_name,
+                                    'fabrication_year': int(fab_yr) if fab_yr else None,
+                                    'unit_price': u_pr
+                                })
+                        except Exception as ex:
+                            pass
 
         all_series = []
         if raw_series:
