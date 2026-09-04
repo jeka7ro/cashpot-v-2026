@@ -4052,45 +4052,92 @@
             <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
               <!-- Status filter pills -->
               <div style="display:flex; background:var(--surface); border:1px solid var(--border); border-radius:9999px; padding:3px; gap:2px;">
-                <button type="button" onclick="setLifecycleStatusFilter('all')" id="flt-life-all" class="btn-ghost" style="padding:5px 14px; border-radius:9999px; font-size:12px; font-weight:700; background:var(--accent); color:white;">Toate</button>
-                <button type="button" onclick="setLifecycleStatusFilter('active')" id="flt-life-active" class="btn-ghost" style="padding:5px 14px; border-radius:9999px; font-size:12px; font-weight:600; color:var(--text);">În Sală (Active)</button>
-                <button type="button" onclick="setLifecycleStatusFilter('in_stock')" id="flt-life-in_stock" class="btn-ghost" style="padding:5px 14px; border-radius:9999px; font-size:12px; font-weight:600; color:var(--text);">În Stoc</button>
-                <button type="button" onclick="setLifecycleStatusFilter('sold')" id="flt-life-sold" class="btn-ghost" style="padding:5px 14px; border-radius:9999px; font-size:12px; font-weight:600; color:var(--text);">Vândute (Ieșite)</button>
+                <button type="button" onclick="setLifecycleStatusFilter('all')" id="flt-life-all" class="btn-ghost" style="padding:6px 16px; border-radius:9999px; font-size:12px; font-weight:700; background:var(--accent); color:white;">Toate</button>
+                <button type="button" onclick="setLifecycleStatusFilter('active')" id="flt-life-active" class="btn-ghost" style="padding:6px 16px; border-radius:9999px; font-size:12px; font-weight:600; color:var(--text);">În Sală (Active)</button>
+                <button type="button" onclick="setLifecycleStatusFilter('in_stock')" id="flt-life-in_stock" class="btn-ghost" style="padding:6px 16px; border-radius:9999px; font-size:12px; font-weight:600; color:var(--text);">În Stoc</button>
+                <button type="button" onclick="setLifecycleStatusFilter('sold')" id="flt-life-sold" class="btn-ghost" style="padding:6px 16px; border-radius:9999px; font-size:12px; font-weight:600; color:var(--text);">Vândute (Ieșite)</button>
               </div>
 
-              <!-- Search box -->
+              <!-- Search box with count badge -->
               <div style="position:relative;">
-                <svg style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--muted); width:14px; height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                <input type="text" id="lifecycle-search-input" placeholder="Caută serie, furnizor, cumpărător..." oninput="handleLifecycleSearch(this.value)" style="padding:6px 16px 6px 32px; border:1px solid var(--border); border-radius:9999px; background:var(--surface); color:var(--text); font-size:13px; outline:none; min-width:240px;">
+                <svg style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--muted); width:14px; height:14px; pointer-events:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" id="lifecycle-search-input" placeholder="Caută serie, furnizor, cumpărător..." oninput="handleLifecycleSearch(this.value)" style="padding:7px 80px 7px 34px; border:1px solid var(--border); border-radius:9999px; background:var(--surface); color:var(--text); font-size:13px; outline:none; min-width:260px;">
+                <span id="lifecycle-search-badge" style="display:none; position:absolute; right:8px; top:50%; transform:translateY(-50%); background:var(--accent); color:white; border-radius:9999px; padding:2px 8px; font-size:11px; font-weight:700; white-space:nowrap;"></span>
               </div>
             </div>
 
             <div style="display:flex; align-items:center; gap:8px;">
-              <button type="button" onclick="loadSlotLifecycle()" class="btn-ghost" style="padding:8px 14px; font-size:12px; display:inline-flex; align-items:center; gap:6px;" title="Reîmprospătează datele">
+              <button type="button" onclick="loadSlotLifecycle()" class="btn-ghost" style="padding:8px 16px; font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:6px; border:1px solid var(--border); border-radius:9999px;" title="Reîmprospătează datele">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
                 <span>Refresh</span>
               </button>
-              <button type="button" onclick="exportLifecycleExcel()" class="btn-ghost" style="padding:8px 16px;">Export Excel</button>
-              <button type="button" onclick="openContractModal(null, 'Vânzare Sloturi')" class="btn btn-primary" style="background:var(--accent); color:white; padding:8px 16px; border:none; border-radius:9999px; cursor:pointer; font-weight:600;">+ Adaugă Contract Vânzare</button>
+              <button type="button" onclick="exportLifecycleExcel()" class="btn-ghost" style="padding:8px 16px; font-size:12px; font-weight:600; display:inline-flex; align-items:center; gap:6px; border:1px solid var(--border); border-radius:9999px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                <span>Export Excel</span>
+              </button>
+              <button type="button" onclick="openContractModal(null, 'Vânzare Sloturi')" class="btn btn-primary" style="background:var(--accent); color:white; padding:8px 18px; border:none; border-radius:9999px; cursor:pointer; font-weight:600; font-size:13px; display:inline-flex; align-items:center; gap:6px;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                <span>Adaugă Contract Vânzare</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Bulk Action Bar -->
+          <div id="lifecycle-bulk-bar" style="display:none; align-items:center; justify-content:space-between; background:rgba(16,185,129,0.08); border:1px solid rgba(16,185,129,0.25); border-radius:12px; padding:8px 16px; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span id="lifecycle-selected-count" style="font-weight:700; font-size:13px; color:var(--text);">0 aparate selectate</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button type="button" onclick="exportSelectedLifecycleExcel()" class="btn-ghost" style="padding:6px 14px; font-size:12px; font-weight:600; border:1px solid rgba(16,185,129,0.3); border-radius:8px; display:inline-flex; align-items:center; gap:6px;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                <span>Exportă Selectate</span>
+              </button>
+              <button type="button" onclick="deselectAllLifecycle()" class="btn-ghost" style="padding:6px 14px; font-size:12px; font-weight:600; color:var(--muted); border-radius:8px;">
+                Deselectează
+              </button>
             </div>
           </div>
 
           <!-- Table Container -->
           <div class="table-container" style="background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow-x:auto;">
-            <table class="data-table" style="width:100%; border-collapse:collapse; min-width:1300px;">
+            <table class="data-table" style="width:100%; border-collapse:collapse; min-width:1380px;">
               <thead style="background:var(--surface2);">
                 <tr>
-                  <th style="padding:12px; width:40px; text-align:center; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">#</th>
-                  <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Serie Aparat</th>
-                  <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Aparat / Model / Cabinet</th>
-                  <th style="padding:12px; text-align:center; width:80px; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">An Fabr.</th>
-                  <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Locație Curentă</th>
-                  <th style="padding:12px; text-align:center; width:110px; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Status</th>
-                  <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Intrare: Factură & Furnizor</th>
-                  <th style="padding:12px; text-align:right; width:110px; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Preț Achiziție</th>
-                  <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Ieșire: Factură & Cumpărător</th>
-                  <th style="padding:12px; text-align:right; width:110px; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Preț Vânzare</th>
-                  <th style="padding:12px; text-align:right; width:110px; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Marjă / Profit</th>
+                  <th style="padding:12px; width:40px; text-align:center; border-bottom:1px solid var(--border); position:sticky; left:0; z-index:2; background:var(--surface2);">
+                    <input type="checkbox" id="lifecycle-select-all" onclick="toggleAllLifecycle(this)" title="Selectează toate de pe pagină" style="cursor:pointer;">
+                  </th>
+                  <th style="padding:12px; width:50px; text-align:center; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Nr.</th>
+                  <th onclick="sortLifecycleTable('serial_nr')" style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase; cursor:pointer; user-select:none;" title="Click pentru sortare">
+                    Serie Aparat <span id="sort-life-serial_nr" style="font-size:10px; margin-left:4px;">▲</span>
+                  </th>
+                  <th onclick="sortLifecycleTable('vendor')" style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase; cursor:pointer; user-select:none;" title="Click pentru sortare">
+                    Aparat / Model / Cabinet <span id="sort-life-vendor" style="font-size:10px; margin-left:4px;"></span>
+                  </th>
+                  <th onclick="sortLifecycleTable('fabrication_year')" style="padding:12px; text-align:center; width:80px; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase; cursor:pointer; user-select:none;" title="Click pentru sortare">
+                    An Fabr. <span id="sort-life-fabrication_year" style="font-size:10px; margin-left:4px;"></span>
+                  </th>
+                  <th onclick="sortLifecycleTable('current_location')" style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase; cursor:pointer; user-select:none;" title="Click pentru sortare">
+                    Locație Curentă <span id="sort-life-current_location" style="font-size:10px; margin-left:4px;"></span>
+                  </th>
+                  <th onclick="sortLifecycleTable('status')" style="padding:12px; text-align:center; width:110px; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase; cursor:pointer; user-select:none;" title="Click pentru sortare">
+                    Status <span id="sort-life-status" style="font-size:10px; margin-left:4px;"></span>
+                  </th>
+                  <th onclick="sortLifecycleTable('purchase_supplier')" style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase; cursor:pointer; user-select:none;" title="Click pentru sortare">
+                    Intrare: Factură & Furnizor <span id="sort-life-purchase_supplier" style="font-size:10px; margin-left:4px;"></span>
+                  </th>
+                  <th onclick="sortLifecycleTable('purchase_price')" style="padding:12px; text-align:right; width:110px; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase; cursor:pointer; user-select:none;" title="Click pentru sortare">
+                    Preț Achiziție <span id="sort-life-purchase_price" style="font-size:10px; margin-left:4px;"></span>
+                  </th>
+                  <th onclick="sortLifecycleTable('sale_buyer')" style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase; cursor:pointer; user-select:none;" title="Click pentru sortare">
+                    Ieșire: Factură & Cumpărător <span id="sort-life-sale_buyer" style="font-size:10px; margin-left:4px;"></span>
+                  </th>
+                  <th onclick="sortLifecycleTable('sale_price')" style="padding:12px; text-align:right; width:110px; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase; cursor:pointer; user-select:none;" title="Click pentru sortare">
+                    Preț Vânzare <span id="sort-life-sale_price" style="font-size:10px; margin-left:4px;"></span>
+                  </th>
+                  <th onclick="sortLifecycleTable('profit')" style="padding:12px; text-align:right; width:110px; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase; cursor:pointer; user-select:none;" title="Click pentru sortare">
+                    Marjă / Profit <span id="sort-life-profit" style="font-size:10px; margin-left:4px;"></span>
+                  </th>
                   <th style="padding:12px; text-align:center; width:90px; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Acțiuni</th>
                 </tr>
               </thead>
@@ -4098,8 +4145,9 @@
                 <!-- Rendered via JS -->
               </tbody>
             </table>
+            <div id="pg-lifecycle" class="pagination-wrapper" style="border-top:1px solid var(--border); padding:10px 18px; display:flex; justify-content:space-between; align-items:center; background:var(--surface); border-bottom-left-radius:12px; border-bottom-right-radius:12px;">
+            </div>
           </div>
-          <div id="lifecycle-count-info" style="font-size:12px; color:var(--muted); margin-top:10px; padding:0 4px;">Afișate: 0 aparate</div>
         </div>
 
         <!-- VIEW ONJN -->

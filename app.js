@@ -13927,6 +13927,10 @@ let _lifecycleFilter = 'all';
 let _lifecycleSearch = '';
 let _lifecycleSortCol = 'serial_nr';
 let _lifecycleSortAsc = true;
+let _lifecyclePage = 1;
+let _lifecycleLimit = 25;
+let _selectedLifecycleSerials = new Set();
+let _currentLifecyclePageSerials = [];
 let _sellSlotSeriesTags = [];
 let _availableSlotsCache = [];
 
@@ -13939,18 +13943,28 @@ window.switchContractSubTab = function(tab) {
   }
 };
 
+window.sortLifecycleTable = function(col) {
+  if (_lifecycleSortCol === col) {
+    _lifecycleSortAsc = !_lifecycleSortAsc;
+  } else {
+    _lifecycleSortCol = col;
+    _lifecycleSortAsc = true;
+  }
+  renderLifecycleTable();
+};
+
 window.loadSlotLifecycle = async function() {
   const tbody = document.getElementById('lifecycle-tbody');
   if (tbody) {
-    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; padding:30px; color:var(--muted);"><span class="spinner" style="display:inline-block; width:20px; height:20px; border-width:2px; vertical-align:middle; margin-right:8px;"></span> Se încarcă parcul de sloturi...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="13" style="text-align:center; padding:30px; color:var(--muted);"><span class="spinner" style="display:inline-block; width:20px; height:20px; border-width:2px; vertical-align:middle; margin-right:8px;"></span> Se încarcă parcul de sloturi...</td></tr>';
   }
 
   try {
     const params = new URLSearchParams({
       status: _lifecycleFilter,
-      search: _lifecycleSearch,
-      sort_by: _lifecycleSortCol,
-      sort_dir: _lifecycleSortAsc ? 'asc' : 'desc'
+      search: '',
+      sort_by: 'serial_nr',
+      sort_dir: 'asc'
     });
 
     const res = await fetch('/api/slots/inventory-lifecycle?' + params.toString());
@@ -13990,36 +14004,111 @@ window.loadSlotLifecycle = async function() {
   } catch (err) {
     console.error('Error loadSlotLifecycle:', err);
     if (tbody) {
-      tbody.innerHTML = `<tr><td colspan="12" style="text-align:center; padding:20px; color:#ef4444;">Eroare la încărcare: ${escapeHtml(err.message || String(err))}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="13" style="text-align:center; padding:20px; color:#ef4444;">Eroare la încărcare: ${escapeHtml(err.message || String(err))}</td></tr>`;
     }
   }
 };
 
 window.renderLifecycleTable = function() {
   const tbody = document.getElementById('lifecycle-tbody');
-  const countEl = document.getElementById('lifecycle-count-info');
+  const pgWrap = document.getElementById('pg-lifecycle');
   if (!tbody) return;
 
-  if (!_lifecycleData || _lifecycleData.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; padding:30px; color:var(--muted);">Niciun aparat găsit conform filtrelor selectate.</td></tr>';
-    if (countEl) countEl.innerText = 'Afișate: 0 aparate';
+  // Sorting in memory
+  const col = _lifecycleSortCol;
+  const asc = _lifecycleSortAsc;
+  _lifecycleData.sort((a, b) => {
+    let valA = a[col];
+    let valB = b[col];
+    if (valA === null || valA === undefined || valA === '-') valA = '';
+    if (valB === null || valB === undefined || valB === '-') valB = '';
+
+    if (col === 'purchase_price' || col === 'sale_price' || col === 'profit' || col === 'fabrication_year') {
+      const numA = parseFloat(valA) || 0;
+      const numB = parseFloat(valB) || 0;
+      return asc ? numA - numB : numB - numA;
+    }
+
+    const strA = String(valA).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const strB = String(valB).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return asc ? strA.localeCompare(strB) : strB.localeCompare(strA);
+  });
+
+  // Update sort headers indicators
+  const sortCols = ['serial_nr', 'vendor', 'fabrication_year', 'current_location', 'status', 'purchase_supplier', 'purchase_price', 'sale_buyer', 'sale_price', 'profit'];
+  sortCols.forEach(c => {
+    const el = document.getElementById('sort-life-' + c);
+    if (el) {
+      if (c === col) {
+        el.innerText = asc ? '▲' : '▼';
+        el.style.color = 'var(--accent)';
+      } else {
+        el.innerText = '';
+      }
+    }
+  });
+
+  // Client-side filtering if search is active
+  let filteredList = _lifecycleData;
+  if (_lifecycleSearch) {
+    const q = _lifecycleSearch.toLowerCase();
+    filteredList = _lifecycleData.filter(item => {
+      return (item.serial_nr && item.serial_nr.toLowerCase().includes(q)) ||
+             (item.vendor && item.vendor.toLowerCase().includes(q)) ||
+             (item.model && item.model.toLowerCase().includes(q)) ||
+             (item.cabinet && item.cabinet.toLowerCase().includes(q)) ||
+             (item.current_location && item.current_location.toLowerCase().includes(q)) ||
+             (item.purchase_supplier && item.purchase_supplier.toLowerCase().includes(q)) ||
+             (item.purchase_invoice_number && item.purchase_invoice_number.toLowerCase().includes(q)) ||
+             (item.sale_buyer && item.sale_buyer.toLowerCase().includes(q)) ||
+             (item.sale_invoice_number && item.sale_invoice_number.toLowerCase().includes(q)) ||
+             (item.status && item.status.toLowerCase().includes(q));
+    });
+  }
+
+  // Update search count badge
+  const searchBadge = document.getElementById('lifecycle-search-badge');
+  if (searchBadge) {
+    if (_lifecycleSearch) {
+      searchBadge.innerText = `${filteredList.length} / ${_lifecycleData.length}`;
+      searchBadge.style.display = 'inline-block';
+    } else {
+      searchBadge.style.display = 'none';
+    }
+  }
+
+  if (filteredList.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="13" style="text-align:center; padding:30px; color:var(--muted);">Niciun aparat găsit conform filtrelor selectate.</td></tr>';
+    if (pgWrap) pgWrap.style.display = 'none';
+    updateLifecycleBulkBar();
     return;
   }
 
-  if (countEl) {
-    countEl.innerText = `Afișate: ${_lifecycleData.length} aparate`;
-  }
+  // Pagination calculation
+  const totalRecords = filteredList.length;
+  const limit = _lifecycleLimit === 'all' ? totalRecords : parseInt(_lifecycleLimit, 10);
+  const totalPages = _lifecycleLimit === 'all' ? 1 : Math.ceil(totalRecords / limit) || 1;
+  if (_lifecyclePage > totalPages) _lifecyclePage = totalPages || 1;
+  if (_lifecyclePage < 1) _lifecyclePage = 1;
 
-  tbody.innerHTML = _lifecycleData.map((item, idx) => {
+  const startIdx = _lifecycleLimit === 'all' ? 0 : (_lifecyclePage - 1) * limit;
+  const pageItems = _lifecycleLimit === 'all' ? filteredList : filteredList.slice(startIdx, startIdx + limit);
+  _currentLifecyclePageSerials = pageItems.map(it => it.serial_nr);
+
+  // Render rows
+  tbody.innerHTML = pageItems.map((item, idx) => {
+    const isSelected = _selectedLifecycleSerials.has(item.serial_nr);
+    const rowNum = startIdx + idx + 1;
+
     let statusBadge = '';
     if (item.status === 'În Sală (Activ)') {
-      statusBadge = '<span style="display:inline-block; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:700; background:rgba(16,185,129,0.15); color:#10b981;">În Sală</span>';
+      statusBadge = '<span style="display:inline-block; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:700; background:rgba(16,185,129,0.15); color:#10b981;">În Sală</span>';
     } else if (item.status === 'În Stoc') {
-      statusBadge = '<span style="display:inline-block; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:700; background:rgba(59,130,246,0.15); color:#3b82f6;">În Stoc</span>';
+      statusBadge = '<span style="display:inline-block; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:700; background:rgba(59,130,246,0.15); color:#3b82f6;">În Stoc</span>';
     } else if (item.status === 'Vândut') {
-      statusBadge = '<span style="display:inline-block; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:700; background:rgba(245,158,11,0.15); color:#f59e0b;">Vândut</span>';
+      statusBadge = '<span style="display:inline-block; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:700; background:rgba(245,158,11,0.15); color:#f59e0b;">Vândut</span>';
     } else {
-      statusBadge = `<span style="display:inline-block; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:700; background:rgba(148,163,184,0.15); color:var(--muted);">${escapeHtml(item.status || '-')}</span>`;
+      statusBadge = `<span style="display:inline-block; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:700; background:rgba(148,163,184,0.15); color:var(--muted);">${escapeHtml(item.status || '-')}</span>`;
     }
 
     // Purchase column formatting
@@ -14027,7 +14116,7 @@ window.renderLifecycleTable = function() {
     if (item.purchase_supplier && item.purchase_supplier !== '-') {
       purchaseHtml = `<div style="font-weight:700; color:var(--text); font-size:12px;">${escapeHtml(item.purchase_supplier)}</div>`;
       if (item.purchase_invoice_number && item.purchase_invoice_number !== '-') {
-        purchaseHtml += `<div style="font-size:11px; color:var(--muted);">Fact: ${escapeHtml(item.purchase_invoice_number)} ${item.purchase_invoice_date ? '(' + item.purchase_invoice_date + ')' : ''}</div>`;
+        purchaseHtml += `<div style="font-size:11px; color:var(--muted); margin-top:2px;">Fact: ${escapeHtml(item.purchase_invoice_number)} ${item.purchase_invoice_date ? '(' + item.purchase_invoice_date + ')' : ''}</div>`;
       }
     }
 
@@ -14040,7 +14129,7 @@ window.renderLifecycleTable = function() {
     if (item.status === 'Vândut' && item.sale_buyer && item.sale_buyer !== '-') {
       saleHtml = `<div style="font-weight:700; color:#f59e0b; font-size:12px;">${escapeHtml(item.sale_buyer)}</div>`;
       if (item.sale_invoice_number && item.sale_invoice_number !== '-') {
-        saleHtml += `<div style="font-size:11px; color:var(--muted);">Fact: ${escapeHtml(item.sale_invoice_number)} ${item.sale_date ? '(' + item.sale_date + ')' : ''}</div>`;
+        saleHtml += `<div style="font-size:11px; color:var(--muted); margin-top:2px;">Fact: ${escapeHtml(item.sale_invoice_number)} ${item.sale_date ? '(' + item.sale_date + ')' : ''}</div>`;
       }
     }
 
@@ -14061,24 +14150,29 @@ window.renderLifecycleTable = function() {
     if (item.status === 'Vândut') {
       actionBtn = `
         <div style="display:flex; justify-content:center; gap:4px;">
-          <button type="button" onclick="revertSlotSale('${escapeHtml(item.serial_nr)}')" class="btn-ghost" style="padding:3px 8px; font-size:11px; color:var(--muted); border:1px solid var(--border); border-radius:6px;" title="Anulează vânzarea (reintroduce în stoc)">Anulează</button>
-          ${item.sale_invoice_id ? `<a href="/api/contracts/invoices/${item.sale_invoice_id}/download" target="_blank" class="btn-ghost" style="padding:3px 8px; font-size:11px; color:var(--accent); border:1px solid var(--border); border-radius:6px; text-decoration:none;" title="Descarcă Factură PDF">PDF</a>` : ''}
+          <button type="button" onclick="revertSlotSale('${escapeHtml(item.serial_nr)}')" class="btn-ghost" style="padding:4px 8px; font-size:11px; font-weight:600; color:var(--muted); border:1px solid var(--border); border-radius:8px;" title="Anulează vânzarea (reintroduce în stoc)">Anulează</button>
+          ${item.sale_invoice_id ? `<a href="/api/contracts/invoices/${item.sale_invoice_id}/download" target="_blank" class="btn-ghost" style="padding:4px 8px; font-size:11px; font-weight:600; color:var(--accent); border:1px solid var(--border); border-radius:8px; text-decoration:none;" title="Descarcă Factură PDF">PDF</a>` : ''}
         </div>
       `;
     } else {
       actionBtn = `
-        <button type="button" onclick="openContractModal(null, 'Vânzare Sloturi', '${escapeHtml(item.serial_nr)}')" class="btn-ghost" style="padding:3px 10px; font-size:11px; font-weight:700; color:var(--accent); border:1px solid rgba(16,185,129,0.3); border-radius:6px; background:rgba(16,185,129,0.08);" title="Vinde acest aparat">+ Vinde</button>
+        <button type="button" onclick="openContractModal(null, 'Vânzare Sloturi', '${escapeHtml(item.serial_nr)}')" class="btn-ghost" style="padding:4px 10px; font-size:11px; font-weight:700; color:var(--accent); border:1px solid rgba(16,185,129,0.3); border-radius:8px; background:rgba(16,185,129,0.08); cursor:pointer;" title="Vinde acest aparat">+ Vinde</button>
       `;
     }
 
+    const rowBg = isSelected ? 'background:rgba(16,185,129,0.08);' : '';
+
     return `
-      <tr style="border-bottom:1px solid var(--border);">
-        <td style="padding:10px 12px; text-align:center; color:var(--muted); font-size:11px;">${idx + 1}</td>
+      <tr style="border-bottom:1px solid var(--border); ${rowBg} transition:background 0.15s ease;" id="row-life-${escapeHtml(item.serial_nr)}">
+        <td style="padding:10px 12px; width:40px; text-align:center; position:sticky; left:0; z-index:1; background:var(--surface);">
+          <input type="checkbox" class="lifecycle-chk" value="${escapeHtml(item.serial_nr)}" ${isSelected ? 'checked' : ''} onchange="toggleLifecycleRow('${escapeHtml(item.serial_nr)}', this.checked)" style="cursor:pointer;">
+        </td>
+        <td style="padding:10px 12px; width:50px; text-align:center; color:var(--muted); font-size:12px;">${rowNum}</td>
         <td style="padding:10px 12px; font-weight:800; font-family:monospace; font-size:13px; color:var(--text);">${escapeHtml(item.serial_nr)}</td>
         <td style="padding:10px 12px; font-size:12px;">
           <span style="font-weight:700; color:var(--text);">${escapeHtml(item.vendor)}</span>
           ${item.model !== '-' ? `<span style="color:var(--muted); margin-left:4px;">${escapeHtml(item.model)}</span>` : ''}
-          ${item.cabinet !== '-' ? `<div style="font-size:11px; color:var(--muted);">${escapeHtml(item.cabinet)}</div>` : ''}
+          ${item.cabinet !== '-' ? `<div style="font-size:11px; color:var(--muted); margin-top:2px;">${escapeHtml(item.cabinet)}</div>` : ''}
         </td>
         <td style="padding:10px 12px; text-align:center; font-size:12px; color:var(--muted);">${escapeHtml(item.fabrication_year)}</td>
         <td style="padding:10px 12px; font-size:12px;">
@@ -14094,10 +14188,107 @@ window.renderLifecycleTable = function() {
       </tr>
     `;
   }).join('');
+
+  // Update master checkbox
+  const masterCb = document.getElementById('lifecycle-select-all');
+  if (masterCb) {
+    masterCb.checked = pageItems.length > 0 && pageItems.every(it => _selectedLifecycleSerials.has(it.serial_nr));
+  }
+
+  // Update bulk bar
+  updateLifecycleBulkBar();
+
+  // Render pagination wrapper
+  if (pgWrap) {
+    pgWrap.style.display = 'flex';
+    pgWrap.innerHTML = `
+      <div class="pg-controls" style="display:flex; align-items:center; gap:12px;">
+        <span class="pg-info" style="font-size:12px; font-weight:700; color:var(--text); padding-right:12px; border-right:1px solid var(--border);">Total: <strong>${totalRecords}</strong> aparate</span>
+        <span class="pg-info" style="font-size:12px; color:var(--muted); padding-left:4px;">Afișează</span>
+        <select onchange="changeLifecycleLimit(this.value)" class="glass-select" style="padding:4px 28px 4px 10px; font-size:12px; border-radius:9999px; background:var(--surface); border:1px solid var(--border); color:var(--text); cursor:pointer;">
+          <option value="10" ${_lifecycleLimit == 10 ? 'selected' : ''}>10</option>
+          <option value="15" ${_lifecycleLimit == 15 ? 'selected' : ''}>15</option>
+          <option value="25" ${_lifecycleLimit == 25 ? 'selected' : ''}>25</option>
+          <option value="50" ${_lifecycleLimit == 50 ? 'selected' : ''}>50</option>
+          <option value="all" ${_lifecycleLimit === 'all' ? 'selected' : ''}>Toate</option>
+        </select>
+      </div>
+      <div class="pg-controls" style="display:flex; align-items:center; gap:8px;">
+        <span class="pg-info" style="margin-right:8px; font-size:12px; color:var(--text);">Pagina <strong>${_lifecyclePage}</strong> din <strong>${totalPages}</strong></span>
+        <button class="btn-pg" onclick="changeLifecyclePage(-1)" ${_lifecyclePage <= 1 ? 'disabled style="opacity:0.4; cursor:not-allowed;"' : 'style="cursor:pointer;"'} title="Pagina anterioară">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        </button>
+        <button class="btn-pg" onclick="changeLifecyclePage(1)" ${_lifecyclePage >= totalPages ? 'disabled style="opacity:0.4; cursor:not-allowed;"' : 'style="cursor:pointer;"'} title="Pagina următoare">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        </button>
+      </div>
+    `;
+  }
+};
+
+window.toggleAllLifecycle = function(masterCb) {
+  if (masterCb.checked) {
+    if (_currentLifecyclePageSerials && _currentLifecyclePageSerials.length > 0) {
+      _currentLifecyclePageSerials.forEach(s => _selectedLifecycleSerials.add(s));
+    }
+  } else {
+    if (_currentLifecyclePageSerials && _currentLifecyclePageSerials.length > 0) {
+      _currentLifecyclePageSerials.forEach(s => _selectedLifecycleSerials.delete(s));
+    }
+  }
+  renderLifecycleTable();
+};
+
+window.toggleLifecycleRow = function(serial, isChecked) {
+  if (isChecked) {
+    _selectedLifecycleSerials.add(serial);
+  } else {
+    _selectedLifecycleSerials.delete(serial);
+  }
+  updateLifecycleBulkBar();
+  const row = document.getElementById('row-life-' + serial);
+  if (row) {
+    row.style.background = isChecked ? 'rgba(16, 185, 129, 0.08)' : '';
+  }
+  const masterCb = document.getElementById('lifecycle-select-all');
+  if (masterCb && _currentLifecyclePageSerials) {
+    masterCb.checked = _currentLifecyclePageSerials.length > 0 && _currentLifecyclePageSerials.every(s => _selectedLifecycleSerials.has(s));
+  }
+};
+
+window.deselectAllLifecycle = function() {
+  _selectedLifecycleSerials.clear();
+  const masterCb = document.getElementById('lifecycle-select-all');
+  if (masterCb) masterCb.checked = false;
+  renderLifecycleTable();
+};
+
+window.updateLifecycleBulkBar = function() {
+  const bar = document.getElementById('lifecycle-bulk-bar');
+  const countEl = document.getElementById('lifecycle-selected-count');
+  const sz = _selectedLifecycleSerials.size;
+  if (bar) {
+    bar.style.display = sz > 0 ? 'flex' : 'none';
+  }
+  if (countEl) {
+    countEl.innerText = `${sz} ${sz === 1 ? 'aparat selectat' : 'aparate selectate'}`;
+  }
+};
+
+window.changeLifecycleLimit = function(val) {
+  _lifecycleLimit = val === 'all' ? 'all' : parseInt(val, 10);
+  _lifecyclePage = 1;
+  renderLifecycleTable();
+};
+
+window.changeLifecyclePage = function(delta) {
+  _lifecyclePage += delta;
+  renderLifecycleTable();
 };
 
 window.setLifecycleStatusFilter = function(status) {
   _lifecycleFilter = status;
+  _lifecyclePage = 1;
   ['all', 'active', 'in_stock', 'sold'].forEach(s => {
     const btn = document.getElementById('flt-life-' + s);
     if (btn) {
@@ -14120,8 +14311,9 @@ window.handleLifecycleSearch = function(val) {
   clearTimeout(_lifecycleSearchTimer);
   _lifecycleSearchTimer = setTimeout(() => {
     _lifecycleSearch = (val || '').trim();
-    loadSlotLifecycle();
-  }, 300);
+    _lifecyclePage = 1;
+    renderLifecycleTable();
+  }, 150);
 };
 
 // Delegat direct către Adaugă Contract Vânzare Sloturi
@@ -14153,13 +14345,13 @@ window.revertSlotSale = async function(serialNr) {
   }
 };
 
-window.exportLifecycleExcel = function() {
-  if (!_lifecycleData || _lifecycleData.length === 0) {
+function exportLifecycleDataset(dataList, filename) {
+  if (!dataList || dataList.length === 0) {
     if (typeof showAlert === 'function') showAlert('Nu există date de exportat.');
     return;
   }
 
-  const exportRows = _lifecycleData.map((s, idx) => ({
+  const exportRows = dataList.map((s, idx) => ({
     'Nr.': idx + 1,
     'Serie Aparat': s.serial_nr,
     'Producător': s.vendor,
@@ -14185,9 +14377,8 @@ window.exportLifecycleExcel = function() {
     const ws = XLSX.utils.json_to_sheet(exportRows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Parc Sloturi');
-    XLSX.writeFile(wb, `Gestiune_Parc_Sloturi_${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.writeFile(wb, filename);
   } else {
-    // Fallback CSV
     const headers = Object.keys(exportRows[0]);
     const csvContent = [
       headers.join(';'),
@@ -14197,12 +14388,25 @@ window.exportLifecycleExcel = function() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Gestiune_Parc_Sloturi_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = filename.replace('.xlsx', '.csv');
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   }
+}
+
+window.exportLifecycleExcel = function() {
+  exportLifecycleDataset(_lifecycleData, `Gestiune_Parc_Sloturi_${new Date().toISOString().split('T')[0]}.xlsx`);
+};
+
+window.exportSelectedLifecycleExcel = function() {
+  if (_selectedLifecycleSerials.size === 0) {
+    exportLifecycleExcel();
+    return;
+  }
+  const selectedData = _lifecycleData.filter(item => _selectedLifecycleSerials.has(item.serial_nr));
+  exportLifecycleDataset(selectedData, `Selectate_${selectedData.length}_Aparate_${new Date().toISOString().split('T')[0]}.xlsx`);
 };
 
 
