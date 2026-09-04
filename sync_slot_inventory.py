@@ -63,42 +63,29 @@ def sync_inventory():
     stations = c.fetchall()
     print(f"Loaded {len(stations)} stations from casino_stations")
 
-    # Insert stations
+    # Enrich station metadata only for machines that exist from invoices
     for st in stations:
         s_nr = str(st['serial_nr']).strip()
         if not s_nr: continue
         
-        status = 'În Sală (Activ)'
-        if st['is_deleted']:
-            status = 'Casat'
-        elif not st['location_name'] or st['location_name'] == 'Depozit':
-            status = 'În Stoc'
-            
         vendor = st['vendor_name'] or vendor_pdf_map.get(s_nr)
         fab_year = st['fabrication_year'] or year_pdf_map.get(s_nr)
         
         c.execute('''
-            INSERT INTO cp2_slot_inventory (
-                serial_nr, vendor, model, cabinet, fabrication_year,
-                current_location, status, purchase_contract_number, purchase_invoice_number,
-                entry_date
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_DATE)
-            ON CONFLICT (serial_nr) DO UPDATE SET
-                vendor = COALESCE(EXCLUDED.vendor, cp2_slot_inventory.vendor),
-                model = COALESCE(EXCLUDED.model, cp2_slot_inventory.model),
-                cabinet = COALESCE(EXCLUDED.cabinet, cp2_slot_inventory.cabinet),
-                fabrication_year = COALESCE(EXCLUDED.fabrication_year, cp2_slot_inventory.fabrication_year),
-                current_location = COALESCE(EXCLUDED.current_location, cp2_slot_inventory.current_location),
-                status = COALESCE(EXCLUDED.status, cp2_slot_inventory.status),
-                purchase_contract_number = COALESCE(EXCLUDED.purchase_contract_number, cp2_slot_inventory.purchase_contract_number),
-                purchase_invoice_number = COALESCE(EXCLUDED.purchase_invoice_number, cp2_slot_inventory.purchase_invoice_number)
+            UPDATE cp2_slot_inventory SET
+                vendor = COALESCE(cp2_slot_inventory.vendor, %s),
+                model = COALESCE(cp2_slot_inventory.model, %s),
+                cabinet = COALESCE(cp2_slot_inventory.cabinet, %s),
+                fabrication_year = COALESCE(cp2_slot_inventory.fabrication_year, %s),
+                current_location = COALESCE(%s, cp2_slot_inventory.current_location)
+            WHERE serial_nr = %s
         ''', (
-            s_nr, vendor, st['model_name'], st['cabinet_name'], fab_year,
-            st['location_name'], status, st['purchase_contract'], st['invoice']
+            vendor, st['model_name'], st['cabinet_name'], fab_year,
+            st['location_name'], s_nr
         ))
     
     conn.commit()
-    print("Stations inserted/updated.")
+    print("Stations metadata enriched.")
 
     # 3. Fetch contract invoices and associate slots
     c.execute('''

@@ -13293,7 +13293,7 @@ window.renderSeriesTags = function() {
 
   if (!wrapper) return;
   wrapper.innerHTML = _currentSeriesTags.map((tag, idx) => `
-    <span class="series-chip" style="display:inline-flex; align-items:center; gap:6px; background:rgba(99, 102, 241, 0.15); color:var(--accent); border:1px solid rgba(99, 102, 241, 0.3); border-radius:6px; padding:3px 8px; font-family:monospace; font-size:11.5px; font-weight:600;">
+    <span class="series-chip" style="display:inline-flex; align-items:center; gap:6px; background:rgba(99, 102, 241, 0.15); color:var(--accent); border:1px solid rgba(99, 102, 241, 0.3); border-radius:6px; padding:3px 8px; font-size:11.5px; font-weight:600;">
       <span>${escapeHtml(tag)}</span>
       <span onclick="removeSeriesTag(${idx})" style="cursor:pointer; font-weight:bold; font-size:14px; opacity:0.7; line-height:1;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.7" title="Șterge tag">&times;</span>
     </span>
@@ -13487,7 +13487,7 @@ window.renderContractInvoicesTable = function() {
       const remaining = seriesArr.length - 3;
       seriesHtml = `
         <div style="display:flex; flex-wrap:wrap; gap:4px; align-items:center;">
-          ${visible.map(s => `<span style="display:inline-block; font-family:monospace; font-size:11px; background:rgba(99, 102, 241, 0.12); color:var(--accent); border:1px solid rgba(99, 102, 241, 0.25); padding:2px 6px; border-radius:4px; font-weight:600;">${escapeHtml(s)}</span>`).join('')}
+          ${visible.map(s => `<span style="display:inline-block; font-size:11px; background:rgba(99, 102, 241, 0.12); color:var(--accent); border:1px solid rgba(99, 102, 241, 0.25); padding:2px 6px; border-radius:4px; font-weight:600;">${escapeHtml(s)}</span>`).join('')}
           <button onclick="openInvoiceSlotsModal('${inv.id}')" style="background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.3); border-radius:6px; font-size:11px; font-weight:700; color:var(--accent); padding:3px 8px; cursor:pointer; transition:0.2s; display:inline-flex; align-items:center; gap:4px;" onmouseover="this.style.background='rgba(99,102,241,0.2)'" onmouseout="this.style.background='rgba(99,102,241,0.12)'" title="Deschide Tabel Sloturi (Provider, Model, Cabinet, Sală, Preț)">
             Vezi Tabel Sloturi (${seriesArr.length}) &rarr;
           </button>
@@ -14035,7 +14035,7 @@ window.renderLifecycleTable = function() {
   });
 
   // Update sort headers indicators
-  const sortCols = ['serial_nr', 'vendor', 'fabrication_year', 'current_location', 'status', 'purchase_supplier', 'purchase_price', 'sale_buyer', 'sale_price', 'profit'];
+  const sortCols = ['serial_nr', 'vendor', 'fabrication_year', 'current_location', 'status', 'purchase_supplier', 'purchase_price', 'sale_buyer', 'sale_price'];
   sortCols.forEach(c => {
     const el = document.getElementById('sort-life-' + c);
     if (el) {
@@ -14078,7 +14078,7 @@ window.renderLifecycleTable = function() {
   }
 
   if (filteredList.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="13" style="text-align:center; padding:30px; color:var(--muted);">Niciun aparat găsit conform filtrelor selectate.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:30px; color:var(--muted);">Niciun aparat găsit conform filtrelor selectate.</td></tr>';
     if (pgWrap) pgWrap.style.display = 'none';
     updateLifecycleBulkBar();
     return;
@@ -14101,8 +14101,8 @@ window.renderLifecycleTable = function() {
     const rowNum = startIdx + idx + 1;
 
     let statusBadge = '';
-    if (item.status === 'În Sală (Activ)') {
-      statusBadge = '<span style="display:inline-block; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:700; background:rgba(16,185,129,0.15); color:#10b981;">În Sală</span>';
+    if (item.status === 'Activ' || item.status === 'În Sală (Activ)' || item.status === 'În Sală') {
+      statusBadge = '<span style="display:inline-block; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:700; background:rgba(16,185,129,0.15); color:#10b981;">Activ</span>';
     } else if (item.status === 'În Stoc') {
       statusBadge = '<span style="display:inline-block; padding:4px 10px; border-radius:12px; font-size:11px; font-weight:700; background:rgba(59,130,246,0.15); color:#3b82f6;">În Stoc</span>';
     } else if (item.status === 'Vândut') {
@@ -14129,36 +14129,13 @@ window.renderLifecycleTable = function() {
     if (item.status === 'Vândut' && item.sale_buyer && item.sale_buyer !== '-') {
       saleHtml = `<div style="font-weight:700; color:#f59e0b; font-size:12px;">${escapeHtml(item.sale_buyer)}</div>`;
       if (item.sale_invoice_number && item.sale_invoice_number !== '-') {
-        saleHtml += `<div style="font-size:11px; color:var(--muted); margin-top:2px;">Fact: ${escapeHtml(item.sale_invoice_number)} ${item.sale_date ? '(' + item.sale_date + ')' : ''}</div>`;
+        saleHtml += `<div style="font-size:11px; color:var(--muted); margin-top:2px;">Fact: ${escapeHtml(item.sale_invoice_number)} ${item.sale_date ? '(' + item.sale_date + ')' : ''} ${item.sale_invoice_id ? `<a href="/api/contracts/invoices/${item.sale_invoice_id}/download" target="_blank" style="color:var(--accent); font-weight:700; margin-left:4px; text-decoration:none;" title="Descarcă Factură PDF">(PDF)</a>` : ''}</div>`;
       }
     }
 
     const sPriceStr = item.sale_price !== null && item.sale_price !== undefined
       ? `<span style="font-weight:700; color:#10b981;">${Number(item.sale_price).toLocaleString('ro-RO')} ${escapeHtml(item.sale_currency || 'RON')}</span>`
       : '<span style="color:var(--muted);">-</span>';
-
-    // Profit formatting
-    let profitStr = '<span style="color:var(--muted);">-</span>';
-    if (item.profit !== null && item.profit !== undefined) {
-      const pSign = item.profit >= 0 ? '+' : '';
-      const pColor = item.profit >= 0 ? '#10b981' : '#ef4444';
-      profitStr = `<span style="font-weight:800; color:${pColor};">${pSign}${Number(item.profit).toLocaleString('ro-RO')} ${escapeHtml(item.sale_currency || 'RON')}</span>`;
-    }
-
-    // Actions
-    let actionBtn = '';
-    if (item.status === 'Vândut') {
-      actionBtn = `
-        <div style="display:flex; justify-content:center; gap:4px;">
-          <button type="button" onclick="revertSlotSale('${escapeHtml(item.serial_nr)}')" class="btn-ghost" style="padding:4px 8px; font-size:11px; font-weight:600; color:var(--muted); border:1px solid var(--border); border-radius:8px;" title="Anulează vânzarea (reintroduce în stoc)">Anulează</button>
-          ${item.sale_invoice_id ? `<a href="/api/contracts/invoices/${item.sale_invoice_id}/download" target="_blank" class="btn-ghost" style="padding:4px 8px; font-size:11px; font-weight:600; color:var(--accent); border:1px solid var(--border); border-radius:8px; text-decoration:none;" title="Descarcă Factură PDF">PDF</a>` : ''}
-        </div>
-      `;
-    } else {
-      actionBtn = `
-        <button type="button" onclick="openContractModal(null, 'Vânzare Sloturi', '${escapeHtml(item.serial_nr)}')" class="btn-ghost" style="padding:4px 10px; font-size:11px; font-weight:700; color:var(--accent); border:1px solid rgba(16,185,129,0.3); border-radius:8px; background:rgba(16,185,129,0.08); cursor:pointer;" title="Vinde acest aparat">+ Vinde</button>
-      `;
-    }
 
     const rowBg = isSelected ? 'background:rgba(16,185,129,0.08);' : '';
 
@@ -14168,13 +14145,15 @@ window.renderLifecycleTable = function() {
           <input type="checkbox" class="lifecycle-chk" value="${escapeHtml(item.serial_nr)}" ${isSelected ? 'checked' : ''} onchange="toggleLifecycleRow('${escapeHtml(item.serial_nr)}', this.checked)" style="cursor:pointer;">
         </td>
         <td style="padding:10px 12px; width:50px; text-align:center; color:var(--muted); font-size:12px;">${rowNum}</td>
-        <td style="padding:10px 12px; font-weight:800; font-family:monospace; font-size:13px; color:var(--text);">${escapeHtml(item.serial_nr)}</td>
+        <td style="padding:10px 12px;">
+          <div style="font-weight:700; font-size:13px; color:var(--text);">${escapeHtml(item.serial_nr)}</div>
+          ${item.fabrication_year && item.fabrication_year !== '-' ? `<div style="font-size:11px; color:var(--muted); margin-top:2px;">An: ${escapeHtml(item.fabrication_year)}</div>` : ''}
+        </td>
         <td style="padding:10px 12px; font-size:12px;">
           <span style="font-weight:700; color:var(--text);">${escapeHtml(item.vendor)}</span>
           ${item.model !== '-' ? `<span style="color:var(--muted); margin-left:4px;">${escapeHtml(item.model)}</span>` : ''}
           ${item.cabinet !== '-' ? `<div style="font-size:11px; color:var(--muted); margin-top:2px;">${escapeHtml(item.cabinet)}</div>` : ''}
         </td>
-        <td style="padding:10px 12px; text-align:center; font-size:12px; color:var(--muted);">${escapeHtml(item.fabrication_year)}</td>
         <td style="padding:10px 12px; font-size:12px;">
           <span style="font-weight:600; color:var(--text);">${escapeHtml(item.current_location)}</span>
         </td>
@@ -14183,8 +14162,6 @@ window.renderLifecycleTable = function() {
         <td style="padding:10px 12px; text-align:right; font-size:12px;">${pPriceStr}</td>
         <td style="padding:10px 12px;">${saleHtml}</td>
         <td style="padding:10px 12px; text-align:right; font-size:12px;">${sPriceStr}</td>
-        <td style="padding:10px 12px; text-align:right; font-size:12px;">${profitStr}</td>
-        <td style="padding:10px 12px; text-align:center;">${actionBtn}</td>
       </tr>
     `;
   }).join('');
@@ -14369,8 +14346,7 @@ function exportLifecycleDataset(dataList, filename) {
     'Nr. Factură Ieșire': s.sale_invoice_number,
     'Dată Ieșire': s.sale_date || s.exit_date,
     'Preț Vânzare': s.sale_price,
-    'Monedă Vânzare': s.sale_currency,
-    'Profit / Marjă': s.profit
+    'Monedă Vânzare': s.sale_currency
   }));
 
   if (typeof XLSX !== 'undefined') {

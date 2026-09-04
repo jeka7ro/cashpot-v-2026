@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, send_from_directory, Response, send_file
+from flask import Flask, jsonify, request, send_from_directory, Response, send_file, redirect
 from flask_cors import CORS
 import pymysql, os, requests as req_lib, xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
@@ -4835,6 +4835,115 @@ def delete_contract(contract_id):
     pg_qry("DELETE FROM cp2_contracts WHERE id = %s", (contract_id,))
     return jsonify({"success": True})
 
+def auto_resize_pdf_if_large(file_data, target_max_bytes=10 * 1024 * 1024):
+    """
+    Automatically optimizes and resizes any PDF larger than target_max_bytes (default 10 MB).
+    Downsamples high-resolution scan images to 150 DPI and applies JPEG compression,
+    reducing 20-60 MB scanned contracts to 1-3 MB while preserving crisp text readability.
+    """
+    if not file_data or len(file_data) <= target_max_bytes:
+        return file_data
+    try:
+        import fitz, io
+        from PIL import Image
+        
+        # 1. Try deflate/garbage clean first
+        doc = fitz.open(stream=file_data, filetype='pdf')
+        compressed = doc.tobytes(deflate=True, garbage=4, clean=True)
+        if len(compressed) <= target_max_bytes:
+            print(f"[PDF Auto-Resize] Deflate reduced PDF from {len(file_data)/1024/1024:.2f}MB to {len(compressed)/1024/1024:.2f}MB")
+            return compressed
+            
+        # 2. Downsample and resize scanned pages
+        src_doc = fitz.open(stream=compressed, filetype='pdf')
+        out_doc = fitz.open()
+        max_dim = 1700
+        quality = 75
+        
+        for page_num in range(len(src_doc)):
+            page = src_doc[page_num]
+            pix = page.get_pixmap(dpi=150)
+            img = Image.open(io.BytesIO(pix.tobytes('jpeg')))
+            if max(img.size) > max_dim:
+                img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+            buf = io.BytesIO()
+            img.save(buf, format='JPEG', quality=quality, optimize=True)
+            img_bytes = buf.getvalue()
+            
+            new_page = out_doc.new_page(width=page.rect.width, height=page.rect.height)
+            new_page.insert_image(page.rect, stream=img_bytes)
+            
+        resized_bytes = out_doc.tobytes(deflate=True, garbage=4, clean=True)
+        if len(resized_bytes) < len(file_data):
+            print(f"[PDF Auto-Resize] Resized PDF from {len(file_data)/1024/1024:.2f}MB to {len(resized_bytes)/1024/1024:.2f}MB")
+            return resized_bytes
+        return compressed
+    except Exception as e:
+        print(f"[PDF Auto-Resize] Warning during PDF optimization: {e}")
+        return file_data
+
+def save_contract_file_bytes(file_id, file_data, filename=None):
+    if not file_data:
+        return
+        
+    # Automatically resize PDFs > 10 MB to prevent large payload and protocol issues
+    file_data = auto_resize_pdf_if_large(file_data)
+    
+    if filename:
+        try:
+            import os
+            os.makedirs('uploads/contracts', exist_ok=True)
+            disk_path = os.path.join('uploads/contracts', f"{file_id}_{filename}")
+            with open(disk_path, 'wb') as f:
+                f.write(file_data)
+            pg_qry("UPDATE cp2_contract_files SET filepath = %s WHERE id = %s", (disk_path, file_id))
+        except Exception as e_disk:
+            print("Disk write warning:", e_disk)
+
+    # If larger than 5 MB, store in chunks (to prevent psycopg2 hex wire inflation over 16MB limit)
+    if len(file_data) > 5 * 1024 * 1024:
+        chunk_size = 2 * 1024 * 1024
+        chunks = [file_data[i:i + chunk_size] for i in range(0, len(file_data), chunk_size)]
+        
+        pg_qry("DELETE FROM cp2_contract_file_chunks WHERE file_id = %s", (file_id,))
+        for idx, chk in enumerate(chunks):
+            pg_qry("""
+                INSERT INTO cp2_contract_file_chunks (file_id, chunk_index, chunk_data)
+                VALUES (%s, %s, %s)
+            """, (file_id, idx, chk))
+            
+        marker = f"CHUNKED:{len(chunks)}".encode('utf-8')
+        pg_qry("""
+            INSERT INTO cp2_contract_file_data (file_id, file_data)
+            VALUES (%s, %s)
+            ON CONFLICT (file_id) DO UPDATE SET file_data = EXCLUDED.file_data
+        """, (file_id, marker))
+    else:
+        pg_qry("DELETE FROM cp2_contract_file_chunks WHERE file_id = %s", (file_id,))
+        pg_qry("""
+            INSERT INTO cp2_contract_file_data (file_id, file_data)
+            VALUES (%s, %s)
+            ON CONFLICT (file_id) DO UPDATE SET file_data = EXCLUDED.file_data
+        """, (file_id, file_data))
+
+def load_contract_file_bytes(file_id):
+    fdata = pg_qry("SELECT file_data FROM cp2_contract_file_data WHERE file_id = %s", (file_id,))
+    if not fdata or not fdata[0].get('file_data'):
+        return None
+        
+    raw = bytes(fdata[0]['file_data'])
+    if raw.startswith(b"CHUNKED:"):
+        chunk_rows = pg_qry("""
+            SELECT chunk_data FROM cp2_contract_file_chunks 
+            WHERE file_id = %s 
+            ORDER BY chunk_index ASC
+        """, (file_id,))
+        if not chunk_rows:
+            return None
+        return b''.join([bytes(r['chunk_data']) for r in chunk_rows])
+        
+    return raw
+
 @app.route('/api/contracts/<contract_id>/files', methods=['POST'])
 def upload_contract_file(contract_id):
     if 'file' not in request.files: return jsonify({"error": "No file"}), 400
@@ -4854,12 +4963,14 @@ def upload_contract_file(contract_id):
         VALUES (%s, %s, %s, %s, %s)
     """, (fid, contract_id, is_annex, filename, ''))
     
-    pg_qry("INSERT INTO cp2_contract_file_data (file_id, file_data) VALUES (%s, %s)", (fid, file_data))
+    save_contract_file_bytes(fid, file_data, filename)
     
     return jsonify({"success": True})
 
 @app.route('/api/contracts/files/<file_id>', methods=['DELETE'])
 def delete_contract_file(file_id):
+    pg_qry("DELETE FROM cp2_contract_file_chunks WHERE file_id = %s", (file_id,))
+    pg_qry("DELETE FROM cp2_contract_file_data WHERE file_id = %s", (file_id,))
     pg_qry("DELETE FROM cp2_contract_files WHERE id = %s", (file_id,))
     return jsonify({"success": True})
 
@@ -4874,33 +4985,20 @@ def upload_contract_file_data(file_id):
     file_data = file.read()
     filename = secure_filename(file.filename)
     
-    pg_qry("UPDATE cp2_contract_files SET filename = %s, filepath = '' WHERE id = %s", (filename, file_id))
-    pg_qry("""
-        INSERT INTO cp2_contract_file_data (file_id, file_data)
-        VALUES (%s, %s)
-        ON CONFLICT (file_id) DO UPDATE SET file_data = EXCLUDED.file_data
-    """, (file_id, file_data))
+    pg_qry("UPDATE cp2_contract_files SET filename = %s WHERE id = %s", (filename, file_id))
+    save_contract_file_bytes(file_id, file_data, filename)
     
     if request.headers.get('Accept') == 'application/json' or request.is_json:
         return jsonify({"success": True})
         
-    return f"""<!DOCTYPE html>
-<html>
-<body>
-    <script>
-        alert('Fișierul PDF a fost încărcat și salvat cu succes în baza de date!');
-        window.location.href = '/api/contracts/files/{file_id}/download';
-    </script>
-</body>
-</html>"""
+    return redirect(f'/api/contracts/files/{file_id}/download')
 
 @app.route('/api/contracts/files/<file_id>/download', methods=['GET'])
 def download_contract_file(file_id):
     rows = pg_qry("SELECT id, contract_id, filename, filepath FROM cp2_contract_files WHERE id = %s", (file_id,))
     if not rows: return "File not found", 404
     
-    fdata = pg_qry("SELECT file_data FROM cp2_contract_file_data WHERE file_id = %s", (file_id,))
-    file_data = fdata[0]['file_data'] if fdata and fdata[0]['file_data'] else None
+    file_data = load_contract_file_bytes(file_id)
     
     if not file_data:
         # Fallback to local disk for old files
@@ -4965,7 +5063,7 @@ def download_contract_file(file_id):
             padding: 10px 14px;
             font-size: 12px;
             color: #cbd5e1;
-            font-family: monospace;
+            font-family: inherit, sans-serif;
             margin-bottom: 24px;
             word-break: break-all;
         }}
@@ -5101,6 +5199,7 @@ def add_contract_invoice(contract_id):
     """, (iid, contract_id, inv_number, inv_date, amount, currency, supplier, slots_count, slots_series, filename, notes))
 
     if file_data:
+        file_data = auto_resize_pdf_if_large(file_data)
         pg_qry("INSERT INTO cp2_contract_invoice_data (invoice_id, file_data) VALUES (%s, %s)", (iid, file_data))
 
     # Synchronize with cp2_slot_inventory
@@ -5155,7 +5254,7 @@ def add_contract_invoice(contract_id):
                             purchase_invoice_id, purchase_invoice_number, purchase_invoice_date,
                             purchase_supplier, purchase_price, purchase_currency, notes
                         ) VALUES (
-                            %s, 'În Stoc', 'Achiziție', %s,
+                            %s, 'Activ', 'Achiziție', %s,
                             %s, %s,
                             %s, %s, %s,
                             %s, %s, %s, %s
@@ -5178,6 +5277,21 @@ def add_contract_invoice(contract_id):
                         iid, inv_number, inv_date,
                         supplier, unit_p, currency, notes
                     ))
+                    # Enrich metadata from casino_stations if available
+                    pg_qry("""
+                        UPDATE cp2_slot_inventory SET
+                            vendor = COALESCE(cp2_slot_inventory.vendor, v.name),
+                            model = COALESCE(cp2_slot_inventory.model, vm.name),
+                            cabinet = COALESCE(cp2_slot_inventory.cabinet, c.name),
+                            fabrication_year = COALESCE(cp2_slot_inventory.fabrication_year, s.fabrication_year),
+                            current_location = COALESCE(cp2_slot_inventory.current_location, l.name, 'În Stoc / Depozit')
+                        FROM casino_stations s
+                        LEFT JOIN casino_vendors v ON s.vendor_id = v.id
+                        LEFT JOIN casino_vendor_models vm ON s.vendor_model_id = vm.id
+                        LEFT JOIN casino_cabinets c ON s.cabinet_id = c.id
+                        LEFT JOIN casino_locations l ON s.location_id = l.id
+                        WHERE cp2_slot_inventory.serial_nr = %s AND s.serial_nr = %s
+                    """, (s_nr, s_nr))
         except Exception as ex_sync:
             print("Warning: could not sync inventory on invoice add:", ex_sync)
 
@@ -5189,7 +5303,7 @@ def delete_contract_invoice(invoice_id):
         # Revert any sales associated with this invoice
         pg_qry('''
             UPDATE cp2_slot_inventory
-            SET status = CASE WHEN current_location IS NOT NULL AND current_location != 'Depozit' THEN 'În Sală (Activ)' ELSE 'În Stoc' END,
+            SET status = CASE WHEN current_location IS NOT NULL AND current_location != 'Depozit' THEN 'Activ' ELSE 'În Stoc' END,
                 exit_type = NULL, exit_date = NULL,
                 sale_contract_id = NULL, sale_contract_number = NULL,
                 sale_invoice_id = NULL, sale_invoice_number = NULL, sale_invoice_date = NULL,
@@ -5691,13 +5805,13 @@ def get_slot_inventory_lifecycle():
         params = []
         
         if status_filter == 'active':
-            where_clauses.append("status = 'În Sală (Activ)'")
+            where_clauses.append("status IN ('Activ', 'În Sală (Activ)')")
         elif status_filter == 'in_stock':
             where_clauses.append("status = 'În Stoc'")
         elif status_filter == 'sold':
             where_clauses.append("status = 'Vândut'")
         elif status_filter == 'available':
-            where_clauses.append("status IN ('În Sală (Activ)', 'În Stoc')")
+            where_clauses.append("status IN ('Activ', 'În Sală (Activ)', 'În Stoc')")
             
         if search:
             where_clauses.append("""(
@@ -5796,7 +5910,7 @@ def get_slot_inventory_lifecycle():
         kpi_rows = pg_qry("""
             SELECT 
                 COUNT(*) as total_slots,
-                COUNT(*) FILTER (WHERE status = 'În Sală (Activ)') as total_active,
+                COUNT(*) FILTER (WHERE status IN ('Activ', 'În Sală (Activ)')) as total_active,
                 COUNT(*) FILTER (WHERE status = 'În Stoc') as total_stock,
                 COUNT(*) FILTER (WHERE status = 'Vândut') as total_sold,
                 COALESCE(SUM(purchase_price), 0) as total_purchase_val,
@@ -5935,7 +6049,7 @@ def revert_slot_sale():
         if serial_nr:
             pg_qry('''
                 UPDATE cp2_slot_inventory
-                SET status = CASE WHEN current_location IS NOT NULL AND current_location != 'Depozit' THEN 'În Sală (Activ)' ELSE 'În Stoc' END,
+                SET status = CASE WHEN current_location IS NOT NULL AND current_location != 'Depozit' THEN 'Activ' ELSE 'În Stoc' END,
                     exit_type = NULL, exit_date = NULL,
                     sale_contract_id = NULL, sale_contract_number = NULL,
                     sale_invoice_id = NULL, sale_invoice_number = NULL, sale_invoice_date = NULL,
@@ -5947,7 +6061,7 @@ def revert_slot_sale():
         elif invoice_id:
             pg_qry('''
                 UPDATE cp2_slot_inventory
-                SET status = CASE WHEN current_location IS NOT NULL AND current_location != 'Depozit' THEN 'În Sală (Activ)' ELSE 'În Stoc' END,
+                SET status = CASE WHEN current_location IS NOT NULL AND current_location != 'Depozit' THEN 'Activ' ELSE 'În Stoc' END,
                     exit_type = NULL, exit_date = NULL,
                     sale_contract_id = NULL, sale_contract_number = NULL,
                     sale_invoice_id = NULL, sale_invoice_number = NULL, sale_invoice_date = NULL,
