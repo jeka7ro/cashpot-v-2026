@@ -10,6 +10,17 @@ function escapeHtml(str) {
 }
 window.escapeHtml = escapeHtml;
 
+function escapeAttr(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+window.escapeAttr = escapeAttr;
+
 window.showAlert = function(text, title="Atenție") {
   document.getElementById("custom-alert-title").innerText = title;
   document.getElementById("custom-alert-text").innerText = text;
@@ -380,6 +391,11 @@ function renderTablePaginated(key) {
     st.parsedRows = null; // Reset cache if no sort
   }
 
+  const totalRecords = rowsToRender.length;
+  const totalPages = st.limit === 'all' ? 1 : Math.ceil(totalRecords / st.limit) || 1;
+  if (st.page > totalPages) st.page = 1;
+  if (st.page < 1) st.page = 1;
+
   if (st.limit === 'all' || rowsToRender.length <= st.limit) {
     tbody.innerHTML = rowsToRender.join('');
   } else {
@@ -390,8 +406,6 @@ function renderTablePaginated(key) {
   
   if(pgWrap) {
     pgWrap.style.display = 'flex';
-    const totalRecords = rowsToRender.length;
-    const totalPages = st.limit === 'all' ? 1 : Math.ceil(totalRecords / st.limit) || 1;
     
     pgWrap.innerHTML = `
       <div class="pg-controls" style="gap:12px; align-items:center;">
@@ -11976,6 +11990,57 @@ window.sortContractsTable = function(col) {
   renderContractsTable();
 };
 
+window._contractCompanyFilter = null;
+
+window.filterContractsByCompany = function(event, companyName) {
+  if (event) {
+    event.stopPropagation();
+    event.preventDefault();
+  }
+  
+  if (!companyName) return;
+  const cleanName = companyName.trim();
+  
+  // Toggle off if already filtered by this company
+  if (window._contractCompanyFilter && window._contractCompanyFilter.toLowerCase() === cleanName.toLowerCase()) {
+    window._contractCompanyFilter = null;
+  } else {
+    window._contractCompanyFilter = cleanName;
+  }
+  
+  // Reset pagination to page 1 across all records
+  if (tableStates && tableStates.contracts) {
+    tableStates.contracts.page = 1;
+  }
+  
+  // Clear search input so company filter applies cleanly
+  const searchInput = document.getElementById('filter-contract-search');
+  if (searchInput) {
+    searchInput.value = '';
+  }
+  
+  renderContractsTable();
+};
+
+window.clearContractCompanyFilter = function() {
+  window._contractCompanyFilter = null;
+  if (tableStates && tableStates.contracts) {
+    tableStates.contracts.page = 1;
+  }
+  const searchInput = document.getElementById('filter-contract-search');
+  if (searchInput) {
+    searchInput.value = '';
+  }
+  renderContractsTable();
+};
+
+window.handleContractSearchInput = function() {
+  if (tableStates && tableStates.contracts) {
+    tableStates.contracts.page = 1;
+  }
+  renderContractsTable();
+};
+
 window.renderContractsTable = function() {
   const tb = document.getElementById('contracts-tbody');
   if (!tb) return;
@@ -11996,6 +12061,15 @@ window.renderContractsTable = function() {
     filteredContracts = filteredContracts.filter(c => c.type === filterType);
   }
   
+  // Filter by clicked company across all records
+  if (window._contractCompanyFilter) {
+    const cf = window._contractCompanyFilter.toLowerCase().trim();
+    filteredContracts = filteredContracts.filter(c => {
+      const on = (c.owner_name || '').toLowerCase().trim();
+      return on === cf || on.includes(cf) || cf.includes(on);
+    });
+  }
+
   const filterSearch = document.getElementById('filter-contract-search') ? document.getElementById('filter-contract-search').value.toLowerCase().trim() : '';
   if (filterSearch) {
     filteredContracts = filteredContracts.filter(c => {
@@ -12008,6 +12082,19 @@ window.renderContractsTable = function() {
        ].filter(Boolean).join(' ').toLowerCase();
        return str.includes(filterSearch);
     });
+  }
+
+  // Update active company filter chip UI in toolbar
+  const filterChip = document.getElementById('contract-active-company-filter');
+  const filterName = document.getElementById('contract-active-company-name');
+  if (filterChip && filterName) {
+    if (window._contractCompanyFilter) {
+      filterName.innerText = window._contractCompanyFilter;
+      filterChip.style.display = 'inline-flex';
+    } else {
+      filterChip.style.display = 'none';
+      filterName.innerText = '';
+    }
   }
 
 
@@ -12093,7 +12180,10 @@ window.renderContractsTable = function() {
     }
     
     let typeHtml = `<strong>${c.type || '-'}</strong>`;
-    if (c.owner_name) typeHtml += `<br><span style="font-size:11px; color:var(--muted)">${c.owner_name}</span>`;
+    if (c.owner_name) {
+      const isFiltered = (window._contractCompanyFilter && window._contractCompanyFilter.toLowerCase().trim() === c.owner_name.toLowerCase().trim());
+      typeHtml += `<br><span onclick="filterContractsByCompany(event, '${escapeAttr(c.owner_name)}')" class="contract-company-link" style="font-size:11px; color:${isFiltered ? '#10b981' : 'var(--muted)'}; cursor:pointer; text-decoration:${isFiltered ? 'underline' : 'underline dotted'}; text-underline-offset:2px; font-weight:${isFiltered ? '700' : 'normal'}; transition:color 0.15s;" onmouseover="this.style.color='#10b981'" onmouseout="this.style.color='${isFiltered ? '#10b981' : 'var(--muted)'}'" title="Click pentru a filtra toate contractele după această societate (${escapeAttr(c.owner_name)})">${escapeHtml(c.owner_name)}</span>`;
+    }
 
     let locHtml = locSummary;
     let detaliiContractHtml = '';
@@ -14176,7 +14266,7 @@ window.renderLifecycleTable = function() {
     // Purchase column formatting
     let purchaseHtml = '<span style="color:var(--muted);">-</span>';
     if (item.purchase_supplier && item.purchase_supplier !== '-') {
-      purchaseHtml = `<div style="font-weight:700; color:var(--text); font-size:12px;">${escapeHtml(item.purchase_supplier)}</div>`;
+      purchaseHtml = `<div style="font-weight:700; color:var(--text); font-size:12px; cursor:pointer; text-decoration:underline dotted; text-underline-offset:2px;" onclick="filterLifecycleByCompany('${escapeAttr(item.purchase_supplier)}')" title="Filtrează inventarul după ${escapeAttr(item.purchase_supplier)}" onmouseover="this.style.color='#10b981'" onmouseout="this.style.color='var(--text)'">${escapeHtml(item.purchase_supplier)}</div>`;
       if (item.purchase_invoice_number && item.purchase_invoice_number !== '-') {
         purchaseHtml += `<div style="font-size:11px; color:var(--muted); margin-top:2px;">Fact: ${escapeHtml(item.purchase_invoice_number)} ${item.purchase_invoice_date ? '(' + item.purchase_invoice_date + ')' : ''}</div>`;
       }
@@ -14197,7 +14287,7 @@ window.renderLifecycleTable = function() {
     // Sale column formatting
     let saleHtml = '<span style="color:var(--muted);">-</span>';
     if (item.status === 'Vândut' && item.sale_buyer && item.sale_buyer !== '-') {
-      saleHtml = `<div style="font-weight:700; color:#f59e0b; font-size:12px;">${escapeHtml(item.sale_buyer)}</div>`;
+      saleHtml = `<div style="font-weight:700; color:#f59e0b; font-size:12px; cursor:pointer; text-decoration:underline dotted; text-underline-offset:2px;" onclick="filterLifecycleByCompany('${escapeAttr(item.sale_buyer)}')" title="Filtrează inventarul după ${escapeAttr(item.sale_buyer)}" onmouseover="this.style.color='#10b981'" onmouseout="this.style.color='#f59e0b'">${escapeHtml(item.sale_buyer)}</div>`;
       if (item.sale_invoice_number && item.sale_invoice_number !== '-') {
         saleHtml += `<div style="font-size:11px; color:var(--muted); margin-top:2px;">Fact: ${escapeHtml(item.sale_invoice_number)} ${item.sale_date ? '(' + item.sale_date + ')' : ''} ${item.sale_invoice_id ? `<a href="/api/contracts/invoices/${item.sale_invoice_id}/download" target="_blank" style="color:var(--accent); font-weight:700; margin-left:4px; text-decoration:none;" title="Descarcă Factură PDF">(PDF)</a>` : ''}</div>`;
       }
@@ -14369,6 +14459,15 @@ window.handleLifecycleSearch = function(val) {
     _lifecyclePage = 1;
     renderLifecycleTable();
   }, 150);
+};
+
+window.filterLifecycleByCompany = function(company) {
+  const val = (company || '').trim();
+  const searchInput = document.getElementById('search-lifecycle');
+  if (searchInput) searchInput.value = val;
+  _lifecycleSearch = val;
+  _lifecyclePage = 1;
+  renderLifecycleTable();
 };
 
 // Delegat direct către Adaugă Contract Vânzare Sloturi

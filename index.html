@@ -3933,8 +3933,12 @@
                   <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                 </svg>
                 <input type="text" id="filter-contract-search" placeholder="Caută contract..."
-                  oninput="renderContractsTable()"
+                  oninput="handleContractSearchInput()"
                   style="padding:6px 16px 6px 32px; border:1px solid var(--border); border-radius:9999px; background:var(--surface); color:var(--text); font-size:13px; outline:none; min-width:180px;">
+              </div>
+              <div id="contract-active-company-filter" style="display:none; align-items:center; gap:6px; background:rgba(16,185,129,0.12); border:1px solid rgba(16,185,129,0.3); border-radius:9999px; padding:4px 12px; font-size:12px; color:#10b981; font-weight:600; white-space:nowrap;">
+                <span>Societate: <strong id="contract-active-company-name"></strong></span>
+                <button type="button" onclick="clearContractCompanyFilter()" style="background:transparent; border:none; color:#10b981; cursor:pointer; font-size:15px; font-weight:bold; line-height:1; padding:0 2px;" title="Șterge filtrul de societate">&times;</button>
               </div>
             </div>
             <div style="display:flex; align-items:center; gap:8px;">
