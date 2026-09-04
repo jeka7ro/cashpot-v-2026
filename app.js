@@ -12445,8 +12445,12 @@ window.handleContractTypeChange = async function() {
       if (invLabel) invLabel.innerText = 'Nr. Factură Achiziție (Opțional)';
       if (invInput) invInput.placeholder = 'ex: FF-10492';
       if (seriesLabel) seriesLabel.innerText = 'Serii Aparate / Sloturi Achiziționate (Tag-uri)';
-      if (pickerContainer) pickerContainer.style.display = 'none';
     }
+  }
+  // If a PDF file is already chosen in the file input and we don't have series tags yet, run extraction
+  const uploadFileInput = document.getElementById('contract-upload-file');
+  if (uploadFileInput && uploadFileInput.files && uploadFileInput.files.length > 0 && (!_contractModalSeriesTags || _contractModalSeriesTags.length === 0)) {
+    handleContractModalPdfUpload(uploadFileInput);
   }
 };
 
@@ -12577,98 +12581,114 @@ window.handleContractModalPdfUpload = async function(fileInput) {
     return;
   }
 
-  const contractType = document.getElementById('contract-type')?.value;
-  const isSlotType = (contractType === 'Achiziție Sloturi' || contractType === 'Vânzare Sloturi');
-  if (isSlotType) {
-    const file = fileInput.files[0];
-    const statusEl = document.getElementById('contract-modal-pdf-status');
-    const hintEl = document.getElementById('contract-modal-series-hint');
-    if (statusEl) {
-      statusEl.style.display = 'inline';
-      statusEl.style.color = 'var(--accent)';
-      statusEl.innerText = 'Se extrag datele și seriile din PDF...';
-    }
+  const file = fileInput.files[0];
+  const statusEl = document.getElementById('contract-modal-pdf-status');
+  const hintEl = document.getElementById('contract-modal-series-hint');
+  if (statusEl) {
+    statusEl.style.display = 'inline';
+    statusEl.style.color = 'var(--accent)';
+    statusEl.innerText = 'Se extrag datele și seriile din anexa PDF...';
+  }
 
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const res = await fetch('/api/contracts/invoices/extract-pdf', {
-        method: 'POST',
-        body: formData
-      });
-      const data = await res.json();
-      if (data.success) {
-        // Auto-fill fields from PDF
-        const nrInput = document.getElementById('contract-number');
-        const invNrInput = document.getElementById('contract-modal-inv-number');
-        if (data.invoice_number) {
-          if (nrInput && (!nrInput.value || nrInput.value.trim() === '')) nrInput.value = data.invoice_number;
-          if (invNrInput && (!invNrInput.value || invNrInput.value.trim() === '')) invNrInput.value = data.invoice_number;
-        }
-        const dateInput = document.getElementById('contract-start');
-        if (dateInput && data.invoice_date && (!dateInput.value || dateInput.value.trim() === '')) {
-          dateInput.value = data.invoice_date;
-        }
-        const totalInput = document.getElementById('contract-total');
-        if (totalInput && data.amount && data.amount > 0 && (!totalInput.value || totalInput.value === '0' || totalInput.value.trim() === '')) {
-          totalInput.value = (typeof window.formatNumberValue === 'function') ? window.formatNumberValue(data.amount) : String(data.amount);
-        }
-        if (data.currency) {
-          const curSelect = document.getElementById('contract-currency');
-          if (curSelect) {
-            curSelect.value = data.currency;
-            const curLbl = document.getElementById('contract-currency-label');
-            if (curLbl) curLbl.innerText = data.currency;
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch('/api/contracts/invoices/extract-pdf', {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+    if (data.success) {
+      let contractType = document.getElementById('contract-type')?.value;
+      
+      // Auto-switch to slot contract type if series are found and type is not yet a slot type
+      if (data.series && data.series.length > 0 && contractType !== 'Achiziție Sloturi' && contractType !== 'Vânzare Sloturi') {
+        const typeEl = document.getElementById('contract-type');
+        if (typeEl) {
+          typeEl.value = (data.customer && !data.supplier) ? 'Vânzare Sloturi' : 'Achiziție Sloturi';
+          contractType = typeEl.value;
+          if (typeof handleContractTypeChange === 'function') {
+            await handleContractTypeChange();
           }
-        }
-        const suppInput = document.getElementById('contract-modal-supplier');
-        const ownerInput = document.getElementById('contract-owner');
-        const clientOrSupp = (contractType === 'Vânzare Sloturi') ? (data.customer || data.supplier) : (data.supplier || data.customer);
-        if (clientOrSupp) {
-          if (suppInput && (!suppInput.value || suppInput.value.trim() === '')) suppInput.value = clientOrSupp;
-          if (ownerInput && (!ownerInput.value || ownerInput.value.trim() === '')) ownerInput.value = clientOrSupp;
-        }
-
-        // Store extracted rate and series prices for saveContract
-        window._extractedExchangeRate = data.exchange_rate || null;
-        window._extractedSeriesPrices = data.series_prices || null;
-
-        // Show exchange rate banner if available
-        const rateBanner = document.getElementById('contract-modal-rate-banner');
-        if (rateBanner) {
-          if (data.exchange_rate && data.currency === 'EUR') {
-            rateBanner.style.display = 'flex';
-            const rateText = document.getElementById('contract-modal-rate-text');
-            const rateRon = document.getElementById('contract-modal-rate-ron');
-            if (rateText) rateText.innerText = `Curs Factură / BNR (${data.invoice_date || 'ziua vânzării'}): 1 EUR = ${Number(data.exchange_rate).toFixed(4)} LEI`;
-            if (rateRon && data.amount_ron) rateRon.innerText = `Total: ${Number(data.amount_ron).toLocaleString('ro-RO', { minimumFractionDigits: 2 })} LEI`;
-          } else {
-            rateBanner.style.display = 'none';
-          }
-        }
-
-        if (data.series && data.series.length > 0) {
-          addContractModalSeriesTags(data.series);
-          if (hintEl) {
-            hintEl.style.display = 'inline';
-            hintEl.innerText = `${data.series.length} serii extrase automat din PDF`;
-          }
-        }
-        if (statusEl) {
-          statusEl.style.color = '#10b981';
-          statusEl.innerText = `${data.series ? data.series.length : 0} serii extrase cu succes`;
-        }
-      } else {
-        if (statusEl) {
-          statusEl.style.color = 'var(--muted)';
-          statusEl.innerText = 'PDF atașat';
         }
       }
-    } catch (err) {
-      console.error('Eroare extract PDF:', err);
+
+      // Ensure slot section is displayed if series were found
+      if (data.series && data.series.length > 0) {
+        const slotSection = document.getElementById('contract-slot-acquisition-section');
+        if (slotSection) slotSection.style.display = 'block';
+      }
+
+      // Auto-fill fields from PDF
+      const nrInput = document.getElementById('contract-number');
+      const invNrInput = document.getElementById('contract-modal-inv-number');
+      if (data.invoice_number) {
+        if (nrInput && (!nrInput.value || nrInput.value.trim() === '')) nrInput.value = data.invoice_number;
+        if (invNrInput && (!invNrInput.value || invNrInput.value.trim() === '')) invNrInput.value = data.invoice_number;
+      }
+      const dateInput = document.getElementById('contract-start');
+      if (dateInput && data.invoice_date && (!dateInput.value || dateInput.value.trim() === '')) {
+        dateInput.value = data.invoice_date;
+      }
+      const totalInput = document.getElementById('contract-total');
+      if (totalInput && data.amount && data.amount > 0 && (!totalInput.value || totalInput.value === '0' || totalInput.value.trim() === '')) {
+        totalInput.value = (typeof window.formatNumberValue === 'function') ? window.formatNumberValue(data.amount) : String(data.amount);
+      }
+      if (data.currency) {
+        const curSelect = document.getElementById('contract-currency');
+        if (curSelect) {
+          curSelect.value = data.currency;
+          const curLbl = document.getElementById('contract-currency-label');
+          if (curLbl) curLbl.innerText = data.currency;
+        }
+      }
+      const suppInput = document.getElementById('contract-modal-supplier');
+      const ownerInput = document.getElementById('contract-owner');
+      const clientOrSupp = (contractType === 'Vânzare Sloturi') ? (data.customer || data.supplier) : (data.supplier || data.customer);
+      if (clientOrSupp) {
+        if (suppInput && (!suppInput.value || suppInput.value.trim() === '')) suppInput.value = clientOrSupp;
+        if (ownerInput && (!ownerInput.value || ownerInput.value.trim() === '')) ownerInput.value = clientOrSupp;
+      }
+
+      // Store extracted rate and series prices for saveContract
+      window._extractedExchangeRate = data.exchange_rate || null;
+      window._extractedSeriesPrices = data.series_prices || null;
+
+      // Show exchange rate banner if available
+      const rateBanner = document.getElementById('contract-modal-rate-banner');
+      if (rateBanner) {
+        if (data.exchange_rate && data.currency === 'EUR') {
+          rateBanner.style.display = 'flex';
+          const rateText = document.getElementById('contract-modal-rate-text');
+          const rateRon = document.getElementById('contract-modal-rate-ron');
+          if (rateText) rateText.innerText = `Curs Factură / BNR (${data.invoice_date || 'ziua vânzării'}): 1 EUR = ${Number(data.exchange_rate).toFixed(4)} LEI`;
+          if (rateRon && data.amount_ron) rateRon.innerText = `Total: ${Number(data.amount_ron).toLocaleString('ro-RO', { minimumFractionDigits: 2 })} LEI`;
+        } else {
+          rateBanner.style.display = 'none';
+        }
+      }
+
+      if (data.series && data.series.length > 0) {
+        addContractModalSeriesTags(data.series);
+        if (hintEl) {
+          hintEl.style.display = 'inline';
+          hintEl.innerText = `${data.series.length} serii extrase automat din PDF`;
+        }
+      }
       if (statusEl) {
-        statusEl.style.display = 'none';
+        statusEl.style.color = '#10b981';
+        statusEl.innerText = `${data.series ? data.series.length : 0} serii extrase cu succes`;
       }
+    } else {
+      if (statusEl) {
+        statusEl.style.color = 'var(--muted)';
+        statusEl.innerText = 'PDF atașat';
+      }
+    }
+  } catch (err) {
+    console.error('Eroare extract PDF:', err);
+    if (statusEl) {
+      statusEl.style.display = 'none';
     }
   }
 };

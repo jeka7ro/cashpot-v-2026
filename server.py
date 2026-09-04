@@ -1379,6 +1379,14 @@ def add_header(r):
 def index():
     return send_from_directory(BASE_DIR, 'index.html')
 
+@app.after_request
+def add_no_cache(response):
+    if request.path.endswith('.js') or request.path.endswith('.css') or request.path == '/':
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    return response
+
 @app.route('/style.css')
 def serve_css():
     return send_from_directory(BASE_DIR, 'style.css')
