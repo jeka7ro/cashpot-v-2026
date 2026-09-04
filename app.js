@@ -12488,7 +12488,8 @@ window.handleContractModalPdfUpload = async function(fileInput) {
   }
 
   const contractType = document.getElementById('contract-type')?.value;
-  if (contractType === 'Achiziție Sloturi') {
+  const isSlotType = (contractType === 'Achiziție Sloturi' || contractType === 'Vânzare Sloturi');
+  if (isSlotType) {
     const file = fileInput.files[0];
     const statusEl = document.getElementById('contract-modal-pdf-status');
     const hintEl = document.getElementById('contract-modal-series-hint');
@@ -12532,10 +12533,30 @@ window.handleContractModalPdfUpload = async function(fileInput) {
         }
         const suppInput = document.getElementById('contract-modal-supplier');
         const ownerInput = document.getElementById('contract-owner');
-        if (data.supplier) {
-          if (suppInput && (!suppInput.value || suppInput.value.trim() === '')) suppInput.value = data.supplier;
-          if (ownerInput && (!ownerInput.value || ownerInput.value.trim() === '')) ownerInput.value = data.supplier;
+        const clientOrSupp = (contractType === 'Vânzare Sloturi') ? (data.customer || data.supplier) : (data.supplier || data.customer);
+        if (clientOrSupp) {
+          if (suppInput && (!suppInput.value || suppInput.value.trim() === '')) suppInput.value = clientOrSupp;
+          if (ownerInput && (!ownerInput.value || ownerInput.value.trim() === '')) ownerInput.value = clientOrSupp;
         }
+
+        // Store extracted rate and series prices for saveContract
+        window._extractedExchangeRate = data.exchange_rate || null;
+        window._extractedSeriesPrices = data.series_prices || null;
+
+        // Show exchange rate banner if available
+        const rateBanner = document.getElementById('contract-modal-rate-banner');
+        if (rateBanner) {
+          if (data.exchange_rate && data.currency === 'EUR') {
+            rateBanner.style.display = 'flex';
+            const rateText = document.getElementById('contract-modal-rate-text');
+            const rateRon = document.getElementById('contract-modal-rate-ron');
+            if (rateText) rateText.innerText = `Curs Factură / BNR (${data.invoice_date || 'ziua vânzării'}): 1 EUR = ${Number(data.exchange_rate).toFixed(4)} LEI`;
+            if (rateRon && data.amount_ron) rateRon.innerText = `Total: ${Number(data.amount_ron).toLocaleString('ro-RO', { minimumFractionDigits: 2 })} LEI`;
+          } else {
+            rateBanner.style.display = 'none';
+          }
+        }
+
         if (data.series && data.series.length > 0) {
           addContractModalSeriesTags(data.series);
           if (hintEl) {
@@ -12584,8 +12605,13 @@ window.openContractModal = function(id = null, defaultType = null, preselectedSe
   const fileSpan = document.getElementById('contract-upload-filename');
   if (fileSpan) fileSpan.innerText = '';
   
-  // Reset series tags & acquisition fields
+  // Reset series tags & acquisition fields & exchange rate cache
   clearContractModalSeriesTags();
+  window._extractedExchangeRate = null;
+  window._extractedSeriesPrices = null;
+  const rateBanner = document.getElementById('contract-modal-rate-banner');
+  if (rateBanner) rateBanner.style.display = 'none';
+
   if (document.getElementById('contract-modal-supplier')) document.getElementById('contract-modal-supplier').value = '';
   if (document.getElementById('contract-modal-inv-number')) document.getElementById('contract-modal-inv-number').value = '';
   if (document.getElementById('contract-modal-pdf-status')) document.getElementById('contract-modal-pdf-status').style.display = 'none';
@@ -12797,6 +12823,12 @@ window.saveContract = async function() {
         invFormData.append('slots_count', _contractModalSeriesTags.length);
         invFormData.append('slots_series', _contractModalSeriesTags.join(','));
         invFormData.append('notes', payload.type === 'Vânzare Sloturi' ? 'Factură vânzare sloturi generată automat' : 'Factură achiziție sloturi generată automat');
+        if (window._extractedExchangeRate) {
+          invFormData.append('exchange_rate', window._extractedExchangeRate);
+        }
+        if (window._extractedSeriesPrices) {
+          invFormData.append('series_prices', JSON.stringify(window._extractedSeriesPrices));
+        }
         if (fileInput && fileInput.files.length > 0) {
           invFormData.append('file', fileInput.files[0]);
         }
@@ -13277,6 +13309,10 @@ window.toggleAddInvoiceForm = function(show) {
       statusEl.style.display = 'none';
       statusEl.innerText = '';
     }
+    window._extractedExchangeRate = null;
+    window._extractedSeriesPrices = null;
+    const rateBanner = document.getElementById('inv-rate-banner');
+    if (rateBanner) rateBanner.style.display = 'none';
   }
 };
 
@@ -13399,9 +13435,28 @@ window.autoExtractInvoicePdf = async function(fileInput) {
         const el = document.getElementById('inv-currency');
         if (el) el.value = data.currency;
       }
-      if (data.supplier) {
+      const clientOrSupp = data.customer || data.supplier;
+      if (clientOrSupp) {
         const el = document.getElementById('inv-supplier');
-        if (el && !el.value) el.value = data.supplier;
+        if (el && !el.value) el.value = clientOrSupp;
+      }
+
+      // Cache extracted exchange rate and series prices
+      window._extractedExchangeRate = data.exchange_rate || null;
+      window._extractedSeriesPrices = data.series_prices || null;
+
+      // Update rate banner
+      const rateBanner = document.getElementById('inv-rate-banner');
+      if (rateBanner) {
+        if (data.exchange_rate && data.currency === 'EUR') {
+          rateBanner.style.display = 'flex';
+          const rateText = document.getElementById('inv-rate-text');
+          const rateRon = document.getElementById('inv-rate-ron');
+          if (rateText) rateText.innerText = `Curs Factură / BNR (${data.invoice_date || 'ziua facturii'}): 1 EUR = ${Number(data.exchange_rate).toFixed(4)} LEI`;
+          if (rateRon && data.amount_ron) rateRon.innerText = `Total: ${Number(data.amount_ron).toLocaleString('ro-RO', { minimumFractionDigits: 2 })} LEI`;
+        } else {
+          rateBanner.style.display = 'none';
+        }
       }
 
       if (data.series && data.series.length > 0) {
@@ -13502,7 +13557,8 @@ window.renderContractInvoicesTable = function() {
         <td style="padding:12px;">${inv.invoice_date || '-'}</td>
         <td style="padding:12px; font-weight:600;">${inv.supplier || '-'}</td>
         <td style="padding:12px; text-align:right; font-weight:700; color:#10b981;">
-          ${fmt(inv.amount)} ${inv.currency || 'EUR'}
+          <div>${fmt(inv.amount)} ${inv.currency || 'EUR'}</div>
+          ${inv.currency === 'EUR' && inv.amount_ron ? `<div style="font-size:11px; color:var(--muted); font-weight:500;">(${fmt(inv.amount_ron)} LEI)</div>` : ''}
         </td>
         <td style="padding:12px; text-align:center; font-weight:700;">${inv.slots_count || 0}</td>
         <td style="padding:12px;">${seriesHtml}</td>
@@ -13554,6 +13610,12 @@ window.saveContractInvoice = async function() {
   formData.append('slots_count', invSlotsCount);
   formData.append('slots_series', invSlotsSeries);
   formData.append('notes', invNotes);
+  if (window._extractedExchangeRate) {
+    formData.append('exchange_rate', window._extractedExchangeRate);
+  }
+  if (window._extractedSeriesPrices) {
+    formData.append('series_prices', JSON.stringify(window._extractedSeriesPrices));
+  }
 
   if (fileInput && fileInput.files.length > 0) {
     formData.append('file', fileInput.files[0]);
@@ -14120,9 +14182,17 @@ window.renderLifecycleTable = function() {
       }
     }
 
-    const pPriceStr = item.purchase_price !== null && item.purchase_price !== undefined
-      ? `<span style="font-weight:700; color:var(--text);">${Number(item.purchase_price).toLocaleString('ro-RO')} ${escapeHtml(item.purchase_currency || 'RON')}</span>`
-      : '<span style="color:var(--muted);">-</span>';
+    let pPriceStr = '<span style="color:var(--muted);">-</span>';
+    if (item.purchase_price !== null && item.purchase_price !== undefined) {
+      const cur = escapeHtml(item.purchase_currency || 'RON');
+      const valStr = Number(item.purchase_price).toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      if (cur === 'EUR' && item.purchase_price_ron) {
+        const ronStr = Number(item.purchase_price_ron).toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        pPriceStr = `<div><span style="font-weight:700; color:var(--text);">${valStr} EUR</span></div><div style="font-size:11px; color:var(--muted); margin-top:2px;">(${ronStr} LEI)</div>`;
+      } else {
+        pPriceStr = `<span style="font-weight:700; color:var(--text);">${valStr} ${cur}</span>`;
+      }
+    }
 
     // Sale column formatting
     let saleHtml = '<span style="color:var(--muted);">-</span>';
@@ -14133,9 +14203,17 @@ window.renderLifecycleTable = function() {
       }
     }
 
-    const sPriceStr = item.sale_price !== null && item.sale_price !== undefined
-      ? `<span style="font-weight:700; color:#10b981;">${Number(item.sale_price).toLocaleString('ro-RO')} ${escapeHtml(item.sale_currency || 'RON')}</span>`
-      : '<span style="color:var(--muted);">-</span>';
+    let sPriceStr = '<span style="color:var(--muted);">-</span>';
+    if (item.sale_price !== null && item.sale_price !== undefined) {
+      const cur = escapeHtml(item.sale_currency || 'RON');
+      const valStr = Number(item.sale_price).toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      if (cur === 'EUR' && item.sale_price_ron) {
+        const ronStr = Number(item.sale_price_ron).toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        sPriceStr = `<div><span style="font-weight:700; color:#10b981;">${valStr} EUR</span></div><div style="font-size:11px; color:var(--muted); margin-top:2px;">(${ronStr} LEI)</div>`;
+      } else {
+        sPriceStr = `<span style="font-weight:700; color:#10b981;">${valStr} ${cur}</span>`;
+      }
+    }
 
     const rowBg = isSelected ? 'background:rgba(16,185,129,0.08);' : '';
 

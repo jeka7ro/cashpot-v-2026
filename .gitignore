@@ -38,3 +38,4 @@ scratch_crop*.png
 test.txt
 test_dash*.js
 uploads/
+scripts/ocr_helper
