@@ -1,4 +1,15 @@
 
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+window.escapeHtml = escapeHtml;
+
 window.showAlert = function(text, title="Atenție") {
   document.getElementById("custom-alert-title").innerText = title;
   document.getElementById("custom-alert-text").innerText = text;
@@ -1781,7 +1792,7 @@ window.openExpensesSettings = function() {
   openSettings(true);
 }
 function closeSettings(){document.getElementById('settings-modal').classList.remove('show');}
-function closeSettingsOutside(e){if(e.target===document.getElementById('settings-modal'))closeSettings();}
+function closeSettingsOutside(e){ /* intentionally disabled: modals do not close on outside click */ }
 async function saveSettings(){
   const ex=[];
   document.querySelectorAll('#settings-locations-list input[type="checkbox"]').forEach(c => {
@@ -1864,6 +1875,7 @@ function tBadge(curr, prev) {
 // ─── API Loaders ──────────────────────────────────────────────────────────────
 async function loadFilters(){
   filtersData=await api('/api/filters');
+  window.filtersData = filtersData;
   const ex=getExcluded();
   const fs=document.getElementById('global-loc-select');
   
@@ -3911,7 +3923,7 @@ window.openDayAnalysis = async function(dateStr) {
       <div style="background:linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(139,92,246,0.1) 100%); border:1px solid rgba(139,92,246,0.3); border-radius:var(--radius); padding:20px; margin-bottom:24px; display:flex; flex-direction:column;">
         <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
           <div>
-            <div style="font-size:11px; font-weight:800; color:#8b5cf6; text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px;">✨ Smart Client Insights</div>
+            <div style="font-size:11px; font-weight:800; color:#8b5cf6; text-transform:uppercase; letter-spacing:.05em; margin-bottom:4px;">Smart Client Insights</div>
             <div style="font-size:13px; color:var(--text); max-width:400px; line-height:1.4;">
               Activitate loialitate: <strong>${smart.card_players}</strong> clienți cu card unici au jucat.
             </div>
@@ -5875,7 +5887,7 @@ function renderUtilizatori() {
         <td>${index++}</td>
         <td>
           <div style="display:flex;align-items:center;gap:12px;">
-            <div style="width:32px; height:32px; border-radius:50%; background:var(--orange); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:12px;">⏳</div>
+            <div style="width:32px; height:32px; border-radius:50%; background:var(--orange); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:bold; font-size:12px;">P</div>
             <div>
               <strong style="color:var(--orange)">Invitație în așteptare</strong>
               <div style="font-size:10px; color:var(--muted)">Generat: ${new Date(inv.created_at).toLocaleDateString('ro-RO')}</div>
@@ -12080,12 +12092,19 @@ window.renderContractsTable = function() {
     let detaliiContractHtml = '';
     if (c.contract_number) detaliiContractHtml += `<span style="font-size:11px; font-weight:600; color:var(--text)">Nr. ${c.contract_number}</span>`;
     if (c.m2) detaliiContractHtml += `${c.contract_number ? '<br>' : ''}<span style="font-size:11px; color:var(--muted)">${c.m2} m²</span>`;
+    
+    const totalSlots = (c.invoices || []).reduce((sum, inv) => sum + (parseInt(inv.slots_count) || (inv.slots_series ? inv.slots_series.split(',').filter(Boolean).length : 0)), 0);
+    const hasSlots = totalSlots > 0 || c.type === 'Achiziție Sloturi' || (c.invoices && c.invoices.length > 0) || (c.slots_series && c.slots_series.trim()) || (c.slots_count && parseInt(c.slots_count) > 0);
+    if (hasSlots) {
+      const label = totalSlots > 0 ? `${totalSlots} sloturi (vezi serii)` : (c.slots_series ? 'Vezi serii sloturi' : 'Adaugă serii');
+      detaliiContractHtml += `${detaliiContractHtml ? '<br>' : ''}<button type="button" onclick="event.stopPropagation(); openContractSlotsSeries('${c.id}')" style="display:inline-flex; align-items:center; gap:5px; margin-top:4px; cursor:pointer; background:rgba(16,185,129,0.12); color:#10b981; border:1px solid rgba(16,185,129,0.3); padding:2px 8px; border-radius:12px; font-size:11px; font-weight:700; transition:0.2s;" onmouseover="this.style.background='rgba(16,185,129,0.22)'" onmouseout="this.style.background='rgba(16,185,129,0.12)'" title="Deschide Tabel Sloturi & Serii (${label})"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg><span>${label}</span></button>`;
+    }
     if (!detaliiContractHtml) detaliiContractHtml = '-';
 
     let valabilHtml = `<span style="font-size:0.9em;">De la: ${c.start_date || '-'} <br> Până la: ${c.end_date || '-'}</span>`;
 
     let statusHtml = '';
-    if (remainingStr !== '-') statusHtml += `<strong style="color:var(--accent); font-size:11px;">⏱ ${remainingStr}</strong>`;
+    if (remainingStr !== '-') statusHtml += `<strong style="color:var(--accent); font-size:11px;">${remainingStr}</strong>`;
     if (c.notice_period_months && c.notice_period_months > 0) statusHtml += `<br><span style="font-size:11px; color:var(--muted)">Preaviz: ${c.notice_period_months} luni</span>`;
 
     const mainFiles = (c.files || []).filter(f => !f.is_annex);
@@ -12106,13 +12125,14 @@ window.renderContractsTable = function() {
         </td>
         <td style="text-align:center;">
           <div style="display:flex; justify-content:flex-end; gap:8px;">
-            ${(c.files && c.files.length > 0) ? `
-            <button onclick="viewContractPdfs('${c.id}')" style="width:32px; height:32px; border-radius:50%; background:var(--red); border:none; display:flex; align-items:center; justify-content:center; cursor:pointer; color:white; transition:0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'" title="Vezi PDF-uri (${c.files.length})">
+            ${((c.files && c.files.length > 0) || (c.invoices && c.invoices.some(inv => Boolean(inv.filename)))) ? `
+            <button onclick="viewContractPdfs('${c.id}')" style="width:32px; height:32px; border-radius:50%; border:1px solid var(--border); background:var(--surface); display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--red); transition:0.2s;" onmouseover="this.style.borderColor='var(--red)'" onmouseout="this.style.borderColor='var(--border)'" title="Vezi Document PDF">
               <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
             </button>` : ''}
-            <button onclick="openContractFilesModal('${c.id}')" style="width:32px; height:32px; border-radius:50%; border:1px solid var(--border); background:var(--surface); display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--accent); transition:0.2s;" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'" title="Gestionează Fișiere">
-              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
-            </button>
+            ${hasSlots ? `
+            <button type="button" onclick="openContractSlotsSeries('${c.id}')" style="width:32px; height:32px; border-radius:50%; border:1px solid rgba(16,185,129,0.4); background:rgba(16,185,129,0.08); display:flex; align-items:center; justify-content:center; cursor:pointer; color:#10b981; transition:0.2s;" onmouseover="this.style.background='rgba(16,185,129,0.22)'; this.style.borderColor='#10b981';" onmouseout="this.style.background='rgba(16,185,129,0.08)'; this.style.borderColor='rgba(16,185,129,0.4)';" title="Tabel & Listă Aparate Slot (${totalSlots > 0 ? totalSlots + ' sloturi' : 'Serii'})">
+              <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+            </button>` : ''}
             <button onclick="openContractModal('${c.id}')" style="width:32px; height:32px; border-radius:50%; border:1px solid var(--border); background:var(--surface); display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--text); transition:0.2s;" onmouseover="this.style.borderColor='var(--text)'" onmouseout="this.style.borderColor='var(--border)'" title="Modifică">
               <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
             </button>
@@ -12133,16 +12153,19 @@ window.renderContractsTable = function() {
   
   // Render footer
   const tfootHtml = `
-    <tr>
-      <td colspan="4" style="text-align:right; font-weight:700;">TOTAL:</td>
-      <td style="font-weight:700; color:var(--text);">${fmt(totalM2)} m²</td>
-      <td colspan="2"></td>
-      <td class="num" style="font-weight:700; color:var(--text);">
-        <span style="color:var(--muted); font-size:10px;">LEI:</span> ${fmt(totalRon)} RON<br>
-        <span style="color:var(--muted); font-size:10px;">EUR:</span> ${fmt(totalEur)} €<br>
-        <span style="color:var(--muted); font-size:10px; font-weight:normal;">(${fmt(totalEur * EUR_RATE)} RON)</span>
+    <tr style="height:36px;">
+      <td colspan="4" style="text-align:right; font-weight:700; padding:6px 12px; vertical-align:middle; white-space:nowrap;">TOTAL:</td>
+      <td style="font-weight:700; color:var(--text); padding:6px 12px; vertical-align:middle; white-space:nowrap;">${fmt(totalM2)} m²</td>
+      <td colspan="2" style="padding:6px 12px; vertical-align:middle;"></td>
+      <td class="num" style="font-weight:700; color:var(--text); padding:6px 12px; vertical-align:middle; white-space:nowrap; text-align:right;">
+        <span style="display:inline-flex; align-items:center; gap:8px; justify-content:flex-end; white-space:nowrap;">
+          <span><span style="color:var(--muted); font-size:11px;">LEI:</span> ${fmt(totalRon)} RON</span>
+          <span style="color:var(--border);">•</span>
+          <span><span style="color:var(--muted); font-size:11px;">EUR:</span> ${fmt(totalEur)} €</span>
+          <span style="color:var(--muted); font-size:11px; font-weight:normal;">(${fmt(totalEur * EUR_RATE)} RON)</span>
+        </span>
       </td>
-      <td></td>
+      <td style="padding:6px 12px; vertical-align:middle;"></td>
     </tr>
   `;
   const tfootEl = document.getElementById('contracts-tfoot');
@@ -12270,6 +12293,209 @@ window.exportContractsExcel = function() {
   }
 };
 
+// --- CONTRACT TYPE DYNAMICS & SLOT ACQUISITION TAGS ---
+let _contractModalSeriesTags = [];
+
+window.handleContractTypeChange = function() {
+  const typeEl = document.getElementById('contract-type');
+  if (!typeEl) return;
+  const type = typeEl.value;
+  const isRent = (type === 'Chirie Spațiu' || type === 'Subînchiriere spațiu');
+  const isSlotAcq = (type === 'Achiziție Sloturi');
+
+  // Rent specific fields
+  const rentFields = document.querySelectorAll('.contract-rent-field');
+  rentFields.forEach(el => {
+    el.style.display = isRent ? 'block' : 'none';
+  });
+
+  // Toggle button for optional rent fields (when not rent and not slot acquisition)
+  const toggleBtn = document.getElementById('toggle-rent-fields-btn');
+  if (toggleBtn) {
+    toggleBtn.style.display = (!isRent && !isSlotAcq) ? 'block' : 'none';
+  }
+
+  // Slot acquisition section (serii & factură achiziție)
+  const slotSection = document.getElementById('contract-slot-acquisition-section');
+  if (slotSection) {
+    slotSection.style.display = isSlotAcq ? 'block' : 'none';
+  }
+};
+
+window.toggleRentFieldsManual = function() {
+  const rentFields = document.querySelectorAll('.contract-rent-field');
+  if (rentFields.length === 0) return;
+  const isCurrentlyVisible = rentFields[0].style.display !== 'none';
+  rentFields.forEach(el => {
+    el.style.display = isCurrentlyVisible ? 'none' : 'block';
+  });
+};
+
+window.renderContractModalSeriesTags = function() {
+  const chipsWrapper = document.getElementById('contract-modal-series-chips');
+  const badge = document.getElementById('contract-modal-series-count-badge');
+  const hiddenInput = document.getElementById('contract-modal-slots-series');
+  
+  if (chipsWrapper) {
+    chipsWrapper.innerHTML = _contractModalSeriesTags.map((tag, idx) => `
+      <span style="display:inline-flex; align-items:center; gap:5px; background:rgba(16,185,129,0.15); color:#10b981; border:1px solid rgba(16,185,129,0.3); padding:3px 8px; border-radius:6px; font-size:12px; font-weight:700;">
+        ${escapeHtml(tag)}
+        <button type="button" onclick="removeContractModalSeriesTag(${idx})" style="background:none; border:none; color:#10b981; cursor:pointer; font-weight:bold; font-size:14px; line-height:1; padding:0 2px; margin-left:2px;" title="Șterge">&times;</button>
+      </span>
+    `).join('');
+  }
+  
+  if (badge) {
+    badge.innerText = `${_contractModalSeriesTags.length} sloturi`;
+  }
+  if (hiddenInput) {
+    hiddenInput.value = _contractModalSeriesTags.join(',');
+  }
+};
+
+window.addContractModalSeriesTags = function(seriesArray) {
+  if (!Array.isArray(seriesArray)) {
+    seriesArray = String(seriesArray).split(/[\s,;\r\n]+/);
+  }
+  seriesArray.forEach(raw => {
+    const clean = raw.trim().replace(/^,+|,+$/g, '');
+    if (clean) {
+      _contractModalSeriesTags.push(clean);
+    }
+  });
+  renderContractModalSeriesTags();
+};
+
+window.removeContractModalSeriesTag = function(target) {
+  if (typeof target === 'number') {
+    _contractModalSeriesTags.splice(target, 1);
+  } else {
+    _contractModalSeriesTags = _contractModalSeriesTags.filter(t => t !== target);
+  }
+  renderContractModalSeriesTags();
+};
+
+window.clearContractModalSeriesTags = function() {
+  _contractModalSeriesTags = [];
+  renderContractModalSeriesTags();
+};
+
+window.handleContractModalSeriesKeydown = function(e) {
+  const input = e.target;
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    if (input.value.trim()) {
+      addContractModalSeriesTags(input.value);
+      input.value = '';
+    }
+  } else if (e.key === 'Backspace' && input.value === '') {
+    if (_contractModalSeriesTags.length > 0) {
+      _contractModalSeriesTags.pop();
+      renderContractModalSeriesTags();
+    }
+  }
+};
+
+window.handleContractModalSeriesPaste = function(e) {
+  e.preventDefault();
+  const pasted = (e.clipboardData || window.clipboardData).getData('text');
+  if (pasted) {
+    addContractModalSeriesTags(pasted);
+    e.target.value = '';
+  }
+};
+
+window.handleContractModalSeriesBlur = function(input) {
+  if (input.value.trim()) {
+    addContractModalSeriesTags(input.value);
+    input.value = '';
+  }
+};
+
+window.handleContractModalPdfUpload = async function(fileInput) {
+  const filenameSpan = document.getElementById('contract-upload-filename');
+  if (fileInput.files.length > 0) {
+    filenameSpan.innerText = fileInput.files[0].name;
+  } else {
+    filenameSpan.innerText = '';
+    return;
+  }
+
+  const contractType = document.getElementById('contract-type')?.value;
+  if (contractType === 'Achiziție Sloturi') {
+    const file = fileInput.files[0];
+    const statusEl = document.getElementById('contract-modal-pdf-status');
+    const hintEl = document.getElementById('contract-modal-series-hint');
+    if (statusEl) {
+      statusEl.style.display = 'inline';
+      statusEl.style.color = 'var(--accent)';
+      statusEl.innerText = 'Se extrag datele și seriile din PDF...';
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/contracts/invoices/extract-pdf', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (data.success) {
+        // Auto-fill fields from PDF
+        const nrInput = document.getElementById('contract-number');
+        const invNrInput = document.getElementById('contract-modal-inv-number');
+        if (data.invoice_number) {
+          if (nrInput && (!nrInput.value || nrInput.value.trim() === '')) nrInput.value = data.invoice_number;
+          if (invNrInput && (!invNrInput.value || invNrInput.value.trim() === '')) invNrInput.value = data.invoice_number;
+        }
+        const dateInput = document.getElementById('contract-start');
+        if (dateInput && data.invoice_date && (!dateInput.value || dateInput.value.trim() === '')) {
+          dateInput.value = data.invoice_date;
+        }
+        const totalInput = document.getElementById('contract-total');
+        if (totalInput && data.amount && data.amount > 0 && (!totalInput.value || totalInput.value === '0' || totalInput.value.trim() === '')) {
+          totalInput.value = (typeof window.formatNumberValue === 'function') ? window.formatNumberValue(data.amount) : String(data.amount);
+        }
+        if (data.currency) {
+          const curSelect = document.getElementById('contract-currency');
+          if (curSelect) {
+            curSelect.value = data.currency;
+            const curLbl = document.getElementById('contract-currency-label');
+            if (curLbl) curLbl.innerText = data.currency;
+          }
+        }
+        const suppInput = document.getElementById('contract-modal-supplier');
+        const ownerInput = document.getElementById('contract-owner');
+        if (data.supplier) {
+          if (suppInput && (!suppInput.value || suppInput.value.trim() === '')) suppInput.value = data.supplier;
+          if (ownerInput && (!ownerInput.value || ownerInput.value.trim() === '')) ownerInput.value = data.supplier;
+        }
+        if (data.series && data.series.length > 0) {
+          addContractModalSeriesTags(data.series);
+          if (hintEl) {
+            hintEl.style.display = 'inline';
+            hintEl.innerText = `${data.series.length} serii extrase automat din PDF`;
+          }
+        }
+        if (statusEl) {
+          statusEl.style.color = '#10b981';
+          statusEl.innerText = `${data.series ? data.series.length : 0} serii extrase cu succes`;
+        }
+      } else {
+        if (statusEl) {
+          statusEl.style.color = 'var(--muted)';
+          statusEl.innerText = 'PDF atașat';
+        }
+      }
+    } catch (err) {
+      console.error('Eroare extract PDF:', err);
+      if (statusEl) {
+        statusEl.style.display = 'none';
+      }
+    }
+  }
+};
+
 window.openContractModal = function(id = null) {
   try {
     if (id && typeof id === 'object') id = null; // Ignore Event objects
@@ -12292,6 +12518,14 @@ window.openContractModal = function(id = null) {
   const fileSpan = document.getElementById('contract-upload-filename');
   if (fileSpan) fileSpan.innerText = '';
   
+  // Reset series tags & acquisition fields
+  clearContractModalSeriesTags();
+  if (document.getElementById('contract-modal-supplier')) document.getElementById('contract-modal-supplier').value = '';
+  if (document.getElementById('contract-modal-inv-number')) document.getElementById('contract-modal-inv-number').value = '';
+  if (document.getElementById('contract-modal-pdf-status')) document.getElementById('contract-modal-pdf-status').style.display = 'none';
+  if (document.getElementById('contract-modal-series-hint')) document.getElementById('contract-modal-series-hint').style.display = 'none';
+  if (document.getElementById('contract-modal-existing-invoices')) document.getElementById('contract-modal-existing-invoices').style.display = 'none';
+
   // Build location select options
   const locSelect = document.getElementById('contract-location');
   let locHtml = '<option value="">-- Fără locație specifică --</option>';
@@ -12343,6 +12577,9 @@ window.openContractModal = function(id = null) {
       if (document.getElementById('contract-owner')) {
         document.getElementById('contract-owner').value = c.owner_name || '';
       }
+      if (document.getElementById('contract-modal-supplier')) {
+        document.getElementById('contract-modal-supplier').value = c.owner_name || '';
+      }
       
       if (c.locations && c.locations.length > 0) {
         locSelect.value = c.locations[0].location_id;
@@ -12351,14 +12588,55 @@ window.openContractModal = function(id = null) {
       } else {
         locSelect.value = '';
       }
+
+      // If contract has existing purchase invoices, render summary
+      if (c.invoices && c.invoices.length > 0) {
+        const invSummaryEl = document.getElementById('contract-modal-invoices-summary');
+        const existingInvContainer = document.getElementById('contract-modal-existing-invoices');
+        if (existingInvContainer) existingInvContainer.style.display = 'block';
+        if (invSummaryEl) {
+          invSummaryEl.innerHTML = c.invoices.map(inv => `
+            <div style="padding:6px 10px; background:var(--surface); border:1px solid var(--border); border-radius:8px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
+              <div>
+                <b>${inv.invoice_number}</b> (${inv.invoice_date || '-'}) &bull; <span style="color:#10b981; font-weight:700;">${inv.slots_count || 0} sloturi</span> &bull; ${fmt(inv.amount)} ${inv.currency}
+                ${inv.slots_series ? `<div style="font-size:11px; color:var(--muted); margin-top:2px;">Serii: ${inv.slots_series.split(',').slice(0, 8).join(', ')}${inv.slots_series.split(',').length > 8 ? '...' : ''}</div>` : ''}
+              </div>
+              <button type="button" class="btn-ghost" onclick="openInvoiceSlotsModal('${inv.id}', '${inv.invoice_number}')" style="font-size:11px; color:#10b981; padding:3px 8px;">Vezi Serii</button>
+            </div>
+          `).join('');
+        }
+      }
+
+      // Render existing attached files inside Edit modal
+      const filesSec = document.getElementById('contract-modal-files-section');
+      const filesList = document.getElementById('contract-modal-files-list');
+      if (c.files && c.files.length > 0) {
+        if (filesSec) filesSec.style.display = 'block';
+        if (filesList) {
+          filesList.innerHTML = c.files.map(f => `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border-bottom:1px solid var(--border); font-size:12px;">
+              <a href="/api/contracts/files/${f.id}/download" target="_blank" style="color:var(--text); text-decoration:none; display:flex; align-items:center; gap:6px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:85%;" title="${escapeHtml(f.filename)}">
+                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                <span>${escapeHtml(f.filename)}</span>
+              </a>
+              <button type="button" onclick="deleteContractFileModal('${c.id}', '${f.id}')" style="background:transparent; border:none; color:var(--red); cursor:pointer; font-size:18px; padding:2px 6px; line-height:1;" title="Șterge fișier">&times;</button>
+            </div>
+          `).join('');
+        }
+      } else {
+        if (filesSec) filesSec.style.display = 'none';
+      }
     }
   } else {
     document.getElementById('contract-modal-title').innerText = 'Adaugă Contract';
     if (document.getElementById('contract-currency-label')) {
       document.getElementById('contract-currency-label').innerText = 'LEI';
     }
+    const filesSec = document.getElementById('contract-modal-files-section');
+    if (filesSec) filesSec.style.display = 'none';
   }
   
+  handleContractTypeChange();
   modal.classList.add('show');
   } catch (e) {
     alert('Eroare JS în openContractModal: ' + e.message);
@@ -12384,6 +12662,12 @@ window.saveContract = async function() {
     locations: []
   };
   
+  const isSlotAcq = (payload.type === 'Achiziție Sloturi');
+  if (isSlotAcq) {
+    const modalSupp = document.getElementById('contract-modal-supplier')?.value;
+    if (modalSupp) payload.owner_name = modalSupp;
+  }
+
   const locVal = document.getElementById('contract-location').value;
   if (locVal) {
     if (locVal.startsWith('MANUAL_')) {
@@ -12428,6 +12712,30 @@ window.saveContract = async function() {
           showAlert('Eroare rețea la încărcare fișier: ' + e);
         }
       }
+
+      // If Achiziție Sloturi and series or invoice number were entered, save invoice
+      if (isSlotAcq && (_contractModalSeriesTags.length > 0 || document.getElementById('contract-modal-inv-number')?.value)) {
+        const invFormData = new FormData();
+        invFormData.append('invoice_number', document.getElementById('contract-modal-inv-number')?.value || payload.contract_number || 'Factură Achiziție');
+        invFormData.append('invoice_date', payload.start_date || new Date().toISOString().split('T')[0]);
+        invFormData.append('amount', payload.total_amount || 0);
+        invFormData.append('currency', payload.currency || 'LEI');
+        invFormData.append('supplier', document.getElementById('contract-modal-supplier')?.value || payload.owner_name || '');
+        invFormData.append('slots_count', _contractModalSeriesTags.length);
+        invFormData.append('slots_series', _contractModalSeriesTags.join(','));
+        invFormData.append('notes', 'Adăugat automat la salvare contract');
+        if (fileInput && fileInput.files.length > 0) {
+          invFormData.append('file', fileInput.files[0]);
+        }
+        try {
+          await fetch(`/api/contracts/${finalId}/invoices`, {
+            method: 'POST',
+            body: invFormData
+          });
+        } catch(invErr) {
+          console.error('Eroare salvare factura achizitie:', invErr);
+        }
+      }
       
       document.getElementById('contract-modal').classList.remove('show');
       loadContracts();
@@ -12437,7 +12745,7 @@ window.saveContract = async function() {
   } catch (e) {
     showAlert('Eroare rețea: ' + e);
   }
-}
+};
 
 window.deleteContract = async function(id) {
   const ok = await customConfirm('Sigur dorești să ștergi acest contract?');
@@ -12561,57 +12869,113 @@ window.deleteContractFile = async function(fileId) {
   }
 }
 
+window.deleteContractFileModal = async function(contractId, fileId) {
+  const ok = await customConfirm('Sigur dorești să ștergi acest fișier?');
+  if (!ok) return;
+  try {
+    const res = await api(`/api/contracts/files/${fileId}`, { method: 'DELETE' });
+    if (res.success) {
+      await loadContractsData();
+      openContractModal(contractId);
+    } else {
+      if (typeof showAlert === 'function') showAlert('Eroare: ' + (res.error || 'Necunoscută'));
+    }
+  } catch (e) {
+    if (typeof showAlert === 'function') showAlert('Eroare conexiune: ' + e);
+  }
+};
+
 // === PDF IN-APP VIEWER ===
-let _currentPdfFiles = [];
-let _currentPdfIndex = 0;
+window._currentPdfFiles = [];
+window._currentPdfIndex = 0;
 
 window.viewContractPdfs = function(contractId) {
   const c = _contractsData.find(x => x.id === contractId);
-  if (!c || !c.files || c.files.length === 0) return;
+  if (!c) return;
+
+  const filesList = [];
+  const seenFiles = new Set();
   
-  _currentPdfFiles = [...c.files].sort((a, b) => (a.is_annex === b.is_annex ? 0 : a.is_annex ? 1 : -1));
-  _currentPdfIndex = 0;
+  (c.files || []).forEach(f => {
+    if (f.filename && !seenFiles.has(f.filename.toLowerCase())) {
+      seenFiles.add(f.filename.toLowerCase());
+      filesList.push({
+        id: f.id,
+        filename: f.filename,
+        is_annex: f.is_annex,
+        download_url: '/api/contracts/files/' + f.id + '/download'
+      });
+    }
+  });
+
+  (c.invoices || []).forEach(inv => {
+    if (inv.filename && !seenFiles.has(inv.filename.toLowerCase())) {
+      seenFiles.add(inv.filename.toLowerCase());
+      filesList.push({
+        id: inv.id,
+        filename: `Factura ${inv.invoice_number || ''} (${inv.filename})`.trim(),
+        is_annex: true,
+        download_url: '/api/contracts/invoices/' + inv.id + '/download'
+      });
+    }
+  });
+
+  if (filesList.length === 0) {
+    if (typeof showAlert === 'function') showAlert('Acest contract nu conține fișiere PDF atașate.');
+    return;
+  }
+  
+  window._currentPdfFiles = filesList;
+  window._currentPdfIndex = 0;
   
   updatePdfViewer();
   const modal = document.getElementById('pdf-viewer-modal');
   if (modal) modal.classList.add('show');
-}
+};
 
 window.changePdf = function(dir) {
-  _currentPdfIndex += dir;
-  if (_currentPdfIndex < 0) _currentPdfIndex = 0;
-  if (_currentPdfIndex >= _currentPdfFiles.length) _currentPdfIndex = _currentPdfFiles.length - 1;
+  window._currentPdfIndex += dir;
+  if (window._currentPdfIndex < 0) window._currentPdfIndex = 0;
+  if (window._currentPdfIndex >= window._currentPdfFiles.length) window._currentPdfIndex = window._currentPdfFiles.length - 1;
   updatePdfViewer();
 }
 
 window.updatePdfViewer = function() {
-  const f = _currentPdfFiles[_currentPdfIndex];
+  const f = window._currentPdfFiles[window._currentPdfIndex];
   if (!f) return;
   
   const titleEl = document.getElementById('pdf-viewer-title');
   if (titleEl) titleEl.innerText = f.filename || 'Document PDF';
   
-  const iframe = document.getElementById('pdf-iframe');
-  if (iframe) iframe.src = '/api/contracts/files/' + f.id + '/download';
+  const targetUrl = f.download_url || ('/api/contracts/files/' + f.id + '/download');
   
+  const newTabBtn = document.getElementById('pdf-new-tab-btn');
+  if (newTabBtn) {
+    newTabBtn.href = targetUrl;
+  }
+
+  const iframe = document.getElementById('pdf-iframe');
+  if (iframe) {
+    iframe.src = targetUrl;
+  }
   const counter = document.getElementById('pdf-counter');
   const btnPrev = document.getElementById('pdf-prev-btn');
   const btnNext = document.getElementById('pdf-next-btn');
   
-  if (_currentPdfFiles.length > 1) {
+  if (window._currentPdfFiles.length > 1) {
     if (counter) {
       counter.style.display = 'inline-block';
-      counter.innerText = `${_currentPdfIndex + 1} / ${_currentPdfFiles.length}`;
+      counter.innerText = `${window._currentPdfIndex + 1} / ${window._currentPdfFiles.length}`;
     }
     if (btnPrev) {
       btnPrev.style.display = 'inline-block';
-      btnPrev.disabled = (_currentPdfIndex === 0);
+      btnPrev.disabled = (window._currentPdfIndex === 0);
       btnPrev.style.opacity = btnPrev.disabled ? '0.3' : '1';
       btnPrev.style.cursor = btnPrev.disabled ? 'default' : 'pointer';
     }
     if (btnNext) {
       btnNext.style.display = 'inline-block';
-      btnNext.disabled = (_currentPdfIndex === _currentPdfFiles.length - 1);
+      btnNext.disabled = (window._currentPdfIndex === window._currentPdfFiles.length - 1);
       btnNext.style.opacity = btnNext.disabled ? '0.3' : '1';
       btnNext.style.cursor = btnNext.disabled ? 'default' : 'pointer';
     }
@@ -12623,7 +12987,7 @@ window.updatePdfViewer = function() {
 }
 
 window.deleteCurrentPdf = async function() {
-  const f = _currentPdfFiles[_currentPdfIndex];
+  const f = window._currentPdfFiles[window._currentPdfIndex];
   if (!f) return;
   
   const ok = await customConfirm('Sigur dorești să ștergi acest PDF?');
@@ -12632,7 +12996,7 @@ window.deleteCurrentPdf = async function() {
   try {
     const res = await api('/api/contracts/files/' + f.id, { method: 'DELETE' });
     if (res.success) {
-      await loadContracts(); // update _contractsData in background
+      await loadContractsData(); // update _contractsData in background
       _currentPdfFiles.splice(_currentPdfIndex, 1);
       
       if (_currentPdfFiles.length === 0) {
@@ -12654,7 +13018,46 @@ window.deleteCurrentPdf = async function() {
   } catch (e) {
     showAlert('Eroare rețea: ' + e);
   }
-}
+};
+
+window.uploadReplacementPdf = async function(event) {
+  const file = event.target.files && event.target.files[0];
+  if (!file) return;
+  const f = window._currentPdfFiles && window._currentPdfFiles[window._currentPdfIndex];
+  if (!f) {
+    showAlert('Niciun fișier selectat pentru înlocuire.');
+    return;
+  }
+  
+  const formData = new FormData();
+  formData.append('file', file);
+  
+  if (typeof showLoader === 'function') showLoader(true);
+  try {
+    const res = await fetch('/api/contracts/files/' + f.id + '/upload-data', {
+      method: 'POST',
+      headers: { 'Accept': 'application/json' },
+      body: formData
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (typeof showAlert === 'function') showAlert('Fișierul PDF a fost încărcat și salvat cu succes în baza de date!');
+      f.filename = file.name;
+      const titleEl = document.getElementById('pdf-viewer-title');
+      if (titleEl) titleEl.innerText = file.name;
+      const iframe = document.getElementById('pdf-iframe');
+      if (iframe) iframe.src = f.download_url + '?t=' + Date.now();
+      if (typeof loadContracts === 'function') loadContracts();
+    } else {
+      showAlert('Eroare încărcare PDF: ' + (data.error || 'Necunoscută'));
+    }
+  } catch (err) {
+    showAlert('Eroare conexiune: ' + err.message);
+  } finally {
+    if (typeof showLoader === 'function') showLoader(false);
+    event.target.value = '';
+  }
+};
 
 window.openSmartImportModal = function() {
   const locSelect = document.getElementById('smart-import-location');
@@ -12743,3 +13146,698 @@ window.uploadSmartContracts = async function() {
     loadContractsData(); // Refresh table
   }, 2000);
 };
+
+// --- CONTRACT PURCHASE INVOICES (FACTURI ACHIZITIE SLOTURI) ---
+let _currentContractInvoicesId = null;
+let _currentContractInvoicesList = [];
+let _currentSeriesTags = [];
+
+window.openContractInvoicesModal = async function(contractId) {
+  try {
+    _currentContractInvoicesId = contractId;
+    const modal = document.getElementById('contract-invoices-modal');
+    if (!modal) {
+      alert('Elementul modal contract-invoices-modal nu a fost găsit!');
+      return;
+    }
+
+    const c = _contractsData.find(x => x.id === contractId);
+    const nameEl = document.getElementById('contract-invoices-contract-name');
+    if (nameEl) {
+      if (c) {
+        nameEl.innerText = `(Contract: ${c.contract_number ? 'Nr. ' + c.contract_number : c.type} ${c.owner_name ? '• ' + c.owner_name : ''})`;
+      } else {
+        nameEl.innerText = '';
+      }
+    }
+
+    toggleAddInvoiceForm(false);
+    modal.classList.add('show');
+    await fetchAndRenderContractInvoices();
+  } catch (e) {
+    console.error('Eroare openContractInvoicesModal:', e);
+    alert('Eroare afișare facturi: ' + e.message);
+  }
+};
+
+window.toggleAddInvoiceForm = function(show) {
+  const container = document.getElementById('add-invoice-form-container');
+  if (!container) return;
+  if (show === undefined) {
+    container.style.display = container.style.display === 'none' ? 'block' : 'none';
+  } else {
+    container.style.display = show ? 'block' : 'none';
+  }
+  if (container.style.display === 'block') {
+    const form = document.getElementById('contract-invoice-form');
+    if (form) form.reset();
+    clearAllSeriesTags();
+    const dateInput = document.getElementById('inv-date');
+    if (dateInput && !dateInput.value) {
+      dateInput.value = new Date().toISOString().split('T')[0];
+    }
+    const statusEl = document.getElementById('inv-pdf-extract-status');
+    if (statusEl) {
+      statusEl.style.display = 'none';
+      statusEl.innerText = '';
+    }
+  }
+};
+
+// --- SERIES TAG INPUT MANAGEMENT ---
+window.renderSeriesTags = function() {
+  const wrapper = document.getElementById('series-chips-wrapper');
+  const countBadge = document.getElementById('series-tags-count-badge');
+  const hiddenInput = document.getElementById('inv-slots-series');
+  const slotsCountInput = document.getElementById('inv-slots-count');
+
+  if (countBadge) countBadge.innerText = `${_currentSeriesTags.length} sloturi`;
+  if (hiddenInput) hiddenInput.value = _currentSeriesTags.join(', ');
+  if (slotsCountInput) slotsCountInput.value = _currentSeriesTags.length;
+
+  if (!wrapper) return;
+  wrapper.innerHTML = _currentSeriesTags.map((tag, idx) => `
+    <span class="series-chip" style="display:inline-flex; align-items:center; gap:6px; background:rgba(99, 102, 241, 0.15); color:var(--accent); border:1px solid rgba(99, 102, 241, 0.3); border-radius:6px; padding:3px 8px; font-family:monospace; font-size:11.5px; font-weight:600;">
+      <span>${escapeHtml(tag)}</span>
+      <span onclick="removeSeriesTag(${idx})" style="cursor:pointer; font-weight:bold; font-size:14px; opacity:0.7; line-height:1;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.7" title="Șterge tag">&times;</span>
+    </span>
+  `).join('');
+};
+
+window.addSeriesTags = function(text) {
+  if (!text) return;
+  const items = text.split(/[\s,;]+/).map(s => s.trim()).filter(s => s.length > 0);
+  items.forEach(item => {
+    if (!_currentSeriesTags.includes(item)) {
+      _currentSeriesTags.push(item);
+    }
+  });
+  renderSeriesTags();
+};
+
+window.removeSeriesTag = function(idx) {
+  _currentSeriesTags.splice(idx, 1);
+  renderSeriesTags();
+};
+
+window.clearAllSeriesTags = function() {
+  _currentSeriesTags = [];
+  renderSeriesTags();
+  const hint = document.getElementById('series-extracted-hint');
+  if (hint) hint.style.display = 'none';
+};
+
+window.handleSeriesTagKeydown = function(e) {
+  if (e.key === 'Enter' || e.key === ',' || e.key === 'Tab') {
+    e.preventDefault();
+    const val = e.target.value.trim();
+    if (val) {
+      addSeriesTags(val);
+      e.target.value = '';
+    }
+  } else if (e.key === 'Backspace' && !e.target.value && _currentSeriesTags.length > 0) {
+    removeSeriesTag(_currentSeriesTags.length - 1);
+  }
+};
+
+window.handleSeriesTagPaste = function(e) {
+  e.preventDefault();
+  const pasteData = (e.clipboardData || window.clipboardData).getData('text');
+  if (pasteData) {
+    addSeriesTags(pasteData);
+    e.target.value = '';
+  }
+};
+
+window.handleSeriesTagBlur = function(input) {
+  const val = (input.value || '').trim();
+  if (val) {
+    addSeriesTags(val);
+    input.value = '';
+  }
+};
+
+// --- PDF EXTRACTION ---
+window.autoExtractInvoicePdf = async function(fileInput) {
+  if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+    if (typeof showAlert === 'function') showAlert('Selectează un fișier PDF mai întâi.');
+    else alert('Selectează un fișier PDF mai întâi.');
+    return;
+  }
+
+  const file = fileInput.files[0];
+  const statusEl = document.getElementById('inv-pdf-extract-status');
+  const btn = document.getElementById('btn-extract-pdf');
+
+  if (statusEl) {
+    statusEl.style.display = 'inline';
+    statusEl.innerText = 'Analizăm PDF...';
+    statusEl.style.color = 'var(--accent)';
+  }
+  if (btn) btn.disabled = true;
+
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch('/api/contracts/invoices/extract-pdf', {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+
+    if (data.success) {
+      if (data.invoice_number) {
+        const el = document.getElementById('inv-number');
+        if (el && !el.value) el.value = data.invoice_number;
+      }
+      if (data.invoice_date) {
+        const el = document.getElementById('inv-date');
+        if (el) el.value = data.invoice_date;
+      }
+      if (data.amount && data.amount > 0) {
+        const el = document.getElementById('inv-amount');
+        if (el && (!el.value || parseFloat(el.value) === 0)) el.value = data.amount;
+      }
+      if (data.currency) {
+        const el = document.getElementById('inv-currency');
+        if (el) el.value = data.currency;
+      }
+      if (data.supplier) {
+        const el = document.getElementById('inv-supplier');
+        if (el && !el.value) el.value = data.supplier;
+      }
+
+      if (data.series && data.series.length > 0) {
+        addSeriesTags(data.series.join(', '));
+        const hint = document.getElementById('series-extracted-hint');
+        if (hint) {
+          hint.innerText = `${data.series.length} serii extrase automat din PDF`;
+          hint.style.display = 'inline';
+        }
+      }
+
+      if (statusEl) {
+        statusEl.innerText = `Găsite: ${data.series ? data.series.length : 0} serii`;
+        statusEl.style.color = '#10b981';
+      }
+    } else {
+      if (statusEl) {
+        statusEl.innerText = 'Nu s-au putut extrage date';
+        statusEl.style.color = 'var(--red)';
+      }
+    }
+  } catch (err) {
+    if (statusEl) {
+      statusEl.innerText = 'Eroare conexiune';
+      statusEl.style.color = 'var(--red)';
+    }
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+};
+
+window.fetchAndRenderContractInvoices = async function() {
+  if (!_currentContractInvoicesId) return;
+  try {
+    const res = await api(`/api/contracts/${_currentContractInvoicesId}/invoices`);
+    _currentContractInvoicesList = res || [];
+  } catch (e) {
+    _currentContractInvoicesList = [];
+  }
+  renderContractInvoicesTable();
+};
+
+window.renderContractInvoicesTable = function() {
+  const tbody = document.getElementById('contract-invoices-tbody');
+  const countEl = document.getElementById('kpi-invoice-count');
+  const slotsEl = document.getElementById('kpi-invoice-slots');
+  const totalEl = document.getElementById('kpi-invoice-total');
+
+  const list = _currentContractInvoicesList || [];
+  let totalAmountEur = 0;
+  let totalAmountRon = 0;
+  let totalSlots = 0;
+
+  list.forEach(inv => {
+    const amt = parseFloat(inv.amount) || 0;
+    if (inv.currency === 'RON' || inv.currency === 'LEI') totalAmountRon += amt;
+    else totalAmountEur += amt;
+    totalSlots += parseInt(inv.slots_count) || 0;
+  });
+
+  if (countEl) countEl.innerText = list.length;
+  if (slotsEl) slotsEl.innerText = totalSlots;
+  if (totalEl) {
+    let totStr = '';
+    if (totalAmountEur > 0) totStr += `${fmt(totalAmountEur)} EUR`;
+    if (totalAmountRon > 0) totStr += (totStr ? ' + ' : '') + `${fmt(totalAmountRon)} RON`;
+    totalEl.innerText = totStr || '0 EUR';
+  }
+
+  if (!tbody) return;
+
+  if (list.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:28px; color:var(--text-muted);">Nu este înregistrată nicio factură de achiziție pentru acest contract.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = list.map((inv, idx) => {
+    const hasPdf = Boolean(inv.filename);
+    const seriesArr = (inv.slots_series || '').split(/[\s,;]+/).filter(Boolean);
+    let seriesHtml = '-';
+    if (seriesArr.length > 0) {
+      const visible = seriesArr.slice(0, 3);
+      const remaining = seriesArr.length - 3;
+      seriesHtml = `
+        <div style="display:flex; flex-wrap:wrap; gap:4px; align-items:center;">
+          ${visible.map(s => `<span style="display:inline-block; font-family:monospace; font-size:11px; background:rgba(99, 102, 241, 0.12); color:var(--accent); border:1px solid rgba(99, 102, 241, 0.25); padding:2px 6px; border-radius:4px; font-weight:600;">${escapeHtml(s)}</span>`).join('')}
+          <button onclick="openInvoiceSlotsModal('${inv.id}')" style="background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.3); border-radius:6px; font-size:11px; font-weight:700; color:var(--accent); padding:3px 8px; cursor:pointer; transition:0.2s; display:inline-flex; align-items:center; gap:4px;" onmouseover="this.style.background='rgba(99,102,241,0.2)'" onmouseout="this.style.background='rgba(99,102,241,0.12)'" title="Deschide Tabel Sloturi (Provider, Model, Cabinet, Sală, Preț)">
+            Vezi Tabel Sloturi (${seriesArr.length}) &rarr;
+          </button>
+        </div>
+      `;
+    }
+
+    return `
+      <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:12px; text-align:center; color:var(--muted);">${idx + 1}</td>
+        <td style="padding:12px; font-weight:700; color:var(--accent);">${inv.invoice_number || '-'}</td>
+        <td style="padding:12px;">${inv.invoice_date || '-'}</td>
+        <td style="padding:12px; font-weight:600;">${inv.supplier || '-'}</td>
+        <td style="padding:12px; text-align:right; font-weight:700; color:#10b981;">
+          ${fmt(inv.amount)} ${inv.currency || 'EUR'}
+        </td>
+        <td style="padding:12px; text-align:center; font-weight:700;">${inv.slots_count || 0}</td>
+        <td style="padding:12px;">${seriesHtml}</td>
+        <td style="padding:12px; text-align:right;">
+          <div style="display:flex; justify-content:flex-end; gap:6px;">
+            <button type="button" onclick="openInvoiceSlotsModal('${inv.id}')" style="width:30px; height:30px; border-radius:50%; border:1px solid rgba(16,185,129,0.4); background:rgba(16,185,129,0.08); display:flex; align-items:center; justify-content:center; cursor:pointer; color:#10b981; transition:0.2s;" onmouseover="this.style.background='rgba(16,185,129,0.2)'" onmouseout="this.style.background='rgba(16,185,129,0.08)'" title="Vezi Tabel Sloturi & Serii Factură">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+            </button>
+            ${hasPdf ? `
+              <button onclick="viewContractInvoicePdf('${inv.id}', '${inv.filename}')" style="width:30px; height:30px; border-radius:50%; border:1px solid var(--border); background:var(--surface); display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--red); transition:0.2s;" onmouseover="this.style.borderColor='var(--red)'" onmouseout="this.style.borderColor='var(--border)'" title="Vezi Factură PDF (${inv.filename})">
+                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+              </button>
+            ` : ''}
+            <button onclick="deleteContractInvoice('${inv.id}')" style="width:30px; height:30px; border-radius:50%; border:1px solid var(--border); background:var(--surface); display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--red); transition:0.2s;" onmouseover="this.style.borderColor='var(--red)'" onmouseout="this.style.borderColor='var(--border)'" title="Șterge Factură">
+              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+};
+
+window.saveContractInvoice = async function() {
+  if (!_currentContractInvoicesId) return;
+
+  const invNumber = (document.getElementById('inv-number').value || '').trim();
+  const invDate = document.getElementById('inv-date').value;
+  const invAmount = document.getElementById('inv-amount').value;
+  const invCurrency = document.getElementById('inv-currency').value;
+  const invSupplier = (document.getElementById('inv-supplier').value || '').trim();
+  const invSlotsCount = _currentSeriesTags.length || document.getElementById('inv-slots-count').value || 0;
+  const invSlotsSeries = _currentSeriesTags.join(', ');
+  const invNotes = (document.getElementById('inv-notes').value || '').trim();
+  const fileInput = document.getElementById('inv-file');
+
+  if (!invNumber) {
+    if (typeof showAlert === 'function') showAlert('Introduceți numărul de factură.');
+    else alert('Introduceți numărul de factură.');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('invoice_number', invNumber);
+  formData.append('invoice_date', invDate);
+  formData.append('amount', invAmount || '0');
+  formData.append('currency', invCurrency);
+  formData.append('supplier', invSupplier);
+  formData.append('slots_count', invSlotsCount);
+  formData.append('slots_series', invSlotsSeries);
+  formData.append('notes', invNotes);
+
+  if (fileInput && fileInput.files.length > 0) {
+    formData.append('file', fileInput.files[0]);
+  }
+
+  const saveBtn = document.getElementById('btn-save-invoice');
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.innerText = 'Se salvează...';
+  }
+
+  try {
+    const res = await fetch(`/api/contracts/${_currentContractInvoicesId}/invoices`, {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (typeof showAlert === 'function') showAlert('Factura de achiziție a fost salvată cu succes!');
+      toggleAddInvoiceForm(false);
+      await fetchAndRenderContractInvoices();
+      if (typeof loadContracts === 'function') loadContracts();
+    } else {
+      if (typeof showAlert === 'function') showAlert('Eroare la salvare: ' + (data.error || 'Necunoscută'));
+      else alert('Eroare: ' + data.error);
+    }
+  } catch (e) {
+    if (typeof showAlert === 'function') showAlert('Eroare conexiune: ' + e.message);
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.innerText = 'Salvează Factura';
+    }
+  }
+};
+
+window.deleteContractInvoice = async function(invoiceId) {
+  const ok = await customConfirm('Sigur dorești să ștergi această factură de achiziție?');
+  if (!ok) return;
+
+  try {
+    const res = await api(`/api/contracts/invoices/${invoiceId}`, { method: 'DELETE' });
+    if (res.success) {
+      await fetchAndRenderContractInvoices();
+      if (typeof loadContracts === 'function') loadContracts();
+    } else {
+      if (typeof showAlert === 'function') showAlert('Eroare ștergere: ' + (res.error || 'Necunoscută'));
+    }
+  } catch (e) {
+    if (typeof showAlert === 'function') showAlert('Eroare conexiune: ' + e);
+  }
+};
+
+window.viewContractInvoicePdf = function(invoiceId, filename) {
+  window._currentPdfFiles = [{
+    id: invoiceId,
+    filename: filename || 'Factura_Achizitie.pdf',
+    download_url: '/api/contracts/invoices/' + invoiceId + '/download'
+  }];
+  window._currentPdfIndex = 0;
+  if (typeof updatePdfViewer === 'function') {
+    updatePdfViewer();
+  }
+  const modal = document.getElementById('pdf-viewer-modal');
+  if (modal) modal.classList.add('show');
+};
+
+// --- MODAL TABEL SLOTURI & SERII (PROVIDER, MODEL, CABINET, LOCATIE, ETC.) ---
+window._currentSlotsDetailsList = [];
+window._currentSlotsFilteredList = [];
+
+window._currentSlotsContractId = null;
+
+window.openContractSlotsSeries = async function(contractId) {
+  try {
+    window._currentSlotsContractId = contractId;
+    let c = (_contractsData || []).find(x => String(x.id) === String(contractId));
+    if (!c) {
+      try {
+        const res = await api('/api/contracts');
+        _contractsData = res || [];
+        c = (_contractsData || []).find(x => String(x.id) === String(contractId));
+      } catch (_) {}
+    }
+    const title = `Tabel Sloturi: ${c && c.contract_number ? 'Nr. ' + c.contract_number : (c ? c.type : 'Contract')}`;
+    const sub = c ? `Furnizor: ${c.owner_name || '-'} • Dată: ${c.start_date || '-'} • Valoare Contract: ${fmt(c.total_amount)} ${c.currency || 'LEI'}` : '';
+    await loadAndShowSlotsModal({ contract_id: contractId }, title, sub);
+  } catch (err) {
+    console.error('Error in openContractSlotsSeries:', err);
+    if (typeof showAlert === 'function') showAlert('Eroare la deschiderea listei de aparate: ' + err.message);
+  }
+};
+
+window.openInvoiceSlotsModal = async function(invoiceId, invoiceNumber) {
+  try {
+    let inv = (_currentContractInvoicesList || []).find(x => String(x.id) === String(invoiceId));
+    if (!inv) {
+      for (const c of (_contractsData || [])) {
+        if (c.invoices) {
+          inv = c.invoices.find(x => String(x.id) === String(invoiceId));
+          if (inv) break;
+        }
+      }
+    }
+    if (inv && inv.contract_id) window._currentSlotsContractId = inv.contract_id;
+    const numStr = invoiceNumber || (inv && inv.invoice_number ? inv.invoice_number : '');
+    const title = `Tabel Sloturi: Factura ${numStr}`;
+    const sub = inv ? `Furnizor: ${inv.supplier || '-'} • Dată: ${inv.invoice_date || '-'} • Valoare Factură: ${fmt(inv.amount)} ${inv.currency || 'LEI'}` : '';
+    await loadAndShowSlotsModal({ invoice_id: invoiceId }, title, sub);
+  } catch (err) {
+    console.error('Error in openInvoiceSlotsModal:', err);
+    if (typeof showAlert === 'function') showAlert('Eroare: ' + err.message);
+  }
+};
+
+window.openCurrentContractInvoices = function() {
+  if (window._currentSlotsContractId) {
+    openContractInvoicesModal(window._currentSlotsContractId);
+  }
+};
+
+window.loadAndShowSlotsModal = async function(params, title, subtitle) {
+  const modal = document.getElementById('invoice-slots-modal');
+  if (!modal) return;
+
+  const titleEl = document.getElementById('invoice-slots-modal-title');
+  const subEl = document.getElementById('invoice-slots-modal-subtitle');
+  if (titleEl) titleEl.innerText = title;
+  if (subEl) subEl.innerText = subtitle;
+
+  const tbody = document.getElementById('invoice-slots-table-tbody');
+  if (tbody) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:32px; color:var(--muted); font-size:13px;">Se încarcă detaliile aparatelor (Provider, Model, Cabinet, Locație)...</td></tr>';
+  }
+
+  const searchInput = document.getElementById('search-invoice-slots');
+  if (searchInput) searchInput.value = '';
+
+  modal.classList.add('show');
+
+  try {
+    let url = '/api/contracts/slots-details?';
+    if (params.contract_id) url += 'contract_id=' + encodeURIComponent(params.contract_id);
+    if (params.invoice_id) url += (url.endsWith('?') ? '' : '&') + 'invoice_id=' + encodeURIComponent(params.invoice_id);
+    if (params.series) url += (url.endsWith('?') ? '' : '&') + 'series=' + encodeURIComponent(params.series);
+
+    const res = await api(url);
+    if (res && res.success) {
+      _currentSlotsDetailsList = res.slots || [];
+      _currentSlotsFilteredList = [..._currentSlotsDetailsList];
+
+      const kpiTotal = document.getElementById('slots-kpi-total');
+      const kpiValoare = document.getElementById('slots-kpi-valoare');
+      const kpiVendors = document.getElementById('slots-kpi-vendors');
+      const kpiLocations = document.getElementById('slots-kpi-locations');
+
+      const stats = res.stats || {};
+      if (kpiTotal) kpiTotal.innerText = stats.total_slots || _currentSlotsDetailsList.length;
+      if (kpiValoare) kpiValoare.innerText = (stats.total_amount ? fmt(stats.total_amount) : '0') + ' ' + (stats.currency || 'RON');
+
+      if (kpiVendors) {
+        const vEntries = Object.entries(stats.vendors_count || {});
+        kpiVendors.innerText = vEntries.length > 0 ? vEntries.map(([k, v]) => `${k} (${v})`).join(', ') : '-';
+      }
+      if (kpiLocations) {
+        const lEntries = Object.entries(stats.locations_count || {});
+        kpiLocations.innerText = lEntries.length > 0 ? lEntries.map(([k, v]) => `${k} (${v})`).join(', ') : '-';
+      }
+
+      populateSlotsFilters();
+      renderSlotsDetailsTable();
+    } else {
+      if (tbody) tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:24px; color:var(--red);">Eroare la încărcare date: ${res.error || 'Necunoscută'}</td></tr>`;
+    }
+  } catch (err) {
+    console.error('Error loadAndShowSlotsModal:', err);
+    if (tbody) tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:24px; color:var(--red);">Eroare rețea: ${err.message}</td></tr>`;
+  }
+};
+
+window.populateSlotsFilters = function() {
+  const vendorSelect = document.getElementById('filter-slots-vendor');
+  const locSelect = document.getElementById('filter-slots-location');
+
+  if (vendorSelect) {
+    const vendors = Array.from(new Set(_currentSlotsDetailsList.map(s => s.vendor).filter(Boolean))).sort();
+    vendorSelect.innerHTML = '<option value="">Toți Providerii</option>' + vendors.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+  }
+
+  if (locSelect) {
+    const locs = Array.from(new Set(_currentSlotsDetailsList.map(s => s.location).filter(Boolean))).sort();
+    locSelect.innerHTML = '<option value="">Toate Sălile</option>' + locs.map(l => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join('');
+  }
+};
+
+window.filterSlotsDetailsTable = function(query) {
+  const q = (query !== undefined ? query : (document.getElementById('search-invoice-slots')?.value || '')).toLowerCase().trim();
+  const vFilter = (document.getElementById('filter-slots-vendor')?.value || '').toLowerCase().trim();
+  const lFilter = (document.getElementById('filter-slots-location')?.value || '').toLowerCase().trim();
+
+  _currentSlotsFilteredList = _currentSlotsDetailsList.filter(s => {
+    if (vFilter && (s.vendor || '').toLowerCase() !== vFilter) return false;
+    if (lFilter && (s.location || '').toLowerCase() !== lFilter) return false;
+    if (q) {
+      const match = (s.serial_nr || '').toLowerCase().includes(q) ||
+                    (s.vendor || '').toLowerCase().includes(q) ||
+                    (s.model || '').toLowerCase().includes(q) ||
+                    (s.cabinet || '').toLowerCase().includes(q) ||
+                    (s.location || '').toLowerCase().includes(q) ||
+                    String(s.fabrication_year || '').includes(q);
+      if (!match) return false;
+    }
+    return true;
+  });
+
+  renderSlotsDetailsTable();
+};
+
+window.renderSlotsDetailsTable = function() {
+  const tbody = document.getElementById('invoice-slots-table-tbody');
+  const countEl = document.getElementById('invoice-slots-count-display');
+
+  if (countEl) {
+    countEl.innerText = `Afișate: ${_currentSlotsFilteredList.length} din ${_currentSlotsDetailsList.length} sloturi`;
+  }
+
+  if (!tbody) return;
+
+  if (_currentSlotsFilteredList.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:24px; color:var(--text-muted);">Niciun slot găsit conform filtrelor selectate.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = _currentSlotsFilteredList.map(s => {
+    const statusColor = s.status === 'Activ' ? '#10b981' : (s.status === 'În stoc' ? '#f59e0b' : 'var(--red)');
+
+    return `
+      <tr>
+        <td class="num" style="color:var(--text-muted); text-align:center;">${s.nr_crt}</td>
+        <td><strong>${escapeHtml(s.serial_nr)}</strong></td>
+        <td>${escapeHtml(s.vendor)}</td>
+        <td>${escapeHtml(s.model)}</td>
+        <td style="color:var(--muted);">${escapeHtml(s.cabinet)}</td>
+        <td>${escapeHtml(s.location)}</td>
+        <td style="text-align:center; color:var(--muted);">${escapeHtml(s.fabrication_year)}</td>
+        <td class="num" style="font-weight:600; color:#10b981;">
+          ${s.unit_price ? fmt(s.unit_price) + ' ' + (s.currency || 'RON') : '-'}
+        </td>
+        <td style="text-align:center;">
+          <span style="color:${statusColor}; font-weight:600;">${escapeHtml(s.status)}</span>
+        </td>
+      </tr>
+    `;
+  }).join('');
+};
+
+window.exportSlotsToExcel = function() {
+  const list = _currentSlotsFilteredList && _currentSlotsFilteredList.length > 0 ? _currentSlotsFilteredList : _currentSlotsDetailsList;
+  if (!list || list.length === 0) {
+    if (typeof showAlert === 'function') showAlert('Nu există date în tabel pentru export.');
+    return;
+  }
+
+  const titleEl = document.getElementById('invoice-slots-modal-title');
+  const modalTitle = titleEl ? titleEl.innerText.replace(/[^a-zA-Z0-9_-]/g, '_') : 'Sloturi';
+
+  const excelData = list.map((s, idx) => ({
+    "Nr. Crt.": idx + 1,
+    "Serie Aparat": s.serial_nr || '',
+    "Producător (Provider)": s.vendor || '',
+    "Model": s.model || '',
+    "Cabinet": s.cabinet || '',
+    "Sală (Locație)": s.location || '',
+    "An Fabricație": s.fabrication_year || '',
+    "Preț Achiziție (RON)": s.unit_price ? Number(s.unit_price) : '',
+    "Status": s.status || ''
+  }));
+
+  if (window.XLSX && XLSX.utils) {
+    const ws = XLSX.utils.json_to_sheet(excelData);
+    ws['!cols'] = [
+      { wch: 8 },
+      { wch: 16 },
+      { wch: 22 },
+      { wch: 20 },
+      { wch: 22 },
+      { wch: 20 },
+      { wch: 14 },
+      { wch: 22 },
+      { wch: 14 }
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Sloturi");
+    const fileName = `${modalTitle}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+    if (typeof showAlert === 'function') showAlert(`Tabelul a fost exportat cu succes în format Excel (${fileName})!`, "Export Finalizat");
+  } else {
+    const headers = ["Nr. Crt.", "Serie Aparat", "Producător", "Model", "Cabinet", "Sală", "An Fabricație", "Preț Achiziție (RON)", "Status"];
+    const rows = list.map((s, idx) => [
+      idx + 1,
+      s.serial_nr,
+      s.vendor,
+      s.model,
+      s.cabinet,
+      s.location,
+      s.fabrication_year,
+      s.unit_price || '',
+      s.status
+    ].map(v => `"${String(v || '').replace(/"/g, '""')}"`).join(','));
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${modalTitle}_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+};
+
+window.copySlotsTableToClipboard = function() {
+  if (!_currentSlotsFilteredList || _currentSlotsFilteredList.length === 0) {
+    if (typeof showAlert === 'function') showAlert('Nu există date în tabel de copiat.');
+    return;
+  }
+  const headers = ['Nr', 'Serie', 'Provider', 'Model', 'Cabinet', 'Sala', 'An_Fabr', 'Pret_Achizitie', 'Status'];
+  const rows = _currentSlotsFilteredList.map(s => [
+    s.nr_crt,
+    s.serial_nr,
+    s.vendor,
+    s.model,
+    s.cabinet,
+    s.location,
+    s.fabrication_year,
+    s.unit_price || '',
+    s.status
+  ].map(v => `"${String(v || '').replace(/"/g, '""')}"`).join('\t'));
+
+  const tsv = [headers.join('\t'), ...rows].join('\n');
+  navigator.clipboard.writeText(tsv).then(() => {
+    if (typeof showAlert === 'function') showAlert('Tabelul a fost copiat în clipboard (gata de lipit în Excel)!');
+    else alert('Tabelul a fost copiat în clipboard!');
+  });
+};
+
+window.copyInvoiceSlotsToClipboard = function() {
+  const list = _currentSlotsFilteredList.length > 0 ? _currentSlotsFilteredList : _currentSlotsDetailsList;
+  const seriesStr = list.map(s => s.serial_nr).filter(Boolean).join(', ');
+  if (!seriesStr) {
+    if (typeof showAlert === 'function') showAlert('Nu există serii de copiat.');
+    return;
+  }
+  navigator.clipboard.writeText(seriesStr).then(() => {
+    if (typeof showAlert === 'function') showAlert('Seriile au fost copiate în clipboard!');
+    else alert('Seriile au fost copiate!');
+  });
+};
+
+

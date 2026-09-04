@@ -1,9 +1,10 @@
-from app_db import get_pg_conn
+import psycopg2
+PG_DB_CFG = dict(host="82.76.35.50", port=26257, user="cashpot", password="129hj8oahwd7yaw3e21321", dbname="cashpot")
+conn = psycopg2.connect(**PG_DB_CFG)
+cur = conn.cursor()
 try:
-    conn = get_pg_conn()
-    cur = conn.cursor()
-    cur.execute("SELECT count(*) FROM acc_expenditures WHERE date >= '01.05.2026 00:00:00' AND date <= '31.05.2026 23:59:59'")
-    count = cur.fetchone()[0]
-    print("Success:", count)
+    cur.execute("SELECT id, contract_id, is_annex, filename FROM cp2_contract_files")
+    rows = cur.fetchall()
+    print("Files fetched:", len(rows))
 except Exception as e:
     print("Error:", e)

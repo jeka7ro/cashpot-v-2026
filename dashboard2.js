@@ -1,6 +1,10 @@
 // dashboard2.js - ECharts implementation cu Cross-Filtering
 let echartsInstances = {};
-window.chartDateOverrides = {};
+try {
+    window.chartDateOverrides = JSON.parse(localStorage.getItem('chartDateOverrides')) || {};
+} catch(e) {
+    window.chartDateOverrides = {};
+}
 let currentLocId = null;
 let currentDate = null;
 let currentDonutLevel = 1;
@@ -124,8 +128,15 @@ async function fetchAndRenderSecondary(locId, dateFilter, targetChartId = null) 
     if (targetChartId && window.echartsInstances[targetChartId]) window.echartsInstances[targetChartId].showLoading({text: "Se descarcă datele...", color: "#3b82f6", textColor: "#fff", maskColor: "rgba(15, 15, 26, 0.8)"});
     const colors = getCommonColors();
     const { s, e } = getPeriod();
-    const sFilter = dateFilter || s;
-    const eFilter = dateFilter || e;
+    let sFilter = dateFilter || s;
+    let eFilter = dateFilter || e;
+    
+    if (!eFilter) eFilter = new Date().toISOString().split('T')[0];
+    if (!sFilter) {
+        let d = new Date(eFilter);
+        d.setDate(1);
+        sFilter = d.toISOString().split('T')[0];
+    }
     
     let locPFilter = typeof locParam === 'function' ? locParam() : '';
     if (locId) {
@@ -148,6 +159,8 @@ async function fetchAndRenderSecondary(locId, dateFilter, targetChartId = null) 
         api(`/api/reports/hourly?start=${sFilter}&end=${eFilter}${locPFilter}`)
     ]);
 
+    window._latestRawData = { kpiData, trendData, timelineData, expData, locsData, cabsData, provsData, hourlyData };
+
     // --- 2. COMBO CHART ---
     const domCombo = document.getElementById('echart-combo');
     if (domCombo && (!window.chartDateOverrides['echart-combo'] || targetChartId === 'echart-combo')) {
@@ -156,7 +169,7 @@ async function fetchAndRenderSecondary(locId, dateFilter, targetChartId = null) 
         
         const comboDates = (trendData || []).map(r => r.date || r.zi || '');
         const comboIn = (trendData || []).map(r => Math.round(r.total_in || 0));
-        const comboHold = (trendData || []).map(r => Number((r.hold_pct || 0).toFixed(2)));
+        const comboHold = (trendData || []).map(r => r.total_in ? Number(((r.ggr / r.total_in) * 100).toFixed(2)) : 0);
 
         comboChart.setOption({
             tooltip: { 
@@ -345,7 +358,7 @@ async function fetchAndRenderSecondary(locId, dateFilter, targetChartId = null) 
 
     // --- 6. CALENDAR HEATMAP ---
     if (document.getElementById('echart-cal') && trendData && (!window.chartDateOverrides['echart-cal'] || targetChartId === 'echart-cal')) {
-        let calData = trendData.map(t => [t.date || t.zi, Math.round(t.ggr)]);
+        let calData = trendData.map(t => [t.date || t.zi, Math.round(t.total_in || 0)]);
         let year = trendData.length ? (trendData[0].date || trendData[0].zi || String(new Date().getFullYear())).substring(0,4) : new Date().getFullYear();
         if (!echartsInstances['cal']) echartsInstances['cal'] = echarts.init(document.getElementById('echart-cal'));
         echartsInstances['cal'].setOption({
@@ -364,7 +377,7 @@ async function fetchAndRenderSecondary(locId, dateFilter, targetChartId = null) 
             let d = new Date(r.dt);
             let day = (d.getDay() + 6) % 7; // Mon=0, Sun=6
             let hr = d.getHours();
-            matrix[day][hr] += parseFloat(r.ggr) || 0;
+            matrix[day][hr] += parseFloat(r.in) || 0;
         });
         let heatData = [];
         for(let d=0; d<7; d++) for(let h=0; h<24; h++) heatData.push([h, d, Math.round(matrix[d][h])]);
@@ -374,37 +387,63 @@ async function fetchAndRenderSecondary(locId, dateFilter, targetChartId = null) 
         
         if (!echartsInstances['hourly']) echartsInstances['hourly'] = echarts.init(document.getElementById('echart-hourly'));
         echartsInstances['hourly'].setOption({
-            tooltip: { position: 'top', formatter: (p) => `${days[p.value[1]]} ${hours[p.value[0]]}: ${p.value[2].toLocaleString('ro-RO')} RON` },
+            tooltip: { position: 'top', formatter: (p) => `Total IN<br/>${days[p.value[1]]} ${hours[p.value[0]]}: ${p.value[2].toLocaleString('ro-RO')} RON` },
             grid: { left: '5%', right: '2%', bottom: '5%', top: '5%', containLabel: true },
             xAxis: { type: 'category', data: hours, axisLabel: { color: colors.textColor, interval: 2 } },
             yAxis: { type: 'category', data: days, axisLabel: { color: colors.textColor } },
-            visualMap: { min: 0, max: Math.max(1, ...heatData.map(d=>d[2])), show: false, inRange: { color: ['#3b82f622', '#3b82f6', '#1d4ed8'] } },
+            visualMap: { min: 0, max: Math.max(1, ...heatData.map(d=>d[2])), show: false, inRange: { color: ['#10b98122', '#10b981', '#047857'] } },
             series: [{ type: 'heatmap', data: heatData, label: { show: false }, itemStyle: { borderColor: colors.isDark ? '#0f0f1a' : '#fff', borderWidth: 1 } }]
         }, true);
     }
 
-    // --- 8. RADAR ZILE ---
+    // --- 8. RADAR ZILE (Now Bar Chart) ---
     if (document.getElementById('echart-radar') && trendData && (!window.chartDateOverrides['echart-radar'] || targetChartId === 'echart-radar')) {
-        let daysGGR = Array(7).fill(0);
-        let daysCount = Array(7).fill(0);
+        let daysRaw = [
+            { name: 'Luni', ggr: 0, bet: 0, count: 0 },
+            { name: 'Marți', ggr: 0, bet: 0, count: 0 },
+            { name: 'Miercuri', ggr: 0, bet: 0, count: 0 },
+            { name: 'Joi', ggr: 0, bet: 0, count: 0 },
+            { name: 'Vineri', ggr: 0, bet: 0, count: 0 },
+            { name: 'Sâmbătă', ggr: 0, bet: 0, count: 0 },
+            { name: 'Duminică', ggr: 0, bet: 0, count: 0 }
+        ];
+        
         trendData.forEach(t => {
             let day = (new Date(t.date || t.zi).getDay() + 6) % 7;
-            daysGGR[day] += parseFloat(t.ggr) || 0;
-            daysCount[day]++;
+            daysRaw[day].ggr += parseFloat(t.ggr) || 0;
+            daysRaw[day].bet += parseFloat(t.total_in) || 0;
+            daysRaw[day].count++;
         });
-        let radarData = daysGGR.map((g,i) => daysCount[i] ? Math.round(g/daysCount[i]) : 0);
         
+        daysRaw.forEach(d => {
+            d.avgGgr = d.count ? Math.round(d.ggr / d.count) : 0;
+            d.avgBet = d.count ? Math.round(d.bet / d.count) : 0;
+        });
+        
+        // Sort descending by BET
+        daysRaw.sort((a, b) => b.avgBet - a.avgBet);
+        
+        let categories = daysRaw.map(d => d.name);
+        let dataBET = daysRaw.map(d => d.avgBet);
+        let dataGGR = daysRaw.map(d => d.avgGgr);
+
         if (!echartsInstances['radar']) echartsInstances['radar'] = echarts.init(document.getElementById('echart-radar'));
         echartsInstances['radar'].setOption({
-            tooltip: { trigger: 'item' },
-            radar: {
-                indicator: [
-                    { name: 'Luni', max: Math.max(...radarData) }, { name: 'Marți', max: Math.max(...radarData) }, { name: 'Miercuri', max: Math.max(...radarData) },
-                    { name: 'Joi', max: Math.max(...radarData) }, { name: 'Vineri', max: Math.max(...radarData) }, { name: 'Sâmbătă', max: Math.max(...radarData) }, { name: 'Duminică', max: Math.max(...radarData) }
-                ],
-                axisName: { color: colors.textColor }, splitArea: { show: false }
-            },
-            series: [{ type: 'radar', data: [{ value: radarData, name: 'Medie GGR', areaStyle: { color: 'rgba(59, 130, 246, 0.4)' }, lineStyle: { color: '#3b82f6' } }] }]
+            tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' }, formatter: function(params) {
+                let res = params[0].name + '<br/>';
+                params.forEach(p => {
+                    res += p.marker + ' ' + p.seriesName + ': ' + p.value.toLocaleString('ro-RO') + ' RON<br/>';
+                });
+                return res;
+            } },
+            legend: { data: ['Medie BET', 'Medie GGR'], textStyle: { color: colors.textColor } },
+            grid: { left: '5%', right: '5%', bottom: '5%', top: '15%', containLabel: true },
+            xAxis: [{ type: 'category', data: categories, axisLabel: { color: colors.textColor } }],
+            yAxis: [{ type: 'value', axisLabel: { color: colors.textColor, formatter: (v) => (v/1000).toFixed(0) + 'k' }, splitLine: { show: false } }],
+            series: [
+                { name: 'Medie BET', type: 'bar', data: dataBET, itemStyle: { color: '#10b981', borderRadius: 4 } },
+                { name: 'Medie GGR', type: 'bar', data: dataGGR, itemStyle: { color: '#3b82f6', borderRadius: 4 } }
+            ]
         }, true);
     }
 
@@ -427,22 +466,22 @@ async function fetchAndRenderSecondary(locId, dateFilter, targetChartId = null) 
         }, true);
     }
 
-    // --- 10. IMPACT JACKPOTS ---
+    // --- 10. IMPACT MARKETING ---
     if (document.getElementById('echart-jackpot') && trendData && (!window.chartDateOverrides['echart-jackpot'] || targetChartId === 'echart-jackpot')) {
         let dates = trendData.map(t => (t.date || t.zi || '').substring(5));
         let ggrSeries = trendData.map(t => Math.round(t.ggr));
-        let jpSeries = trendData.map(t => Math.round(t.jackpot || 0));
+        let mktSeries = trendData.map(t => Math.round(t.marketing || 0));
         let taxSeries = trendData.map(t => Math.round((t.ggr || 0) * 0.1)); // Approximation if no taxes API
         
         if (!echartsInstances['jackpot']) echartsInstances['jackpot'] = echarts.init(document.getElementById('echart-jackpot'));
         echartsInstances['jackpot'].setOption({
             tooltip: { trigger: 'axis', axisPointer: { type: 'cross', label: { backgroundColor: '#6a7985' } } },
             grid: { left: '3%', right: '4%', bottom: '5%', top: '15%', containLabel: true },
-            legend: { data: ['GGR', 'Jackpots', 'Taxe Estimative'], textStyle: { color: colors.textColor } },
+            legend: { data: ['GGR', 'Marketing', 'Taxe Estimative'], textStyle: { color: colors.textColor } },
             xAxis: { type: 'category', boundaryGap: false, data: dates, axisLabel: { color: colors.textColor } },
             yAxis: { type: 'value', axisLabel: { color: colors.textColor }, splitLine: { lineStyle: { color: colors.splitLineColor } } },
             series: [
-                { name: 'Jackpots', type: 'line', stack: 'Total', areaStyle: {}, emphasis: { focus: 'series' }, data: jpSeries, itemStyle: { color: '#eab308' } },
+                { name: 'Marketing', type: 'line', stack: 'Total', areaStyle: {}, emphasis: { focus: 'series' }, data: mktSeries, itemStyle: { color: '#eab308' } },
                 { name: 'Taxe Estimative', type: 'line', stack: 'Total', areaStyle: {}, emphasis: { focus: 'series' }, data: taxSeries, itemStyle: { color: '#ef4444' } },
                 { name: 'GGR', type: 'line', stack: 'Total', areaStyle: {}, emphasis: { focus: 'series' }, data: ggrSeries, itemStyle: { color: '#10b981' } }
             ]
@@ -459,8 +498,10 @@ async function fetchAndRenderSecondary(locId, dateFilter, targetChartId = null) 
 
         const tlDates = (timelineData || []).map(r => r.date || r.zi || '');
         const tlGGR = (timelineData || []).map(r => Math.round(r.ggr || 0));
+        const tlBET = (timelineData || []).map(r => Math.round(r.total_in || 0));
+        const tlMarketing = (timelineData || []).map(r => Math.round(r.marketing || 0));
 
-        let tlTitle = `Evoluție GGR (90 Zile) ${s90} - ${eFilter}`;
+        let tlTitle = `Evoluție GGR, BET & MKT (90 Zile) ${s90} - ${eFilter}`;
         if (locId) {
             const activeLoc = currentLevel1Data.find(l => l.loc_id == locId);
             if (activeLoc) tlTitle += ` - ${activeLoc.name}`;
@@ -470,11 +511,15 @@ async function fetchAndRenderSecondary(locId, dateFilter, targetChartId = null) 
             tooltip: { 
                 trigger: 'axis', position: function (pt) { return [pt[0], '10%']; }, backgroundColor: 'rgba(15,15,26,0.9)', textStyle: { color: '#fff' }, borderColor: 'rgba(255,255,255,0.2)',
                 formatter: function(params) {
-                    let p = params[0];
-                    return p.name + '<br/>' + p.marker + ' ' + p.seriesName + ': ' + Math.round(p.value).toLocaleString('ro-RO') + ' RON';
+                    let s = `<b>${params[0].name}</b><br/>`;
+                    params.forEach(p => {
+                        s += `${p.marker} ${p.seriesName}: ${Math.round(p.value).toLocaleString('ro-RO')} RON<br/>`;
+                    });
+                    return s;
                 }
             },
             title: { left: 'center', text: tlTitle, textStyle: { color: colors.textColor, fontSize: 13 } },
+            legend: { data: ['GGR', 'BET', 'Marketing'], textStyle: { color: colors.textColor }, top: 30 },
             grid: { left: '5%', right: '5%', bottom: '20%', top: '20%', containLabel: true },
             xAxis: { type: 'category', boundaryGap: false, data: tlDates, axisLabel: { color: colors.textColor } },
             yAxis: { type: 'value', boundaryGap: [0, '100%'], axisLabel: { color: colors.textColor, formatter: (val) => Math.round(val).toLocaleString('ro-RO') }, splitLine: { lineStyle: { color: colors.splitLineColor, type: 'dashed' } } },
@@ -484,6 +529,10 @@ async function fetchAndRenderSecondary(locId, dateFilter, targetChartId = null) 
             ],
             series: [
                 {
+                    name: 'BET', type: 'line', symbol: 'none', sampling: 'lttb', itemStyle: { color: '#3b82f6' },
+                    data: tlBET
+                },
+                {
                     name: 'GGR', type: 'line', symbol: 'none', sampling: 'lttb', itemStyle: { color: '#eab308' },
                     areaStyle: {
                         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
@@ -492,6 +541,10 @@ async function fetchAndRenderSecondary(locId, dateFilter, targetChartId = null) 
                         ])
                     },
                     data: tlGGR
+                },
+                {
+                    name: 'Marketing', type: 'line', symbol: 'none', sampling: 'lttb', itemStyle: { color: '#ef4444' },
+                    data: tlMarketing
                 }
             ]
         }, true);
@@ -602,7 +655,20 @@ async function initDashboard2() {
             Object.values(echartsInstances).forEach(chart => {
                 if(chart) chart.resize();
             });
-            injectAiButtons();
+            setTimeout(() => { 
+                injectAiButtons(); 
+                
+                // Trigger overrides on load for charts that were saved as toggled in localStorage
+                Object.keys(window.chartDateOverrides).forEach(chartId => {
+                    if (window.chartDateOverrides[chartId] && document.getElementById(chartId)) {
+                        let newStart = new Date().getFullYear() + '-01-01';
+                        let newEnd = new Date().getFullYear() + '-12-31';
+                        let activeLoc = typeof currentLocId !== 'undefined' ? currentLocId : null;
+                        // Execute it async without blocking
+                        fetchAndRenderChartWithOverride(chartId, activeLoc, newStart, newEnd);
+                    }
+                });
+            }, 300);
         }, 100);
     } catch (e) {
         console.error(e);
@@ -675,57 +741,67 @@ function injectAiButtons() {
             if (chartDiv) {
                 const chartId = chartDiv.id;
                 
-                // Toggle Checkbox
+                // Tot Anul Toggle
+                const toggleContainer = document.createElement('div');
+                toggleContainer.style.display = 'flex';
+                toggleContainer.style.alignItems = 'center';
+                toggleContainer.style.gap = '8px';
+
                 const toggleLabel = document.createElement('label');
-                toggleLabel.style.display = 'flex';
-                toggleLabel.style.alignItems = 'center';
-                toggleLabel.style.fontSize = '12px';
-                toggleLabel.style.color = 'var(--muted)';
-                toggleLabel.style.cursor = 'pointer';
-                toggleLabel.style.userSelect = 'none';
+                toggleLabel.className = 'toggle-switch';
                 
                 const toggleInput = document.createElement('input');
                 toggleInput.type = 'checkbox';
-                toggleInput.style.marginRight = '6px';
                 toggleInput.checked = window.chartDateOverrides[chartId] || false;
+                
+                const toggleSlider = document.createElement('span');
+                toggleSlider.className = 'slider';
+                
+                toggleLabel.appendChild(toggleInput);
+                toggleLabel.appendChild(toggleSlider);
                 
                 toggleInput.onchange = (e) => {
                     const isFullYear = e.target.checked;
                     window.chartDateOverrides[chartId] = isFullYear;
+                    localStorage.setItem('chartDateOverrides', JSON.stringify(window.chartDateOverrides));
                     
-                    let newStart = null;
+                    let finalStart = null;
+                    let finalEnd = null;
                     if (isFullYear) {
-                        newStart = new Date().getFullYear() + '-01-01';
+                        finalStart = new Date().getFullYear() + '-01-01';
+                        finalEnd = new Date().getFullYear() + '-12-31';
+                    } else {
+                        finalStart = typeof getPeriod === 'function' ? getPeriod().s : new Date().getFullYear() + '-01-01';
+                        finalEnd = typeof getPeriod === 'function' ? getPeriod().e : new Date().toISOString().split('T')[0];
+                        if (!finalEnd) finalEnd = new Date().toISOString().split('T')[0];
                     }
-                    // Extract locId and current eFilter from global state (if available) or assume defaults
-                    // We'll call fetchAndRenderSecondary with the custom dateFilter and targetChartId
-                    
-                    const currentE = typeof getPeriod === 'function' ? getPeriod().e : new Date().toISOString().split('T')[0];
-                    const currentS = typeof getPeriod === 'function' ? getPeriod().s : new Date().getFullYear() + '-01-01';
-                    
-                    const finalStart = isFullYear ? newStart : currentS;
-                    const finalDateFilter = isFullYear ? finalStart : null; // If null, uses global period
                     
                     let activeLoc = typeof currentLocId !== 'undefined' ? currentLocId : null;
-                    
-                    // We need a specific start/end range if overriden
-                    // Actually, if we pass newStart, we must modify fetchAndRenderSecondary to accept an explicit start/end
-                    // Or we just modify the global state variables locally.
-                    fetchAndRenderChartWithOverride(chartId, activeLoc, finalStart, currentE);
+                    fetchAndRenderChartWithOverride(chartId, activeLoc, finalStart, finalEnd);
                 };
                 
-                toggleLabel.appendChild(toggleInput);
-                toggleLabel.appendChild(document.createTextNode('Tot Anul'));
-                controlsDiv.appendChild(toggleLabel);
+                const toggleText = document.createElement('span');
+                toggleText.innerText = 'Tot Anul';
+                toggleText.style.fontSize = '11px';
+                toggleText.style.color = 'var(--text, #fff)';
+                toggleText.style.cursor = 'pointer';
+                toggleText.onclick = () => { toggleInput.click(); };
+                
+                toggleContainer.appendChild(toggleLabel);
+                toggleContainer.appendChild(toggleText);
+                controlsDiv.appendChild(toggleContainer);
             
                 // AI Button
                 const btn = document.createElement('button');
-                btn.className = 'btn btn-sm btn-outline ai-analyze-btn';
+                btn.className = 'btn-ghost ai-analyze-btn';
                 btn.innerText = 'Analiză AI';
-                btn.style.padding = '4px 12px';
-                btn.style.fontSize = '12px';
-                btn.style.borderRadius = '6px';
+                btn.style.height = '24px';
+                btn.style.padding = '0 12px';
+                btn.style.fontSize = '11px';
                 btn.style.cursor = 'pointer';
+                btn.style.display = 'inline-flex';
+                btn.style.alignItems = 'center';
+                btn.style.justifyContent = 'center';
                 btn.onclick = () => runAiAnalysis(chartId, titleEl.innerText);
                 
                 controlsDiv.appendChild(btn);
@@ -744,7 +820,7 @@ async function runAiAnalysis(chartId, title) {
     
     modalTitle.innerText = `Analiză AI: ${title}`;
     content.innerHTML = '<div style="display:flex; justify-content:center; align-items:center; height:100px;"><div class="spinner"></div><span style="margin-left:10px;">Se analizează datele...</span></div>';
-    modal.style.display = 'flex';
+    modal.classList.add('show');
     
     // Extract ECharts data
     let chartData = [];
@@ -790,11 +866,21 @@ async function runAiAnalysis(chartId, title) {
         console.error("Error extracting chart data:", e);
     }
     
+    let rawDataToAnalyze = null;
+    if (window._latestRawData) {
+        if (chartId.includes('donut') || chartId.includes('loc')) rawDataToAnalyze = window._latestRawData.locsData;
+        else if (chartId.includes('cab')) rawDataToAnalyze = window._latestRawData.cabsData;
+        else if (chartId.includes('prov')) rawDataToAnalyze = window._latestRawData.provsData;
+        else if (chartId.includes('combo') || chartId.includes('cal') || chartId.includes('timeline')) rawDataToAnalyze = window._latestRawData.trendData;
+        else if (chartId.includes('hourly')) rawDataToAnalyze = window._latestRawData.hourlyData;
+        else if (chartId.includes('exp') || chartId.includes('waterfall')) rawDataToAnalyze = window._latestRawData.expData;
+    }
+    
     try {
         const res = await fetch('/api/ai/analyze-chart', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: title, data: chartData })
+            body: JSON.stringify({ title: title, data: chartData, rawData: rawDataToAnalyze })
         });
         const data = await res.json();
         
@@ -804,10 +890,22 @@ async function runAiAnalysis(chartId, title) {
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
             content.innerHTML = htmlText;
         } else {
-            content.innerHTML = `<div style="color:var(--danger)">Eroare: ${data.error || 'Nu s-a putut genera analiza.'}</div>`;
+            content.innerHTML = `
+                <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding: 24px;">
+                    <div style="font-size: 32px; margin-bottom: 16px;">⚠️</div>
+                    <div style="color:var(--danger); font-size: 15px; font-weight: 600; margin-bottom: 8px;">Analiza indisponibilă</div>
+                    <div style="color:var(--muted); font-size: 13px;">${data.error || 'A apărut o problemă la procesarea datelor.'}</div>
+                </div>
+            `;
         }
     } catch(e) {
-        content.innerHTML = `<div style="color:var(--danger)">Eroare rețea: ${e.message}</div>`;
+        content.innerHTML = `
+            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding: 24px;">
+                <div style="font-size: 32px; margin-bottom: 16px;">🔌</div>
+                <div style="color:var(--danger); font-size: 15px; font-weight: 600; margin-bottom: 8px;">Eroare de conexiune</div>
+                <div style="color:var(--muted); font-size: 13px;">Verifică conexiunea la internet sau statusul serverului.</div>
+            </div>
+        `;
     }
 }
 
@@ -817,22 +915,142 @@ async function fetchAndRenderChartWithOverride(chartId, locId, start, end) {
     }
 
     try {
-        // Just call fetchAndRenderSecondary with targetChartId
-        // fetchAndRenderSecondary will use the provided date Filter (start)
-        // Wait, fetchAndRenderSecondary expects dateFilter (which maps to sFilter and eFilter).
-        // Since we want the override to be for the whole year (e.g. 2026-01-01 to end), 
-        // passing `start` to dateFilter will make BOTH sFilter and eFilter equal to `start`, which is wrong if it's the whole year!
-        // We need to modify fetchAndRenderSecondary slightly to accept explicit s and e.
-        // For now, let's just temporarily override the global getPeriod() function while we call it!
-        const originalGetPeriod = window.getPeriod;
-        window.getPeriod = () => ({ s: start, e: end });
+        let locPFilter = typeof locParam === 'function' ? locParam() : '';
+        if (locId) locPFilter = `&loc_ids=${locId}`;
         
-        await fetchAndRenderSecondary(locId, null, chartId);
+        let sFilter = start;
+        let eFilter = end;
+        if (!eFilter) eFilter = new Date().toISOString().split('T')[0];
         
-        window.getPeriod = originalGetPeriod;
+        const colors = getCommonColors();
+        
+        if (chartId === 'echart-cal') {
+            const trendData = await api(`/api/daily?res=day&start=${sFilter}&end=${eFilter}${locPFilter}`);
+            let calData = trendData.map(t => [t.date || t.zi, Math.round(t.total_in || 0)]);
+            let year = sFilter.split('-')[0];
+            if (!echartsInstances['cal']) echartsInstances['cal'] = echarts.init(document.getElementById('echart-cal'));
+            echartsInstances['cal'].setOption({
+                tooltip: { position: 'top', formatter: (p) => `${p.value[0]}: ${p.value[1].toLocaleString('ro-RO')} RON` },
+                visualMap: { min: 0, max: Math.max(1, ...calData.map(d=>d[1])), type: 'piecewise', orient: 'horizontal', left: 'center', top: 0, textStyle: { color: colors.textColor }, inRange: { color: ['#ebedf0', '#9be9a8', '#40c463', '#30a14e', '#216e39'] } },
+                calendar: { top: 60, left: 30, right: 30, range: year, itemStyle: { borderWidth: 1, borderColor: colors.isDark ? '#1a1a2e' : '#fff' }, dayLabel: { color: colors.textColor }, monthLabel: { color: colors.textColor }, yearLabel: { show: false } },
+                series: [{ type: 'heatmap', coordinateSystem: 'calendar', data: calData }]
+            }, true);
+        } else if (chartId === 'echart-hourly') {
+            const hourlyData = await api(`/api/reports/hourly?start=${sFilter}&end=${eFilter}${locPFilter}`);
+            let matrix = Array(7).fill(0).map(() => Array(24).fill(0));
+            hourlyData.forEach(r => {
+                let d = new Date(r.dt);
+                let day = (d.getDay() + 6) % 7;
+                let hr = d.getHours();
+                matrix[day][hr] += (parseFloat(r.in) || 0);
+            });
+            let heatData = [];
+            for (let d = 0; d < 7; d++) {
+                for (let h = 0; h < 24; h++) {
+                    heatData.push([h, d, Math.round(matrix[d][h])]);
+                }
+            }
+            if (!echartsInstances['hourly']) echartsInstances['hourly'] = echarts.init(document.getElementById('echart-hourly'));
+            echartsInstances['hourly'].setOption({
+                tooltip: { position: 'top', formatter: (p) => `Total IN: ${p.value[2].toLocaleString('ro-RO')} RON` },
+                visualMap: { show: false, min: 0, max: Math.max(1, ...heatData.map(d=>d[2])), inRange: { color: ['#ebedf0', '#3b82f6', '#1d4ed8'] } },
+                xAxis: { type: 'category', data: Array.from({length:24}, (_,i)=>i+'h'), splitArea: { show: true }, axisLabel: { color: colors.textColor } },
+                yAxis: { type: 'category', data: ['Luni', 'Marți', 'Miercuri', 'Joi', 'Vineri', 'Sâmbătă', 'Duminică'], splitArea: { show: true }, axisLabel: { color: colors.textColor } },
+                series: [{ type: 'heatmap', data: heatData, label: { show: false }, itemStyle: { borderColor: colors.isDark ? '#0f0f1a' : '#fff', borderWidth: 1 } }]
+            }, true);
+        } else if (chartId === 'echart-rtp') {
+            const trendData = await api(`/api/daily?res=day&start=${sFilter}&end=${eFilter}${locPFilter}`);
+            let rtpData = trendData.map(t => [t.date || t.zi, t.total_in ? Math.round((t.total_out / t.total_in)*1000)/10 : 0]);
+            let holdData = trendData.map(t => [t.date || t.zi, t.total_in ? Math.round((t.ggr / t.total_in)*1000)/10 : 0]);
+            if (!echartsInstances['rtp']) echartsInstances['rtp'] = echarts.init(document.getElementById('echart-rtp'));
+            echartsInstances['rtp'].setOption({
+                tooltip: { trigger: 'axis', formatter: (params) => { let s=`<b>${params[0].axisValue}</b><br/>`; params.forEach(p=>{s+=`${p.marker}${p.seriesName}: ${p.value[1]}%<br/>`;}); return s; } },
+                color: ['#ef4444', '#10b981'],
+                legend: { data: ['RTP %', 'Hold %'], textStyle: { color: colors.textColor } },
+                xAxis: { type: 'category', boundaryGap: false, axisLabel: { color: colors.textColor } },
+                yAxis: { type: 'value', axisLabel: { formatter: '{value} %', color: colors.textColor } },
+                series: [{ name: 'RTP %', type: 'line', data: rtpData, showSymbol: false }, { name: 'Hold %', type: 'line', data: holdData, showSymbol: false }]
+            }, true);
+        } else if (chartId === 'echart-dow') {
+            const trendData = await api(`/api/daily?res=day&start=${sFilter}&end=${eFilter}${locPFilter}`);
+            let daysRaw = [ { name: 'Luni', ggr: 0, bet: 0, count: 0 }, { name: 'Marți', ggr: 0, bet: 0, count: 0 }, { name: 'Miercuri', ggr: 0, bet: 0, count: 0 }, { name: 'Joi', ggr: 0, bet: 0, count: 0 }, { name: 'Vineri', ggr: 0, bet: 0, count: 0 }, { name: 'Sâmbătă', ggr: 0, bet: 0, count: 0 }, { name: 'Duminică', ggr: 0, bet: 0, count: 0 } ];
+            trendData.forEach(t => { let d = new Date(t.date || t.zi); let day = (d.getDay() + 6) % 7; daysRaw[day].ggr += (t.ggr || 0); daysRaw[day].bet += (t.total_in || 0); daysRaw[day].count++; });
+            daysRaw.forEach(d => { if(d.count > 0) { d.ggr = Math.round(d.ggr/d.count); d.bet = Math.round(d.bet/d.count); } });
+            daysRaw.sort((a,b) => b.bet - a.bet);
+            let sortedNames = daysRaw.map(d => d.name); let sortedBet = daysRaw.map(d => d.bet); let sortedGgr = daysRaw.map(d => d.ggr);
+            if (!echartsInstances['radar']) echartsInstances['radar'] = echarts.init(document.getElementById('echart-radar'));
+            echartsInstances['radar'].setOption({
+                tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+                color: ['#10b981', '#3b82f6'],
+                legend: { data: ['Medie BET', 'Medie GGR'], textStyle: { color: colors.textColor } },
+                xAxis: { type: 'category', data: sortedNames, axisLabel: { color: colors.textColor } },
+                yAxis: { type: 'value', axisLabel: { formatter: (val) => val >= 1000 ? (val/1000)+'k' : val, color: colors.textColor } },
+                series: [{ name: 'Medie BET', type: 'bar', data: sortedBet, itemStyle: { borderRadius: [4, 4, 0, 0] } }, { name: 'Medie GGR', type: 'bar', data: sortedGgr, itemStyle: { borderRadius: [4, 4, 0, 0] } }]
+            }, true);
+        } else if (chartId === 'echart-jackpot') {
+            const trendData = await api(`/api/daily?res=day&start=${sFilter}&end=${eFilter}${locPFilter}`);
+            let dates = trendData.map(t => (t.date || t.zi || '').substring(5));
+            let mktSeries = trendData.map(t => Math.round(t.marketing || 0));
+            let ggrSeries = trendData.map(t => Math.round(t.ggr || 0));
+            let taxSeries = trendData.map(t => Math.round((t.ggr || 0) * 0.1));
+            if (!echartsInstances['jackpot']) echartsInstances['jackpot'] = echarts.init(document.getElementById('echart-jackpot'));
+            echartsInstances['jackpot'].setOption({
+                tooltip: { trigger: 'axis' },
+                color: ['#10b981', '#f59e0b', '#ef4444'],
+                legend: { data: ['GGR', 'Marketing', 'Taxe Estimative'], textStyle: { color: colors.textColor } },
+                xAxis: { type: 'category', data: dates, boundaryGap: false, axisLabel: { color: colors.textColor } },
+                yAxis: { type: 'value', axisLabel: { color: colors.textColor } },
+                series: [
+                    { name: 'Marketing', type: 'line', stack: 'Total', areaStyle: {}, emphasis: { focus: 'series' }, data: mktSeries, itemStyle: { color: '#eab308' }, showSymbol: false },
+                    { name: 'Taxe Estimative', type: 'line', stack: 'Total', areaStyle: {}, emphasis: { focus: 'series' }, data: taxSeries, itemStyle: { color: '#ef4444' }, showSymbol: false },
+                    { name: 'GGR', type: 'line', stack: 'Total', areaStyle: {}, emphasis: { focus: 'series' }, data: ggrSeries, itemStyle: { color: '#10b981' }, showSymbol: false }
+                ]
+            }, true);
+        } else if (chartId === 'echart-scatter-loc') {
+            const [locsData, expDataRaw] = await Promise.all([
+                api(`/api/reports/locations?start=${sFilter}&end=${eFilter}${locPFilter}`),
+                api(`/api/expenses/list?start=${sFilter}&end=${eFilter}`)
+            ]);
+            let expData = (expDataRaw && expDataRaw.expenses) ? expDataRaw.expenses : expDataRaw;
+            let scatterData = locsData.filter(l => l.ggr !== null && l.location).map(l => {
+                let exp = 0;
+                if (expData) {
+                    let normL = (l.locatie || l.location || '').toLowerCase();
+                    expData.forEach(e => {
+                        if (!e.is_hidden && e.location_name && e.location_name.toLowerCase() === normL) {
+                            exp += parseFloat(e.amount) || 0;
+                        }
+                    });
+                }
+                return [exp, l.ggr, l.total_in, l.locatie || l.location];
+            });
+            if (!echartsInstances['scatter-loc']) echartsInstances['scatter-loc'] = echarts.init(document.getElementById('echart-scatter-loc'));
+            echartsInstances['scatter-loc'].setOption({
+                tooltip: { 
+                    formatter: function (p) { return `${p.value[3]}<br/>Exp: ${Math.round(p.value[0]).toLocaleString('ro-RO')}<br/>GGR: ${Math.round(p.value[1]).toLocaleString('ro-RO')}<br/>Drop: ${Math.round(p.value[2]).toLocaleString('ro-RO')}`; }
+                },
+                grid: { left: '5%', right: '5%', bottom: '10%', top: '5%', containLabel: true },
+                xAxis: { name: 'Cheltuieli (RON)', nameLocation: 'middle', nameGap: 30, type: 'value', axisLabel: { color: colors.textColor }, splitLine: { lineStyle: { color: colors.splitLineColor } } },
+                yAxis: { name: 'GGR (RON)', type: 'value', axisLabel: { color: colors.textColor }, splitLine: { lineStyle: { color: colors.splitLineColor } } },
+                series: [{
+                    type: 'scatter', data: scatterData,
+                    symbolSize: function (data) { return Math.max(10, Math.min(50, Math.sqrt(data[2]) / 20)); },
+                    itemStyle: { color: '#3b82f6', opacity: 0.7, borderColor: '#60a5fa', borderWidth: 1 }
+                }]
+            }, true);
+        }
+        
+        // Hide loading
+        let realChartId = chartId.replace('echart-', '');
+        if (realChartId === 'dow') realChartId = 'radar';
+        if (echartsInstances[realChartId]) echartsInstances[realChartId].hideLoading();
         if (echartsInstances[chartId]) echartsInstances[chartId].hideLoading();
+        
     } catch (e) {
-        console.error(e);
+        console.error("fetchAndRenderChartWithOverride error:", e);
+        let realChartId = chartId.replace('echart-', '');
+        if (realChartId === 'dow') realChartId = 'radar';
+        if (echartsInstances[realChartId]) echartsInstances[realChartId].hideLoading();
         if (echartsInstances[chartId]) echartsInstances[chartId].hideLoading();
     }
 }

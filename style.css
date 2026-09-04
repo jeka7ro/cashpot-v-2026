@@ -238,7 +238,7 @@ input[type="file"]::file-selector-button:hover { background: var(--border); }
 .data-table tbody tr:hover { background:var(--surface2); cursor:pointer; }
 .data-table td { padding:8px 12px; white-space:nowrap; }
 .data-table td.num { text-align:right; font-variant-numeric:tabular-nums; }
-.data-table tfoot td { background:var(--surface2); font-weight:700; padding:9px 12px; border-top:2px solid var(--border); position: sticky; bottom: -1px; z-index: 5; box-shadow: 0 -2px 8px rgba(0,0,0,0.1); }
+.data-table tfoot td { background:var(--surface2); font-weight:700; padding:6px 12px; line-height:1.2; border-top:2px solid var(--border); position: sticky; bottom: -1px; z-index: 5; box-shadow: 0 -2px 8px rgba(0,0,0,0.1); }
 .data-table tfoot td.num { text-align:right; }
 .table-scroll { overflow-x: auto; overflow-y: visible; }
 .table-scroll::-webkit-scrollbar { width:6px; height:6px; }

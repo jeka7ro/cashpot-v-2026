@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, send_from_directory, Response
+from flask import Flask, jsonify, request, send_from_directory, Response, send_file
 from flask_cors import CORS
 import pymysql, os, requests as req_lib, xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
@@ -216,8 +216,14 @@ def safe(v, default=0):
     return float(v) if v is not None else default
 
 def period_params(req):
-    start = req.args.get('start', '')
-    end   = req.args.get('end',   '')
+    start = req.args.get('start')
+    end   = req.args.get('end')
+    import datetime
+    today = datetime.date.today()
+    if not start:
+        start = today.replace(day=1).strftime('%Y-%m-%d')
+    if not end:
+        end = today.strftime('%Y-%m-%d')
     return start, end
 
 def loc_filter(req, alias='mas'):
@@ -1458,28 +1464,37 @@ def sync_hourly_incomes():
         mysql_data = qry(mysql_sql, [start_sync.strftime('%Y-%m-%d %H:%M:%S'), cutoff.strftime('%Y-%m-%d %H:%M:%S')])
         
         if mysql_data:
+            import psycopg2.extras
+            values = []
             for row in mysql_data:
-                try:
-                    c.execute('''
-                        INSERT INTO cp2_hourly_incomes 
-                        (dt, location_id, machine_id, machine_type_id, total_in, total_out, games, bet, win, jackpot, hh, cb_fortune_wheel, cashback)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        ON CONFLICT (dt, location_id, machine_id) DO NOTHING
-                    ''', (
-                        row['dt'], str(row['location_id']), str(row['machine_id']), str(row['machine_type_id']),
-                        row['total_in'] or 0, row['total_out'] or 0, row['games'] or 0, row['bet'] or 0, row['win'] or 0,
-                        row['jackpot'] or 0, row['hh'] or 0, row['cb_fortune_wheel'] or 0, row['cashback'] or 0
-                    ))
-                except:
-                    pass
-            conn.commit()
+                values.append((
+                    row['dt'], str(row['location_id']), str(row['machine_id']), str(row['machine_type_id']),
+                    row['total_in'] or 0, row['total_out'] or 0, row['games'] or 0, row['bet'] or 0, row['win'] or 0,
+                    row['jackpot'] or 0, row['hh'] or 0, row['cb_fortune_wheel'] or 0, row['cashback'] or 0
+                ))
+            try:
+                psycopg2.extras.execute_values(
+                    c,
+                    '''
+                    INSERT INTO cp2_hourly_incomes 
+                    (dt, location_id, machine_id, machine_type_id, total_in, total_out, games, bet, win, jackpot, hh, cb_fortune_wheel, cashback)
+                    VALUES %s
+                    ON CONFLICT (dt, location_id, machine_id) DO NOTHING
+                    ''',
+                    values,
+                    page_size=1000
+                )
+                conn.commit()
+            except Exception as e:
+                print("Bulk insert failed:", e)
         conn.close()
     except Exception as e:
         print("Error in sync_hourly_incomes:", e)
 
+import threading
 @app.route('/api/reports/hourly')
 def reports_hourly():
-    sync_hourly_incomes()
+    threading.Thread(target=sync_hourly_incomes).start()
     
     start, end = period_params(request)
     lf_mysql, lp_mysql = loc_filter(request, alias='mas')
@@ -4542,17 +4557,30 @@ def get_contracts():
         SELECT 
             c.*,
             COALESCE(
-                json_agg(DISTINCT jsonb_build_object('location_id', cl.location_id, 'amount', cl.amount)) 
-                FILTER (WHERE cl.location_id IS NOT NULL), '[]'
+                (SELECT json_agg(jsonb_build_object('location_id', cl.location_id, 'amount', cl.amount)) 
+                 FROM cp2_contract_locations cl WHERE cl.contract_id = c.id), '[]'
             ) as locations,
             COALESCE(
-                json_agg(DISTINCT jsonb_build_object('id', cf.id, 'is_annex', cf.is_annex, 'filename', cf.filename)) 
-                FILTER (WHERE cf.id IS NOT NULL), '[]'
-            ) as files
+                (SELECT json_agg(jsonb_build_object('id', cf.id, 'is_annex', cf.is_annex, 'filename', cf.filename)) 
+                 FROM cp2_contract_files cf WHERE cf.contract_id = c.id), '[]'
+            ) as files,
+            COALESCE(
+                (SELECT json_agg(jsonb_build_object(
+                    'id', ci.id, 
+                    'invoice_number', ci.invoice_number, 
+                    'invoice_date', ci.invoice_date,
+                    'amount', ci.amount,
+                    'currency', ci.currency,
+                    'supplier', ci.supplier,
+                    'slots_count', ci.slots_count,
+                    'slots_series', ci.slots_series,
+                    'filename', ci.filename,
+                    'notes', ci.notes,
+                    'created_at', ci.created_at
+                ) ORDER BY ci.invoice_date DESC NULLS LAST, ci.created_at DESC) 
+                 FROM cp2_contract_invoices ci WHERE ci.contract_id = c.id), '[]'
+            ) as invoices
         FROM cp2_contracts c
-        LEFT JOIN cp2_contract_locations cl ON c.id = cl.contract_id
-        LEFT JOIN cp2_contract_files cf ON c.id = cf.contract_id
-        GROUP BY c.id
         ORDER BY c.created_at DESC
     """)
     
@@ -4567,6 +4595,11 @@ def get_contracts():
         if 'locations' in r_dict and isinstance(r_dict['locations'], list):
             for loc in r_dict['locations']:
                 loc['name'] = loc_map.get(loc['location_id'], 'Loc necunoscut')
+        if 'invoices' in r_dict and isinstance(r_dict['invoices'], list):
+            for inv in r_dict['invoices']:
+                if inv.get('invoice_date'): inv['invoice_date'] = str(inv['invoice_date'])
+                if inv.get('created_at'): inv['created_at'] = str(inv['created_at'])
+                if inv.get('amount') is not None: inv['amount'] = float(inv['amount'])
         if r_dict.get('start_date'):
             r_dict['start_date'] = str(r_dict['start_date'])
         if r_dict.get('end_date'):
@@ -4595,18 +4628,29 @@ def analyze_chart():
         
     title = data.get('title', 'Grafic')
     chart_data = data.get('data', [])
+    raw_data = data.get('rawData', None)
     
     prompt = f"""
     Acționează ca un analist financiar expert în industria de gambling/cazinouri. 
     Analizează pe scurt datele financiare/de performanță pentru graficul intitulat '{title}'.
-    Datele brute în format JSON:
+    Datele afișate în grafic (rezumate):
     {__import__('json').dumps(chart_data)}
+    """
     
+    if raw_data:
+        prompt += f"""
+    Date suplimentare RAW (complete):
+    {__import__('json').dumps(raw_data)}
+    
+    ATENȚIE: În evaluarea performanței (GGR, Drop), te rog să iei în calcul neapărat câmpul "zile" (zile lucrate efectiv) și "buc" (număr aparate), dacă există. O locație/aparat cu GGR total mai mic dar cu mult mai puține "zile" lucrate poate avea de fapt o performanță zilnică superioară. Nu trage concluzii doar din totaluri brute.
+    """
+        
+    prompt += """
     Te rog să oferi o analiză concisă, la obiect, fără emoji-uri, structurată astfel:
-    1. 3 Concluzii Cheie (ce spun cifrele)
+    1. 3 Concluzii Cheie (ce spun cifrele referitor la performanță reală/medie zilnică)
     2. Riscuri sau alerte (dacă e cazul)
     3. Oportunități
-    Fii profesional, evită platitudinile și raportează-te strict la datele furnizate.
+    Fii profesional, evită platitudinile și raportează-te strict la datele furnizate. Analiza trebuie să fie gata formatată în HTML.
     """
     
     try:
@@ -4694,16 +4738,18 @@ def smart_import_contract():
         if location_id:
             pg_qry('INSERT INTO cp2_contract_locations (contract_id, location_id, amount) VALUES (%s, %s, %s)', (contract_id, location_id, amount))
             
-        os.makedirs('uploads/contracts', exist_ok=True)
         file_id = str(uuid.uuid4())
-        filename = secure_filename(file.filename)
-        save_name = f"{file_id}_{filename}"
-        final_path = os.path.join('uploads', 'contracts', save_name)
-        os.rename(temp_path, final_path)
         
+        with open(temp_path, 'rb') as f:
+            file_data = f.read()
+            
         pg_qry('''INSERT INTO cp2_contract_files (id, contract_id, is_annex, filename, filepath)
                       VALUES (%s, %s, %s, %s, %s)''',
-                   (file_id, contract_id, False, file.filename, final_path))
+                   (file_id, contract_id, False, file.filename, ''))
+                   
+        pg_qry("INSERT INTO cp2_contract_file_data (file_id, file_data) VALUES (%s, %s)", (file_id, file_data))
+        
+        os.remove(temp_path)
         
         return jsonify({"success": True, "contract_id": contract_id, "data": extracted})
         
@@ -4797,48 +4843,718 @@ def upload_contract_file(contract_id):
     
     is_annex = str(request.form.get('is_annex', 'false')).lower() == 'true'
     
-    os.makedirs('uploads/contracts', exist_ok=True)
     import uuid
     fid = str(uuid.uuid4())
-    # prepend fid to avoid collisions
     filename = secure_filename(file.filename)
-    save_name = f"{fid}_{filename}"
-    filepath = os.path.join('uploads', 'contracts', save_name)
-    file.save(filepath)
+    
+    file_data = file.read()
     
     pg_qry("""
         INSERT INTO cp2_contract_files (id, contract_id, is_annex, filename, filepath)
         VALUES (%s, %s, %s, %s, %s)
-    """, (fid, contract_id, is_annex, filename, filepath))
+    """, (fid, contract_id, is_annex, filename, ''))
+    
+    pg_qry("INSERT INTO cp2_contract_file_data (file_id, file_data) VALUES (%s, %s)", (fid, file_data))
     
     return jsonify({"success": True})
 
 @app.route('/api/contracts/files/<file_id>', methods=['DELETE'])
 def delete_contract_file(file_id):
-    rows = pg_qry("SELECT filepath FROM cp2_contract_files WHERE id = %s", (file_id,))
-    if rows:
-        filepath = rows[0]['filepath']
-        try:
-            if os.path.exists(filepath):
-                os.remove(filepath)
-        except Exception as e:
-            pass
-        pg_qry("DELETE FROM cp2_contract_files WHERE id = %s", (file_id,))
+    pg_qry("DELETE FROM cp2_contract_files WHERE id = %s", (file_id,))
     return jsonify({"success": True})
+
+@app.route('/api/contracts/files/<file_id>/upload-data', methods=['POST'])
+def upload_contract_file_data(file_id):
+    if 'file' not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+    file = request.files['file']
+    if not file.filename:
+        return jsonify({"error": "Empty filename"}), 400
+    
+    file_data = file.read()
+    filename = secure_filename(file.filename)
+    
+    pg_qry("UPDATE cp2_contract_files SET filename = %s, filepath = '' WHERE id = %s", (filename, file_id))
+    pg_qry("""
+        INSERT INTO cp2_contract_file_data (file_id, file_data)
+        VALUES (%s, %s)
+        ON CONFLICT (file_id) DO UPDATE SET file_data = EXCLUDED.file_data
+    """, (file_id, file_data))
+    
+    if request.headers.get('Accept') == 'application/json' or request.is_json:
+        return jsonify({"success": True})
+        
+    return f"""<!DOCTYPE html>
+<html>
+<body>
+    <script>
+        alert('Fișierul PDF a fost încărcat și salvat cu succes în baza de date!');
+        window.location.href = '/api/contracts/files/{file_id}/download';
+    </script>
+</body>
+</html>"""
 
 @app.route('/api/contracts/files/<file_id>/download', methods=['GET'])
 def download_contract_file(file_id):
-    rows = pg_qry("SELECT filename, filepath FROM cp2_contract_files WHERE id = %s", (file_id,))
+    rows = pg_qry("SELECT id, contract_id, filename, filepath FROM cp2_contract_files WHERE id = %s", (file_id,))
     if not rows: return "File not found", 404
     
-    fpath = rows[0]['filepath']
-    import os
-    if not os.path.exists(fpath): return "File not found on disk", 404
+    fdata = pg_qry("SELECT file_data FROM cp2_contract_file_data WHERE file_id = %s", (file_id,))
+    file_data = fdata[0]['file_data'] if fdata and fdata[0]['file_data'] else None
     
-    directory = os.path.dirname(os.path.abspath(fpath))
-    fname = os.path.basename(fpath)
-    return send_from_directory(directory, fname, as_attachment=False)
+    if not file_data:
+        # Fallback to local disk for old files
+        fpath = rows[0].get('filepath')
+        import os
+        if not fpath or not os.path.exists(fpath):
+            filename = rows[0].get('filename') or 'Document PDF'
+            html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {{
+            background: #0f172a;
+            color: #f8fafc;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }}
+        .card {{
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 16px;
+            padding: 36px 32px;
+            max-width: 480px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+        }}
+        .icon-wrap {{
+            width: 54px;
+            height: 54px;
+            border-radius: 50%;
+            background: rgba(245, 158, 11, 0.12);
+            color: #f59e0b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 18px;
+        }}
+        h2 {{
+            margin: 0 0 10px;
+            font-size: 18px;
+            font-weight: 700;
+            color: #f8fafc;
+        }}
+        p {{
+            color: #94a3b8;
+            font-size: 13px;
+            line-height: 1.6;
+            margin: 0 0 20px;
+        }}
+        .file-box {{
+            background: #0f172a;
+            border: 1px dashed #475569;
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 12px;
+            color: #cbd5e1;
+            font-family: monospace;
+            margin-bottom: 24px;
+            word-break: break-all;
+        }}
+        .btn-upload {{
+            background: #10b981;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 13px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: 0.2s;
+        }}
+        .btn-upload:hover {{
+            background: #059669;
+        }}
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="icon-wrap">
+            <svg width="28" height="28" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+        </div>
+        <h2>Fișier PDF indisponibil pe server</h2>
+        <p>Înregistrarea contractului există în baza de date, dar fișierul fizic PDF nu a fost găsit pe disc. Puteți încărca fișierul PDF acum direct:</p>
+        <div class="file-box">{filename}</div>
+        <form action="/api/contracts/files/{file_id}/upload-data" method="POST" enctype="multipart/form-data">
+            <input type="file" name="file" accept=".pdf" id="pdf-file-input" style="display:none;" onchange="this.form.submit()">
+            <button type="button" class="btn-upload" onclick="document.getElementById('pdf-file-input').click()">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <span>Încarcă fișierul PDF acum</span>
+            </button>
+        </form>
+    </div>
+</body>
+</html>"""
+            return html, 404, {'Content-Type': 'text/html; charset=utf-8'}
+            
+        directory = os.path.dirname(os.path.abspath(fpath))
+        fname = os.path.basename(fpath)
+        return send_from_directory(directory, fname, as_attachment=False)
+    
+    import io
+    import mimetypes
+    mime_type, _ = mimetypes.guess_type(rows[0]['filename'])
+    if not mime_type:
+        mime_type = 'application/octet-stream'
+        
+    return send_file(
+        io.BytesIO(bytes(file_data)),
+        mimetype=mime_type,
+        as_attachment=False,
+        download_name=rows[0]['filename']
+    )
 
+
+
+# ------------------ CONTRACT PURCHASE INVOICES (FACTURI ACHIZITIE SLOTURI) ------------------
+@app.route('/api/contracts/<contract_id>/invoices', methods=['GET'])
+def get_contract_invoices(contract_id):
+    rows = pg_qry("""
+        SELECT id, contract_id, invoice_number, invoice_date, amount, currency,
+               supplier, slots_count, slots_series, filename, notes, created_at
+        FROM cp2_contract_invoices
+        WHERE contract_id = %s
+        ORDER BY invoice_date DESC NULLS LAST, created_at DESC
+    """, (contract_id,))
+    for r in rows:
+        if r.get('invoice_date'): r['invoice_date'] = str(r['invoice_date'])
+        if r.get('created_at'): r['created_at'] = str(r['created_at'])
+        if r.get('amount') is not None: r['amount'] = float(r['amount'])
+    return jsonify(rows)
+
+@app.route('/api/contracts/<contract_id>/invoices', methods=['POST'])
+def add_contract_invoice(contract_id):
+    import uuid
+    import re
+    iid = str(uuid.uuid4())
+    
+    if request.content_type and 'multipart/form-data' in request.content_type:
+        inv_number = request.form.get('invoice_number', '').strip()
+        inv_date = request.form.get('invoice_date') or None
+        amount_raw = request.form.get('amount', '0').replace(' ', '').replace(',', '.')
+        try: amount = float(amount_raw)
+        except: amount = 0.0
+        currency = request.form.get('currency', 'EUR').strip() or 'EUR'
+        supplier = request.form.get('supplier', '').strip()
+        slots_series = request.form.get('slots_series', '').strip()
+        slots_count_raw = request.form.get('slots_count')
+        
+        series_list = [s.strip() for s in re.split(r'[\s,;]+', slots_series) if s.strip()] if slots_series else []
+        if slots_count_raw and str(slots_count_raw).isdigit() and int(slots_count_raw) > 0:
+            slots_count = int(slots_count_raw)
+        else:
+            slots_count = len(series_list)
+            
+        notes = request.form.get('notes', '').strip()
+        file = request.files.get('file')
+        filename = secure_filename(file.filename) if file and file.filename else None
+        file_data = file.read() if file and file.filename else None
+    else:
+        data = request.json or {}
+        inv_number = str(data.get('invoice_number', '')).strip()
+        inv_date = data.get('invoice_date') or None
+        try: amount = float(data.get('amount', 0))
+        except: amount = 0.0
+        currency = str(data.get('currency', 'EUR')).strip() or 'EUR'
+        supplier = str(data.get('supplier', '')).strip()
+        slots_series = str(data.get('slots_series', '')).strip()
+        series_list = [s.strip() for s in re.split(r'[\s,;]+', slots_series) if s.strip()] if slots_series else []
+        slots_count = int(data.get('slots_count', len(series_list)))
+        notes = str(data.get('notes', '')).strip()
+        filename = None
+        file_data = None
+
+    if not inv_number:
+        return jsonify({"success": False, "error": "Numărul de factură este obligatoriu."}), 400
+
+    pg_qry("""
+        INSERT INTO cp2_contract_invoices
+        (id, contract_id, invoice_number, invoice_date, amount, currency, supplier, slots_count, slots_series, filename, notes)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """, (iid, contract_id, inv_number, inv_date, amount, currency, supplier, slots_count, slots_series, filename, notes))
+
+    if file_data:
+        pg_qry("INSERT INTO cp2_contract_invoice_data (invoice_id, file_data) VALUES (%s, %s)", (iid, file_data))
+
+    return jsonify({"success": True, "id": iid})
+
+@app.route('/api/contracts/invoices/<invoice_id>', methods=['DELETE'])
+def delete_contract_invoice(invoice_id):
+    pg_qry("DELETE FROM cp2_contract_invoices WHERE id = %s", (invoice_id,))
+    return jsonify({"success": True})
+
+@app.route('/api/contracts/invoices/<invoice_id>/download', methods=['GET'])
+def download_contract_invoice_pdf(invoice_id):
+    rows = pg_qry("SELECT filename FROM cp2_contract_invoices WHERE id = %s", (invoice_id,))
+    if not rows: return "Invoice not found", 404
+    
+    fdata = pg_qry("SELECT file_data FROM cp2_contract_invoice_data WHERE invoice_id = %s", (invoice_id,))
+    file_data = fdata[0]['file_data'] if fdata and fdata[0]['file_data'] else None
+    if not file_data:
+        return "Invoice PDF file data not found", 404
+        
+    import io
+    import mimetypes
+    filename = rows[0]['filename'] or f"Factura_{invoice_id}.pdf"
+    mime_type, _ = mimetypes.guess_type(filename)
+    if not mime_type: mime_type = 'application/pdf'
+    
+    return send_file(
+        io.BytesIO(bytes(file_data)),
+        mimetype=mime_type,
+        as_attachment=False,
+        download_name=filename
+    )
+
+
+@app.route('/api/contracts/invoices/extract-pdf', methods=['POST'])
+def extract_invoice_pdf():
+    if 'file' not in request.files:
+        return jsonify({"success": False, "error": "Niciun fișier trimis"}), 400
+    file = request.files['file']
+    if not file.filename:
+        return jsonify({"success": False, "error": "Nume fișier gol"}), 400
+        
+    try:
+        pdf_bytes = file.read()
+        import fitz  # PyMuPDF
+        import re
+        
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        full_text = ""
+        for page in doc:
+            full_text += page.get_text() + "\n"
+            
+        # Also inspect tables if any
+        table_words = []
+        for page in doc:
+            try:
+                tables = page.find_tables()
+                for table in tables:
+                    df = table.extract()
+                    for row in df:
+                        for cell in row:
+                            if cell:
+                                table_words.append(str(cell).strip())
+            except Exception:
+                pass
+
+        # Helper: Robust number parsing
+        def parse_num(s):
+            if not s: return 0.0
+            s = str(s).strip().replace(' ', '')
+            if '.' in s and ',' in s:
+                if s.rfind(',') > s.rfind('.'):
+                    s = s.replace('.', '').replace(',', '.')
+                else:
+                    s = s.replace(',', '')
+            elif ',' in s:
+                parts = s.split(',')
+                if len(parts) == 2 and len(parts[1]) in [1, 2]:
+                    s = parts[0] + '.' + parts[1]
+                else:
+                    s = s.replace(',', '')
+            try: return float(s)
+            except: return 0.0
+
+        # 1. Invoice Number & Date Extraction (Facturis & standard Romanian formats)
+        inv_number = None
+        inv_date = None
+
+        # Facturis header pattern: SERIA : \n NR. FACTURII : \n DATA ... : \n <SERIA> \n <NR> \n <DATA>
+        m_facturis = re.search(r'SERIA\s*:\s*\n\s*NR\.?\s*(?:FACTURII?)?\s*:\s*(?:\n\s*DATA[^\n]*:\s*)?\n\s*([A-Za-z0-9\-_]+)\s*\n\s*([0-9]+)(?:\s*\n\s*([0-9\s\-./]+))?', full_text, re.IGNORECASE)
+        if m_facturis:
+            seria = m_facturis.group(1).strip()
+            nr = m_facturis.group(2).strip()
+            inv_number = f'{seria} {nr}'.strip()
+            if m_facturis.group(3):
+                date_raw = m_facturis.group(3).strip()
+                dm = re.search(r'([0-9]{1,2})\s*[-./\s]\s*([0-9]{1,2})\s*[-./\s]\s*([0-9]{4})', date_raw)
+                if dm:
+                    inv_date = f'{dm.group(3)}-{int(dm.group(2)):02d}-{int(dm.group(1)):02d}'
+
+        # Standard inline Seria: ENT Numar: 00064
+        if not inv_number:
+            m_seria_nr = re.search(r'seri[ae]?[\s:]*([A-Za-z0-9\-]+)?[\s,;]*(?:nr\.?|num[aă]r(?:ul)?|no\.?)[\s:]*([0-9A-Za-z\-_/]+)', full_text, re.IGNORECASE)
+            if m_seria_nr:
+                seria = (m_seria_nr.group(1) or '').strip()
+                nr = (m_seria_nr.group(2) or '').strip()
+                if seria and seria.upper() not in ['FACTURA', 'FISCALA', 'NR', 'SERIA', 'SERIE', 'DOCUMENT', 'FACTURII']:
+                    inv_number = f'{seria} {nr}'.strip()
+                else:
+                    inv_number = nr
+
+        if not inv_number:
+            inv_patterns = [
+                r'(?:factur[aă]\s*(?:fiscal[aă]\s*)?(?:seria\s*[A-Za-z0-9\-]+\s*)?nr\.?|nr\.?\s*(?:de\s*)?factur[aă]|invoice\s*(?:no\.?|num(?:ber)?|#)|num[aă]rul?\s*factur[aă])[\s:]*([A-Za-z0-9\-_/]+)',
+                r'(?:factura|invoice)[\s:]+([A-Za-z0-9\-_/]+)',
+                r'(?:nr\.?\s*doc(?:ument)?|num[aă]r\s*doc(?:ument)?)[\s:]*([A-Za-z0-9\-_/]+)',
+            ]
+            for p in inv_patterns:
+                m = re.search(p, full_text, re.IGNORECASE)
+                if m:
+                    val = m.group(1).strip()
+                    if len(val) >= 2 and val.upper() not in ['FISCALA', 'SERIA', 'DATA', 'TOTAL', 'FURNIZOR', 'CLIENT', 'DE', 'PLATA', 'CUMPARATOR', 'FACTURII', 'NR']:
+                        inv_number = val
+                        break
+
+        # 2. Invoice Date Extraction (if not yet found)
+        months_map = {
+            'ianuarie': '01', 'ian': '01', 'februarie': '02', 'feb': '02',
+            'martie': '03', 'mar': '03', 'aprilie': '04', 'apr': '04',
+            'mai': '05', 'iunie': '06', 'iun': '06', 'iulie': '07', 'iul': '07',
+            'august': '08', 'aug': '08', 'septembrie': '09', 'sep': '09',
+            'octombrie': '10', 'oct': '10', 'noiembrie': '11', 'noi': '11',
+            'decembrie': '12', 'dec': '12',
+            'january': '01', 'february': '02', 'march': '03', 'april': '04',
+            'may': '05', 'june': '06', 'july': '07', 'august': '08',
+            'september': '09', 'october': '10', 'november': '11', 'december': '12'
+        }
+        if not inv_date:
+            m_text_date = re.search(r'(?:dat[aă][^:\n\r]{0,35}|date|issued?)[\s:]*(\d{1,2})[\s.\-/]+([A-Za-zăâîșțĂÂÎȘȚ]{3,12})[\s.\-/]+(\d{4})', full_text, re.IGNORECASE)
+            if m_text_date:
+                day = m_text_date.group(1).zfill(2)
+                mon_str = m_text_date.group(2).lower()
+                year = m_text_date.group(3)
+                for m_name, m_num in months_map.items():
+                    if mon_str.startswith(m_name) or m_name.startswith(mon_str):
+                        inv_date = f'{year}-{m_num}-{day}'
+                        break
+
+        if not inv_date:
+            date_patterns = [
+                r'(?:dat[aă][^:\n\r]{0,40}|date\s*(?:of\s*issue)?|issue[\s_]*date)[\s:]*(\d{1,2})\s*[-./\s]\s*(\d{1,2})\s*[-./\s]\s*(\d{2,4})',
+                r'(?:dat[aă][^:\n\r]{0,40}|date\s*(?:of\s*issue)?|issue[\s_]*date)[\s:]*(\d{4})\s*[-./\s]\s*(\d{1,2})\s*[-./\s]\s*(\d{1,2})',
+            ]
+            for p in date_patterns:
+                m = re.search(p, full_text, re.IGNORECASE)
+                if m:
+                    g1, g2, g3 = m.group(1), m.group(2), m.group(3)
+                    if len(g1) == 4:
+                        inv_date = f'{g1}-{g2.zfill(2)}-{g3.zfill(2)}'
+                    else:
+                        y = g3 if len(g3) == 4 else ('20' + g3)
+                        inv_date = f'{y}-{g2.zfill(2)}-{g1.zfill(2)}'
+                    break
+
+        if not inv_date:
+            first_chunk = full_text[:1500]
+            m_any = re.search(r'\b(\d{1,2})\s*[-./\s]\s*(\d{1,2})\s*[-./\s]\s*(\d{4})\b', first_chunk)
+            if m_any:
+                d, mo, y = m_any.group(1), m_any.group(2), m_any.group(3)
+                if 1 <= int(d) <= 31 and 1 <= int(mo) <= 12 and 2000 <= int(y) <= 2035:
+                    inv_date = f'{y}-{mo.zfill(2)}-{d.zfill(2)}'
+
+        # 3. Total Amount & Currency Extraction
+        amount = 0.0
+        currency = 'EUR'
+
+        # First, search backwards from the bottom TOTAL occurrences
+        for tm in reversed(list(re.finditer(r'\bTOTAL\b', full_text, re.IGNORECASE))):
+            sub = full_text[tm.start():tm.start()+350]
+            amt_matches = list(re.finditer(r'([0-9]{1,3}(?:[.,\s][0-9]{3})*(?:[.,][0-9]{2}))\s*(RON|LEI|EUR|USD|€|\$)?', sub))
+            if amt_matches:
+                last_m = amt_matches[-1]
+                val = parse_num(last_m.group(1))
+                if val > 10.0:
+                    amount = val
+                    if last_m.group(2):
+                        c_found = last_m.group(2).upper()
+                        currency = 'RON' if c_found in ['LEI', 'RON'] else ('USD' if c_found in ['USD', '$'] else 'EUR')
+                    break
+
+        # Standard amount patterns fallback
+        if amount == 0.0:
+            amt_patterns = [
+                r'total\s*(?:de\s*plat[aă]|general|factur[aă]|document|plata)?(?:\s*\([^)]*\))?[\s:]*([0-9\s.,]+)\s*(EUR|RON|LEI|USD|€|\$)?',
+                r'total\s*(?:amount(?:\s*due)?|due|payable)?[\s:]*([0-9\s.,]+)\s*(EUR|RON|LEI|USD|€|\$)?',
+                r'total\s*\((EUR|RON|LEI|USD|€|\$)\)[\s:]*([0-9\s.,]+)',
+                r'total[\s:]+([0-9\s.,]{3,20})',
+            ]
+            for p in amt_patterns:
+                for m in re.finditer(p, full_text, re.IGNORECASE):
+                    g1 = m.group(1)
+                    g2 = m.group(2) if m.lastindex >= 2 else None
+                    num_cand = None
+                    cur_cand = None
+                    if re.match(r'^[0-9\s.,]+$', g1):
+                        num_cand = g1
+                        cur_cand = g2
+                    elif g2 and re.match(r'^[0-9\s.,]+$', g2):
+                        num_cand = g2
+                        cur_cand = g1
+                    if num_cand:
+                        val = parse_num(num_cand)
+                        if val > amount and val > 10.0:
+                            amount = val
+                            if cur_cand:
+                                c_str = cur_cand.upper()
+                                if c_str in ['RON', 'LEI']: currency = 'RON'
+                                elif c_str in ['USD', '$']: currency = 'USD'
+                                else: currency = 'EUR'
+
+        if amount == 0.0 and table_words:
+            for i, w in enumerate(table_words):
+                if 'total' in str(w).lower():
+                    for offset in [1, 2, 3]:
+                        if i + offset < len(table_words):
+                            val = parse_num(str(table_words[i + offset]))
+                            if val > amount and val > 10.0:
+                                amount = val
+                                break
+
+        # 4. Supplier Extraction
+        supplier = None
+        supp_match = re.search(r'(?:furnizor|vendor|supplier)[\s:]*([^\r\n]+)', full_text, re.IGNORECASE)
+        if supp_match:
+            supplier = supp_match.group(1).strip()
+            supplier = re.sub(r'[\s\-:,]+(?:cif|cui|reg\.?|j\d{2}|adresa|str\.).*$', '', supplier, flags=re.IGNORECASE).strip()
+            if len(supplier) > 80: supplier = supplier[:80]
+        else:
+            for supp_name in ['EURO GAMES TECHNOLOGY', 'EGT', 'NOVOMATIC', 'AMUSNET', 'APEX', 'MERKUR', 'CT GAMING', 'CASINO TECHNOLOGY', 'INTERBLOCK', 'SYNOT', 'IGT', 'ENTERTAINMENT SOLUTIONS']:
+                if supp_name in full_text.upper():
+                    supplier = supp_name.title()
+                    break
+
+        # 5. Slot Series Extraction
+        series = []
+        # Priority 0: Structured table parsing (matches numbered lines in equipment invoices)
+        pat_flexible = re.compile(
+            r'(\d+)\.[\s\n]+([A-Za-z0-9\s]+?)\s+serie\s+([0-9]+)(?:[\s\n]+An[\s\n]+fabricatie[\s\n]+([0-9]{4}))?[\s\n]+([^\n]+)[\s\n]+([0-9]+)[\s\n]+([0-9]+(?:\.[0-9]+)?)[\s\n]+([0-9]+(?:\.[0-9]+)?)',
+            re.IGNORECASE
+        )
+        table_matches = list(pat_flexible.finditer(full_text))
+        if table_matches:
+            for tm in table_matches:
+                s_nr = tm.group(3).strip()
+                series.append(s_nr)
+        else:
+            # Priority 1: Explicit series markers: "serie 155708", "seria: 155708", "s/n 155708"
+            for m in re.finditer(r'(?:serie|seria|serii|s/n|serial|sn)[\s:]*([A-Za-z0-9\-_]+)', full_text, re.IGNORECASE):
+                s = m.group(1).strip()
+                if len(s) >= 4 and s.lower() not in ['factura', 'fiscala', 'nr', 'data', 'total', 'lei', 'eur', 'ron', 'an', 'fabricatie', 'model', 'anul']:
+                    if not (s.startswith(('199', '200', '201', '202', '203')) and len(s) == 4):
+                        series.append(s)
+
+            # Priority 2: Only fallback to generic numbers if NO explicit series were found
+            if not series:
+                for m in re.finditer(r'\b([0-9]{5,8})\b', full_text):
+                    s = m.group(1)
+                    if s.startswith(('199', '200', '201', '202', '203')) and len(s) == 4:
+                        continue
+                    if s not in series:
+                        idx = m.start()
+                        context = full_text[max(0, idx-60):min(len(full_text), idx+60)].lower()
+                        if any(w in context for w in ['serie', 'seria', 'aparat', 'slot', 'cabinet', 'premier', 'model', 'sn', 'buc']):
+                            series.append(s)
+
+        # Clean series: eliminate invoice numbers, total amount digits, currency codes, years
+        clean_series = []
+        amt_digits = str(int(amount)) if amount > 0 else ""
+        inv_digits = re.sub(r'[^0-9]', '', inv_number or '')
+        for s in series:
+            if amt_digits and s == amt_digits:
+                continue
+            if inv_digits and s == inv_digits:
+                continue
+            if s.startswith('RO') or s.upper() in ['RON', 'EUR', 'LEI', 'USD']:
+                continue
+            if s in ['2016', '2017', '2018', '2019', '2020', '2021', '2022', '2023', '2024', '2025', '2026']:
+                continue
+            clean_series.append(s)
+        series = clean_series
+
+        return jsonify({
+            "success": True,
+            "invoice_number": inv_number,
+            "invoice_date": inv_date,
+            "amount": amount,
+            "currency": currency,
+            "supplier": supplier,
+            "series": series,
+            "slots_count": len(series),
+            "text_sample": full_text[:500]
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/contracts/slots-details', methods=['GET', 'POST'])
+def get_contract_slots_details():
+    try:
+        data = request.get_json(silent=True) or {}
+        contract_id = request.args.get('contract_id') or data.get('contract_id')
+        invoice_id = request.args.get('invoice_id') or data.get('invoice_id')
+        raw_series = request.args.get('series') or data.get('series')
+
+        invs = []
+        if invoice_id:
+            invs = pg_qry('SELECT * FROM cp2_contract_invoices WHERE id = %s', (invoice_id,))
+        elif contract_id:
+            invs = pg_qry('SELECT * FROM cp2_contract_invoices WHERE contract_id = %s', (contract_id,))
+
+        price_map = {}
+        vendor_pdf_map = {}
+        year_pdf_map = {}
+        pdf_items = []
+
+        contracts_to_check = set()
+        if contract_id:
+            contracts_to_check.add(contract_id)
+        for inv in invs:
+            if inv.get('contract_id'):
+                contracts_to_check.add(str(inv['contract_id']))
+
+        import fitz
+        import re
+
+        for cid in contracts_to_check:
+            c_files = pg_qry('SELECT id FROM cp2_contract_files WHERE contract_id = %s', (cid,))
+            for cf in c_files:
+                fdata = pg_qry('SELECT file_data FROM cp2_contract_file_data WHERE file_id = %s', (cf['id'],))
+                if fdata and fdata[0].get('file_data'):
+                    try:
+                        doc = fitz.open(stream=bytes(fdata[0]['file_data']), filetype='pdf')
+                        full_text = '\n'.join([page.get_text() for page in doc])
+                        pat_flexible = re.compile(
+                            r'(\d+)\.[\s\n]+([A-Za-z0-9\s]+?)\s+serie\s+([0-9]+)(?:[\s\n]+An[\s\n]+fabricatie[\s\n]+([0-9]{4}))?[\s\n]+([^\n]+)[\s\n]+([0-9]+)[\s\n]+([0-9]+(?:\.[0-9]+)?)[\s\n]+([0-9]+(?:\.[0-9]+)?)',
+                            re.IGNORECASE
+                        )
+                        for m in pat_flexible.finditer(full_text):
+                            s_nr = m.group(3).strip()
+                            v_name = m.group(2).strip()
+                            fab_yr = m.group(4)
+                            u_pr = float(m.group(7))
+                            price_map[s_nr] = u_pr
+                            if v_name:
+                                vendor_pdf_map[s_nr] = v_name
+                            if fab_yr:
+                                year_pdf_map[s_nr] = int(fab_yr)
+                            pdf_items.append({
+                                'nr_crt': int(m.group(1)),
+                                'serial_nr': s_nr,
+                                'vendor': v_name,
+                                'fabrication_year': int(fab_yr) if fab_yr else None,
+                                'unit_price': u_pr
+                            })
+                    except Exception as ex:
+                        pass
+
+        all_series = []
+        if raw_series:
+            if isinstance(raw_series, str):
+                all_series = [s.strip() for s in re.split(r'[\s,;]+', raw_series) if s.strip()]
+            elif isinstance(raw_series, list):
+                all_series = [str(s).strip() for s in raw_series if str(s).strip()]
+        elif invs:
+            for inv in invs:
+                s_list = [s.strip() for s in re.split(r'[\s,;]+', inv.get('slots_series') or '') if s.strip()]
+                all_series.extend(s_list)
+
+        # If PDF has more items than all_series (e.g. 149 vs 130), or all_series was empty:
+        if pdf_items and len(pdf_items) > len(all_series):
+            all_series = [item['serial_nr'] for item in pdf_items]
+
+        stations_map = {}
+        if all_series:
+            q = '''
+                SELECT DISTINCT ON (s.serial_nr)
+                    s.serial_nr, 
+                    v.name as vendor_name, 
+                    vm.name as model_name, 
+                    c.name as cabinet_name, 
+                    l.name as location_name,
+                    s.fabrication_year,
+                    s.is_deleted
+                FROM casino_stations s
+                LEFT JOIN casino_vendors v ON s.vendor_id = v.id
+                LEFT JOIN casino_vendor_models vm ON s.vendor_model_id = vm.id
+                LEFT JOIN casino_cabinets c ON s.cabinet_id = c.id
+                LEFT JOIN casino_locations l ON s.location_id = l.id
+                WHERE s.serial_nr = ANY(%s)
+                ORDER BY s.serial_nr, s.is_deleted ASC, s.updated_at DESC
+            '''
+            rows = pg_qry(q, (all_series,))
+            for r in rows:
+                stations_map[r['serial_nr']] = r
+
+        results = []
+        total_slots = len(all_series)
+        total_valoare = 0.0
+        currency = (invs[0].get('currency') if invs else 'RON') or 'RON'
+        vendors_count = {}
+        locations_count = {}
+
+        for idx, s in enumerate(all_series):
+            st = stations_map.get(s)
+            vnd = (st.get('vendor_name') if st else None) or vendor_pdf_map.get(s) or 'Necunoscut'
+            mdl = (st.get('model_name') if st else None) or '-'
+            cab = (st.get('cabinet_name') if st else None) or '-'
+            loc = (st.get('location_name') if st else None) or 'În Stoc / Depozit'
+            yr = (st.get('fabrication_year') if st else None) or year_pdf_map.get(s) or '-'
+            u_pr = price_map.get(s)
+            if u_pr is not None:
+                total_valoare += u_pr
+            is_del = st.get('is_deleted') if st else None
+            status = 'Inactiv' if is_del else ('Activ' if st else 'În stoc')
+
+            vendors_count[vnd] = vendors_count.get(vnd, 0) + 1
+            locations_count[loc] = locations_count.get(loc, 0) + 1
+
+            results.append({
+                'nr_crt': idx + 1,
+                'serial_nr': s,
+                'vendor': vnd,
+                'model': mdl,
+                'cabinet': cab,
+                'location': loc,
+                'fabrication_year': yr,
+                'unit_price': u_pr,
+                'currency': currency,
+                'status': status
+            })
+
+        inv_total = sum(float(inv.get('amount') or 0) for inv in invs) if invs else 0.0
+        return jsonify({
+            'success': True,
+            'stats': {
+                'total_slots': total_slots,
+                'total_amount': inv_total if inv_total > 0 else total_valoare,
+                'currency': currency,
+                'vendors_count': vendors_count,
+                'locations_count': locations_count
+            },
+            'slots': results
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 if __name__ == '__main__':
@@ -4846,3 +5562,4 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5050))
     print(f" CyberSlot Analytics Dashboard → listening on port {port}")
     app.run(host='0.0.0.0', port=port, debug=False)
+

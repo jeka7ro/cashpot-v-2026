@@ -25,10 +25,17 @@ ENV/
 server.log
 cashpot2.db
 *.sqlite3
+*.sqlite
+*.db
 .DS_Store
 node_modules/
 
 Craiova/*.pdf
 Craiova/**/*.pdf
+Ploiesti/
+scratch/
+scratch_crop*.png
+test.txt
+test_dash*.js
 
 
