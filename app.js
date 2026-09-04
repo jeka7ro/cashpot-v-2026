@@ -12296,12 +12296,14 @@ window.exportContractsExcel = function() {
 // --- CONTRACT TYPE DYNAMICS & SLOT ACQUISITION TAGS ---
 let _contractModalSeriesTags = [];
 
-window.handleContractTypeChange = function() {
+window.handleContractTypeChange = async function() {
   const typeEl = document.getElementById('contract-type');
   if (!typeEl) return;
   const type = typeEl.value;
   const isRent = (type === 'Chirie Spațiu' || type === 'Subînchiriere spațiu');
-  const isSlotAcq = (type === 'Achiziție Sloturi' || type === 'Vânzare Sloturi');
+  const isSlotAcq = (type === 'Achiziție Sloturi');
+  const isSlotSale = (type === 'Vânzare Sloturi');
+  const isSlotType = isSlotAcq || isSlotSale;
 
   // Rent specific fields
   const rentFields = document.querySelectorAll('.contract-rent-field');
@@ -12312,18 +12314,71 @@ window.handleContractTypeChange = function() {
   // Toggle button for optional rent fields (when not rent and not slot acquisition)
   const toggleBtn = document.getElementById('toggle-rent-fields-btn');
   if (toggleBtn) {
-    toggleBtn.style.display = (!isRent && !isSlotAcq) ? 'block' : 'none';
+    toggleBtn.style.display = (!isRent && !isSlotType) ? 'block' : 'none';
   }
 
   // Slot acquisition / sale section (serii & factură)
   const slotSection = document.getElementById('contract-slot-acquisition-section');
   if (slotSection) {
-    slotSection.style.display = isSlotAcq ? 'block' : 'none';
-    const titleEl = slotSection.querySelector('.slot-section-title');
-    if (titleEl) {
-      titleEl.innerText = (type === 'Vânzare Sloturi') ? 'Date Factură Vânzare & Serii Sloturi Ieșite' : 'Date Factură & Serii Sloturi Achiziționate';
+    slotSection.style.display = isSlotType ? 'block' : 'none';
+    
+    const titleEl = document.getElementById('contract-modal-slot-title') || slotSection.querySelector('.slot-section-title');
+    const suppLabel = document.getElementById('contract-modal-supplier-label');
+    const suppInput = document.getElementById('contract-modal-supplier');
+    const invLabel = document.getElementById('contract-modal-inv-label');
+    const invInput = document.getElementById('contract-modal-inv-number');
+    const seriesLabel = document.getElementById('contract-modal-series-label');
+    const pickerContainer = document.getElementById('contract-modal-picker-container');
+
+    if (isSlotSale) {
+      if (titleEl) titleEl.innerText = 'Factură Vânzare & Serii Sloturi Vândute (Ieșire Gestiune)';
+      if (suppLabel) suppLabel.innerText = 'Cumpărător / Client *';
+      if (suppInput) suppInput.placeholder = 'ex: SC Cazino SRL, Smart Gaming SRL...';
+      if (invLabel) invLabel.innerText = 'Nr. Factură Vânzare (Opțional)';
+      if (invInput) invInput.placeholder = 'ex: FV-10492';
+      if (seriesLabel) seriesLabel.innerText = 'Serii Aparate / Sloturi Vândute (Tag-uri)';
+      if (pickerContainer) {
+        pickerContainer.style.display = 'block';
+        await populateContractModalSeriesPicker();
+      }
+    } else {
+      if (titleEl) titleEl.innerText = 'Factură Achiziție & Serii Sloturi Achiziționate (Intrare Gestiune)';
+      if (suppLabel) suppLabel.innerText = 'Furnizor / Producător (Opțional)';
+      if (suppInput) suppInput.placeholder = 'ex: EGT, Novomatic, Apex...';
+      if (invLabel) invLabel.innerText = 'Nr. Factură Achiziție (Opțional)';
+      if (invInput) invInput.placeholder = 'ex: FF-10492';
+      if (seriesLabel) seriesLabel.innerText = 'Serii Aparate / Sloturi Achiziționate (Tag-uri)';
+      if (pickerContainer) pickerContainer.style.display = 'none';
     }
   }
+};
+
+window.populateContractModalSeriesPicker = async function() {
+  const picker = document.getElementById('contract-modal-series-picker');
+  if (!picker) return;
+  try {
+    const res = await fetch('/api/slots/available-series');
+    const data = await res.json();
+    const series = data.series || data || [];
+    let html = '<option value="">-- Alege aparat din gestiune pentru a-l adăuga la vânzare --</option>';
+    series.forEach(s => {
+      const locOrStatus = s.location_name || s.current_location || s.status || 'În stoc';
+      html += `<option value="${escapeHtml(s.serial_nr)}">${escapeHtml(s.serial_nr)} - ${escapeHtml(s.model || s.vendor || 'Slot')} (${escapeHtml(locOrStatus)})</option>`;
+    });
+    picker.innerHTML = html;
+  } catch (e) {
+    console.error('Eroare incarcare serii disponibile:', e);
+  }
+};
+
+window.handleContractModalSeriesPickerChange = function(selectEl) {
+  if (!selectEl || !selectEl.value) return;
+  const val = selectEl.value.trim();
+  if (val && !_contractModalSeriesTags.includes(val)) {
+    _contractModalSeriesTags.push(val);
+    renderContractModalSeriesTags();
+  }
+  selectEl.value = '';
 };
 
 window.toggleRentFieldsManual = function() {
@@ -12500,7 +12555,7 @@ window.handleContractModalPdfUpload = async function(fileInput) {
   }
 };
 
-window.openContractModal = function(id = null) {
+window.openContractModal = function(id = null, defaultType = null, preselectedSerial = null) {
   try {
     if (id && typeof id === 'object') id = null; // Ignore Event objects
     
@@ -12632,7 +12687,13 @@ window.openContractModal = function(id = null) {
       }
     }
   } else {
-    document.getElementById('contract-modal-title').innerText = 'Adaugă Contract';
+    document.getElementById('contract-modal-title').innerText = (defaultType === 'Vânzare Sloturi') ? 'Adaugă Contract Vânzare Sloturi' : 'Adaugă Contract';
+    if (defaultType) {
+      document.getElementById('contract-type').value = defaultType;
+    }
+    if (preselectedSerial) {
+      addContractModalSeriesTags([preselectedSerial]);
+    }
     if (document.getElementById('contract-currency-label')) {
       document.getElementById('contract-currency-label').innerText = 'LEI';
     }
@@ -12645,7 +12706,7 @@ window.openContractModal = function(id = null) {
   } catch (e) {
     alert('Eroare JS în openContractModal: ' + e.message);
   }
-}
+};
 
 window.saveContract = async function() {
   const id = document.getElementById('contract-id').value;
@@ -12717,17 +12778,18 @@ window.saveContract = async function() {
         }
       }
 
-      // If Achiziție Sloturi and series or invoice number were entered, save invoice
+      // If Achiziție Sloturi / Vânzare Sloturi and series or invoice number were entered, save invoice
       if (isSlotAcq && (_contractModalSeriesTags.length > 0 || document.getElementById('contract-modal-inv-number')?.value)) {
         const invFormData = new FormData();
-        invFormData.append('invoice_number', document.getElementById('contract-modal-inv-number')?.value || payload.contract_number || 'Factură Achiziție');
+        const defaultInvName = (payload.type === 'Vânzare Sloturi') ? 'Factură Vânzare' : 'Factură Achiziție';
+        invFormData.append('invoice_number', document.getElementById('contract-modal-inv-number')?.value || payload.contract_number || defaultInvName);
         invFormData.append('invoice_date', payload.start_date || new Date().toISOString().split('T')[0]);
         invFormData.append('amount', payload.total_amount || 0);
         invFormData.append('currency', payload.currency || 'LEI');
         invFormData.append('supplier', document.getElementById('contract-modal-supplier')?.value || payload.owner_name || '');
         invFormData.append('slots_count', _contractModalSeriesTags.length);
         invFormData.append('slots_series', _contractModalSeriesTags.join(','));
-        invFormData.append('notes', 'Adăugat automat la salvare contract');
+        invFormData.append('notes', payload.type === 'Vânzare Sloturi' ? 'Factură vânzare sloturi generată automat' : 'Factură achiziție sloturi generată automat');
         if (fileInput && fileInput.files.length > 0) {
           invFormData.append('file', fileInput.files[0]);
         }
@@ -12737,12 +12799,15 @@ window.saveContract = async function() {
             body: invFormData
           });
         } catch(invErr) {
-          console.error('Eroare salvare factura achizitie:', invErr);
+          console.error('Eroare salvare factura contract:', invErr);
         }
       }
       
       document.getElementById('contract-modal').classList.remove('show');
       loadContracts();
+      if (typeof loadSlotLifecycle === 'function') {
+        loadSlotLifecycle();
+      }
     } else {
       showAlert('Eroare salvare: ' + (res.error || 'Necunoscută'));
     }
@@ -14023,7 +14088,7 @@ window.renderLifecycleTable = function() {
       `;
     } else {
       actionBtn = `
-        <button type="button" onclick="openSellSlotModal('${escapeHtml(item.serial_nr)}')" class="btn-ghost" style="padding:3px 10px; font-size:11px; font-weight:700; color:#f59e0b; border:1px solid rgba(245,158,11,0.3); border-radius:6px; background:rgba(245,158,11,0.08);" title="Vinde acest aparat">+ Vinde</button>
+        <button type="button" onclick="openContractModal(null, 'Vânzare Sloturi', '${escapeHtml(item.serial_nr)}')" class="btn-ghost" style="padding:3px 10px; font-size:11px; font-weight:700; color:var(--accent); border:1px solid rgba(16,185,129,0.3); border-radius:6px; background:rgba(16,185,129,0.08);" title="Vinde acest aparat">+ Vinde</button>
       `;
     }
 
@@ -14080,182 +14145,9 @@ window.handleLifecycleSearch = function(val) {
   }, 300);
 };
 
-// ─── MODAL VÂNZARE SLOTURI ────────────────────────────────────────────────────
-window.openSellSlotModal = async function(preselectedSerial) {
-  const form = document.getElementById('form-sell-slots');
-  if (form) form.reset();
-
-  const dateInput = document.getElementById('sell-slot-inv-date');
-  if (dateInput) {
-    dateInput.value = new Date().toISOString().split('T')[0];
-  }
-
-  _sellSlotSeriesTags = [];
-  if (preselectedSerial) {
-    _sellSlotSeriesTags.push(String(preselectedSerial).trim());
-  }
-
-  renderSellSlotChips();
-  updateSellSlotPriceCalc();
-
-  const modal = document.getElementById('modal-sell-slots');
-  if (modal) modal.classList.add('show');
-
-  // Load available series for picker
-  try {
-    const picker = document.getElementById('sell-slot-picker-dropdown');
-    if (picker) {
-      picker.innerHTML = '<option value="">Se încarcă aparatele disponibile...</option>';
-      const res = await fetch('/api/slots/available-series');
-      const data = await res.json();
-      _availableSlotsCache = data || [];
-      picker.innerHTML = '<option value="">Alege aparat din stoc / săli (' + _availableSlotsCache.length + ' disponibile)...</option>' +
-        _availableSlotsCache.map(s => {
-          const locStr = s.current_location ? ` [${s.current_location}]` : '';
-          const prStr = s.purchase_price ? ` - Achiziție: ${Number(s.purchase_price).toLocaleString('ro-RO')} ${s.purchase_currency || 'RON'}` : '';
-          return `<option value="${escapeHtml(s.serial_nr)}">Serie: ${escapeHtml(s.serial_nr)} - ${escapeHtml(s.vendor || '')}${locStr}${prStr}</option>`;
-        }).join('');
-    }
-  } catch (e) {
-    console.error('Error fetching available series:', e);
-  }
-};
-
-window.closeSellSlotModal = function() {
-  const modal = document.getElementById('modal-sell-slots');
-  if (modal) modal.classList.remove('show');
-};
-
-window.handleSellSlotPickerSelect = function(dropdown) {
-  const val = dropdown.value;
-  if (val && !_sellSlotSeriesTags.includes(val)) {
-    _sellSlotSeriesTags.push(val);
-    renderSellSlotChips();
-    updateSellSlotPriceCalc();
-  }
-  dropdown.value = '';
-};
-
-window.handleSellSlotManualKey = function(e) {
-  if (e.key === 'Enter' || e.key === ',') {
-    e.preventDefault();
-    const raw = e.target.value.trim().replace(/,/g, '');
-    if (raw) {
-      const parts = raw.split(/\s+/).filter(Boolean);
-      parts.forEach(p => {
-        if (!_sellSlotSeriesTags.includes(p)) {
-          _sellSlotSeriesTags.push(p);
-        }
-      });
-      e.target.value = '';
-      renderSellSlotChips();
-      updateSellSlotPriceCalc();
-    }
-  }
-};
-
-window.removeSellSlotTag = function(idx) {
-  _sellSlotSeriesTags.splice(idx, 1);
-  renderSellSlotChips();
-  updateSellSlotPriceCalc();
-};
-
-window.renderSellSlotChips = function() {
-  const container = document.getElementById('sell-slot-chips-container');
-  const badge = document.getElementById('sell-slot-calc-badge');
-
-  if (badge) {
-    badge.innerText = `${_sellSlotSeriesTags.length} aparate selectate`;
-  }
-
-  if (!container) return;
-  if (_sellSlotSeriesTags.length === 0) {
-    container.innerHTML = '<span style="font-size:11px; color:var(--muted); padding:4px;">Niciun aparat selectat încă</span>';
-    return;
-  }
-
-  container.innerHTML = _sellSlotSeriesTags.map((tag, idx) => `
-    <span style="display:inline-flex; align-items:center; gap:5px; background:rgba(245,158,11,0.15); color:#f59e0b; border:1px solid rgba(245,158,11,0.3); padding:3px 8px; border-radius:6px; font-size:12px; font-weight:700;">
-      ${escapeHtml(tag)}
-      <button type="button" onclick="removeSellSlotTag(${idx})" style="background:none; border:none; color:#f59e0b; cursor:pointer; font-weight:bold; font-size:14px; line-height:1; padding:0 2px; margin-left:2px;" title="Elimină">&times;</button>
-    </span>
-  `).join('');
-};
-
-window.updateSellSlotPriceCalc = function() {
-  const amount = parseFloat(document.getElementById('sell-slot-amount')?.value) || 0;
-  const curr = document.getElementById('sell-slot-currency')?.value || 'RON';
-  const badge = document.getElementById('sell-slot-calc-badge');
-  const count = _sellSlotSeriesTags.length;
-
-  if (badge) {
-    if (count > 0 && amount > 0) {
-      const perUnit = Math.round(amount / count);
-      badge.innerText = `${count} aparate | ~${perUnit.toLocaleString('ro-RO')} ${curr}/aparat`;
-    } else {
-      badge.innerText = `${count} aparate selectate`;
-    }
-  }
-};
-
-window.submitSellSlotModal = async function(e) {
-  e.preventDefault();
-  if (_sellSlotSeriesTags.length === 0) {
-    if (typeof showAlert === 'function') showAlert('Selectați cel puțin un aparat pentru vânzare.');
-    else alert('Selectați cel puțin un aparat pentru vânzare.');
-    return;
-  }
-
-  const btn = document.getElementById('btn-submit-sell-slot');
-  if (btn) {
-    btn.disabled = true;
-    btn.innerText = 'Se salvează...';
-  }
-
-  try {
-    const formData = new FormData();
-    formData.append('invoice_number', document.getElementById('sell-slot-inv-num').value.trim());
-    formData.append('invoice_date', document.getElementById('sell-slot-inv-date').value);
-    formData.append('buyer', document.getElementById('sell-slot-buyer').value.trim());
-    formData.append('amount', document.getElementById('sell-slot-amount').value || 0);
-    formData.append('currency', document.getElementById('sell-slot-currency').value || 'RON');
-    formData.append('slots_series', _sellSlotSeriesTags.join(','));
-    formData.append('notes', document.getElementById('sell-slot-notes').value.trim());
-
-    const fileInput = document.getElementById('sell-slot-pdf-file');
-    if (fileInput && fileInput.files.length > 0) {
-      formData.append('file', fileInput.files[0]);
-    }
-
-    const res = await fetch('/api/slots/sell', {
-      method: 'POST',
-      body: formData
-    });
-    const data = await res.json();
-    if (!data.success) throw new Error(data.error || 'Eroare la salvare');
-
-    if (typeof showAlert === 'function') {
-      showAlert(`Vânzarea a fost înregistrată cu succes! ${data.count} aparate au fost descărcate din gestiune.`);
-    } else {
-      alert(`Vânzarea a fost înregistrată cu succes! ${data.count} aparate au fost descărcate din gestiune.`);
-    }
-
-    closeSellSlotModal();
-    loadSlotLifecycle();
-    if (typeof loadContracts === 'function') loadContracts();
-  } catch (err) {
-    console.error('Error submitSellSlotModal:', err);
-    if (typeof showAlert === 'function') showAlert('Eroare: ' + err.message);
-    else alert('Eroare: ' + err.message);
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = `
-        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"></path></svg>
-        <span>Confirmă Vânzarea</span>
-      `;
-    }
-  }
+// Delegat direct către Adaugă Contract Vânzare Sloturi
+window.openSellSlotModal = function(preselectedSerial) {
+  openContractModal(null, 'Vânzare Sloturi', preselectedSerial);
 };
 
 window.revertSlotSale = async function(serialNr) {

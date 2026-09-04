@@ -3873,12 +3873,6 @@
                 Gestiune & Parc Sloturi (Intrări / Ieșiri)
               </button>
             </div>
-            <div style="display:flex; gap:8px;">
-              <button type="button" onclick="openSellSlotModal()" class="btn" style="background:#f59e0b; color:white; border:none; border-radius:9999px; padding:8px 18px; font-weight:700; font-size:13px; cursor:pointer; display:inline-flex; align-items:center; gap:6px; box-shadow:0 2px 4px rgba(245,158,11,0.2);">
-                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>
-                <span>+ Înregistrează Vânzare Sloturi</span>
-              </button>
-            </div>
           </div>
 
           <div id="contracte-subview-list">
@@ -4046,15 +4040,12 @@
               </div>
 
               <div style="display:flex; align-items:center; gap:8px;">
-                <button type="button" onclick="exportLifecycleExcel()" class="btn-ghost" style="padding:8px 14px; font-size:12px; display:inline-flex; align-items:center; gap:6px;">
-                  <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="8" y1="13" x2="16" y2="13"></line><line x1="8" y1="17" x2="16" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                  <span>Export Excel Gestiune</span>
+                <button type="button" onclick="loadSlotLifecycle()" class="btn-ghost" style="padding:8px 14px; font-size:12px; display:inline-flex; align-items:center; gap:6px;" title="Reîmprospătează datele">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                  <span>Refresh</span>
                 </button>
-                <button type="button" onclick="loadSlotLifecycle()" class="btn-ghost" style="padding:8px 14px; font-size:12px;" title="Reîmprospătează datele">⟳ Refresh</button>
-                <button type="button" onclick="openSellSlotModal()" class="btn" style="background:#f59e0b; color:white; border:none; border-radius:9999px; padding:8px 16px; font-weight:700; font-size:12px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
-                  <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>
-                  <span>+ Înregistrează Vânzare</span>
-                </button>
+                <button type="button" onclick="exportLifecycleExcel()" class="btn-ghost" style="padding:8px 16px;">Export Excel</button>
+                <button type="button" onclick="openContractModal(null, 'Vânzare Sloturi')" class="btn btn-primary" style="background:var(--accent); color:white; padding:8px 16px; border:none; border-radius:9999px; cursor:pointer; font-weight:600;">+ Adaugă Contract Vânzare</button>
               </div>
             </div>
 
@@ -5101,30 +5092,38 @@
             <button type="button" onclick="toggleRentFieldsManual()" class="btn-ghost" style="font-size:11px; color:var(--muted); padding:4px 10px; border-radius:6px; border:1px dashed var(--border);">Arată/Ascunde câmpuri opționale spațiu (suprafață, preaviz, proprietar)</button>
           </div>
 
-          <!-- SECTIUNE DEDICATA PENTRU ACHIZITIE SLOTURI (SERII & FACTURA) -->
+          <!-- SECTIUNE DEDICATA PENTRU ACHIZITIE / VANZARE SLOTURI (SERII & FACTURA) -->
           <div id="contract-slot-acquisition-section" style="display:none; background:var(--surface2); border:1px solid var(--border); border-radius:12px; padding:18px; margin-bottom:20px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
               <div style="display:flex; align-items:center; gap:8px;">
-                <span style="font-size:14px; font-weight:700; color:var(--accent);">Factură Achiziție & Serii Sloturi</span>
+                <span id="contract-modal-slot-title" class="slot-section-title" style="font-size:14px; font-weight:700; color:var(--accent);">Factură Achiziție & Serii Sloturi</span>
               </div>
               <span id="contract-modal-pdf-status" style="font-size:11px; font-weight:600; color:var(--accent); display:none;"></span>
             </div>
 
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
               <div>
-                <label style="display:block; margin-bottom:6px; font-size:11px; font-weight:700; color:var(--muted);">Furnizor / Producător (Opțional)</label>
+                <label id="contract-modal-supplier-label" style="display:block; margin-bottom:6px; font-size:11px; font-weight:700; color:var(--muted);">Furnizor / Producător (Opțional)</label>
                 <input type="text" id="contract-modal-supplier" class="glass-input" style="width:100%; box-sizing:border-box; padding:8px 12px;" placeholder="ex: EGT, Novomatic, Apex...">
               </div>
               <div>
-                <label style="display:block; margin-bottom:6px; font-size:11px; font-weight:700; color:var(--muted);">Nr. Factură Achiziție (Opțional)</label>
+                <label id="contract-modal-inv-label" style="display:block; margin-bottom:6px; font-size:11px; font-weight:700; color:var(--muted);">Nr. Factură Achiziție (Opțional)</label>
                 <input type="text" id="contract-modal-inv-number" class="glass-input" style="width:100%; box-sizing:border-box; padding:8px 12px;" placeholder="ex: FF-10492">
               </div>
+            </div>
+
+            <!-- Selector aparat din parc / stoc pentru vânzare -->
+            <div id="contract-modal-picker-container" style="display:none; margin-bottom:12px;">
+              <label style="display:block; margin-bottom:6px; font-size:11px; font-weight:700; color:var(--muted);">Alege aparat din gestiune (săli / stoc):</label>
+              <select id="contract-modal-series-picker" class="glass-input" style="width:100%; box-sizing:border-box; padding:8px 12px; font-size:12px;" onchange="handleContractModalSeriesPickerChange(this)">
+                <option value="">-- Alege aparat din gestiune pentru a-l adăuga la vânzare --</option>
+              </select>
             </div>
 
             <div style="margin-bottom:14px;">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
                 <div style="display:flex; align-items:center; gap:8px;">
-                  <label style="font-size:11px; font-weight:700; color:var(--muted);">Serii Aparate / Sloturi Achiziționate (Tag-uri)</label>
+                  <label id="contract-modal-series-label" style="font-size:11px; font-weight:700; color:var(--muted);">Serii Aparate / Sloturi Achiziționate (Tag-uri)</label>
                   <span id="contract-modal-series-count-badge" style="background:var(--accent); color:white; font-size:11px; padding:2px 8px; border-radius:9999px; font-weight:700;">0 sloturi</span>
                 </div>
                 <button type="button" onclick="clearContractModalSeriesTags()" class="btn-ghost" style="font-size:11px; padding:2px 8px; color:var(--muted);">Golește toate</button>
@@ -5456,101 +5455,7 @@
     </div>
   </div>
 
-  <!-- MODAL INREGISTRARE VANZARE SLOTURI -->
-  <div class="settings-modal" id="modal-sell-slots" style="z-index:10001;">
-    <div class="settings-panel glass-panel" style="width:680px; max-width:95vw; max-height:92vh; display:flex; flex-direction:column; border-radius:16px; box-shadow:0 25px 60px rgba(0,0,0,0.45); background:var(--surface);">
-      <div class="settings-header" style="display:flex; justify-content:space-between; align-items:center; padding:18px 24px; border-bottom:1px solid var(--border);">
-        <div style="display:flex; align-items:center; gap:12px;">
-          <div style="width:40px; height:40px; border-radius:10px; background:rgba(245,158,11,0.12); color:#f59e0b; display:flex; align-items:center; justify-content:center;">
-            <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
-              <line x1="3" y1="6" x2="21" y2="6"></line>
-              <path d="M16 10a4 4 0 0 1-8 0"></path>
-            </svg>
-          </div>
-          <div>
-            <div class="settings-title" style="font-size:16px; font-weight:800; color:var(--text);">Înregistrează Vânzare Sloturi</div>
-            <div style="font-size:12px; color:var(--muted); margin-top:2px;">Descărcare din gestiune / inventar și generare factură de vânzare</div>
-          </div>
-        </div>
-        <button class="settings-close" style="border-radius:8px;" onclick="closeSellSlotModal()">&times;</button>
-      </div>
 
-      <form id="form-sell-slots" onsubmit="submitSellSlotModal(event)" style="display:flex; flex-direction:column; flex:1; overflow-y:auto; padding:20px 24px; gap:16px;">
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
-          <div>
-            <label style="display:block; margin-bottom:6px; font-size:12px; font-weight:600; color:var(--text);">Număr Factură Vânzare *</label>
-            <input type="text" id="sell-slot-inv-num" class="glass-input" required placeholder="Ex: FV-2026-001" style="width:100%; box-sizing:border-box;">
-          </div>
-          <div>
-            <label style="display:block; margin-bottom:6px; font-size:12px; font-weight:600; color:var(--text);">Dată Factură Vânzare *</label>
-            <input type="date" id="sell-slot-inv-date" class="glass-input" required style="width:100%; box-sizing:border-box;">
-          </div>
-        </div>
-
-        <div style="display:grid; grid-template-columns:2fr 1fr 1fr; gap:14px;">
-          <div>
-            <label style="display:block; margin-bottom:6px; font-size:12px; font-weight:600; color:var(--text);">Cumpărător / Client *</label>
-            <input type="text" id="sell-slot-buyer" class="glass-input" required placeholder="Ex: SC OPERATOR GAMES SRL" style="width:100%; box-sizing:border-box;">
-          </div>
-          <div>
-            <label style="display:block; margin-bottom:6px; font-size:12px; font-weight:600; color:var(--text);">Valoare Totală *</label>
-            <input type="number" step="0.01" id="sell-slot-amount" class="glass-input" required placeholder="0.00" oninput="updateSellSlotPriceCalc()" style="width:100%; box-sizing:border-box;">
-          </div>
-          <div>
-            <label style="display:block; margin-bottom:6px; font-size:12px; font-weight:600; color:var(--text);">Monedă</label>
-            <select id="sell-slot-currency" class="glass-input" onchange="updateSellSlotPriceCalc()" style="width:100%; box-sizing:border-box;">
-              <option value="RON">RON</option>
-              <option value="EUR">EUR</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Slot Selection -->
-        <div style="background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:14px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-            <label style="font-size:12px; font-weight:700; color:var(--text);">Serii Aparate Vândute *</label>
-            <span id="sell-slot-calc-badge" style="font-size:11px; font-weight:700; color:#10b981; background:rgba(16,185,129,0.1); padding:2px 8px; border-radius:10px;">0 aparate selectate</span>
-          </div>
-
-          <div style="display:flex; gap:8px; margin-bottom:10px;">
-            <select id="sell-slot-picker-dropdown" class="glass-input" style="flex:1; font-size:12px;" onchange="handleSellSlotPickerSelect(this)">
-              <option value="">Alege aparat din stoc / săli...</option>
-            </select>
-          </div>
-
-          <div style="margin-bottom:8px;">
-            <input type="text" id="sell-slot-manual-input" class="glass-input" placeholder="Sau adaugă manual serie (Apasă Enter / Virgulă)..." style="width:100%; box-sizing:border-box; font-size:12px;" onkeydown="handleSellSlotManualKey(event)">
-          </div>
-
-          <!-- Selected chips container -->
-          <div id="sell-slot-chips-container" style="display:flex; flex-wrap:wrap; gap:6px; max-height:140px; overflow-y:auto; padding:6px; background:var(--surface); border:1px dashed var(--border); border-radius:8px; min-height:42px;">
-            <span style="font-size:11px; color:var(--muted); padding:4px;">Niciun aparat selectat încă</span>
-          </div>
-        </div>
-
-        <!-- File upload & Notes -->
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
-          <div>
-            <label style="display:block; margin-bottom:6px; font-size:12px; font-weight:600; color:var(--text);">Factură PDF (Opțional)</label>
-            <input type="file" id="sell-slot-pdf-file" accept=".pdf" class="glass-input" style="width:100%; box-sizing:border-box; font-size:12px; padding:6px 10px;">
-          </div>
-          <div>
-            <label style="display:block; margin-bottom:6px; font-size:12px; font-weight:600; color:var(--text);">Observații / Mențiuni</label>
-            <input type="text" id="sell-slot-notes" class="glass-input" placeholder="Detalii livrare, stare aparate..." style="width:100%; box-sizing:border-box;">
-          </div>
-        </div>
-
-        <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:8px; border-top:1px solid var(--border); padding-top:16px;">
-          <button type="button" onclick="closeSellSlotModal()" class="btn-ghost" style="padding:9px 18px; border-radius:8px; font-size:13px;">Anulează</button>
-          <button type="submit" id="btn-submit-sell-slot" class="btn btn-primary" style="background:#f59e0b; color:white; border:none; padding:9px 22px; border-radius:8px; font-weight:700; font-size:13px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
-            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"></path></svg>
-            <span>Confirmă Vânzarea</span>
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
 
   <!-- MODAL TABEL SLOTURI & SERII ACHIZIȚIE -->
   <div class="settings-modal" id="invoice-slots-modal" style="z-index:10000;">
