@@ -12113,8 +12113,8 @@ window.renderContractsTable = function() {
         va = a.contract_number || ''; 
         vb = b.contract_number || '';
       } else if (_contractsSortCol === 'valabilitate') {
-        va = a.end_date || '9999-12-31'; 
-        vb = b.end_date || '9999-12-31';
+        va = a.end_date || a.start_date || '9999-12-31'; 
+        vb = b.end_date || b.start_date || '9999-12-31';
       } else if (_contractsSortCol === 'valoare') {
         va = parseFloat(a.total_amount) || 0; 
         vb = parseFloat(b.total_amount) || 0;
@@ -12204,7 +12204,13 @@ window.renderContractsTable = function() {
     }
     if (!detaliiContractHtml) detaliiContractHtml = '-';
 
-    let valabilHtml = `<span style="font-size:0.9em;">De la: ${c.start_date || '-'} <br> Până la: ${c.end_date || '-'}</span>`;
+    let valabilHtml = '';
+    const isSlotInvoice = (c.type === 'Achiziție Sloturi' || c.type === 'Vânzare Sloturi');
+    if (isSlotInvoice) {
+      valabilHtml = `<span style="font-size:11px; color:var(--muted);">Data facturii:</span><br><span style="font-size:12px; font-weight:600; color:var(--text);">${c.start_date || '-'}</span>`;
+    } else {
+      valabilHtml = `<span style="font-size:0.9em;">De la: ${c.start_date || '-'} <br> Până la: ${c.end_date || '-'}</span>`;
+    }
 
     let statusHtml = '';
     if (remainingStr !== '-') statusHtml += `<strong style="color:var(--accent); font-size:11px;">${remainingStr}</strong>`;
@@ -12418,6 +12424,16 @@ window.handleContractTypeChange = async function() {
   const toggleBtn = document.getElementById('toggle-rent-fields-btn');
   if (toggleBtn) {
     toggleBtn.style.display = (!isRent && !isSlotType) ? 'block' : 'none';
+  }
+
+  // Slot date fields handling (only contracts have end_date, invoices have Data Facturii)
+  const startLabel = document.getElementById('contract-start-label');
+  const endContainer = document.getElementById('contract-end-container');
+  if (startLabel) {
+    startLabel.innerText = isSlotType ? 'Data Facturii *' : 'Dată Început';
+  }
+  if (endContainer) {
+    endContainer.style.display = isSlotType ? 'none' : 'block';
   }
 
   // Slot acquisition / sale section (serii & factură)

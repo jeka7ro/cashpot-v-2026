@@ -3975,7 +3975,7 @@
                   </th>
                   <th
                     style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase; cursor:pointer;"
-                    onclick="sortContractsTable('valabilitate')">Valabilitate <span
+                    onclick="sortContractsTable('valabilitate')">Valabilitate / Dată <span
                       id="sort-contracts-valabilitate"></span></th>
                   <th
                     style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">
@@ -4844,7 +4844,7 @@
   </div>
 
   <script src="game_uuids.js?v=1"></script>
-  <script src="app.js?v=51"></script>
+  <script src="app.js?v=52"></script>
   <script src="onjn.js?v=47"></script>
   <!-- CUSTOM PROMPT MODAL -->
   <div class="settings-modal" id="modal-custom-prompt" style="z-index: 99999;">
@@ -5085,10 +5085,10 @@
               </select>
             </div>
             <div>
-              <label style="display:block; margin-bottom:8px; font-size:12px; color:var(--muted);">Dată Început</label>
+              <label id="contract-start-label" style="display:block; margin-bottom:8px; font-size:12px; color:var(--muted);">Dată Început</label>
               <input type="date" id="contract-start" class="glass-input" style="width:100%;">
             </div>
-            <div>
+            <div id="contract-end-container">
               <label style="display:block; margin-bottom:8px; font-size:12px; color:var(--muted);">Dată Sfârșit</label>
               <input type="date" id="contract-end" class="glass-input" style="width:100%;">
             </div>
