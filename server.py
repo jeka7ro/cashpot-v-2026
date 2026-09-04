@@ -5103,10 +5103,110 @@ def add_contract_invoice(contract_id):
     if file_data:
         pg_qry("INSERT INTO cp2_contract_invoice_data (invoice_id, file_data) VALUES (%s, %s)", (iid, file_data))
 
+    # Synchronize with cp2_slot_inventory
+    if series_list:
+        try:
+            c_info = pg_qry("SELECT type, contract_number FROM cp2_contracts WHERE id = %s", (contract_id,))
+            c_type = (c_info[0]['type'] if c_info else '') or ''
+            c_num = (c_info[0]['contract_number'] if c_info else '') or ''
+            
+            is_sale = ('vânzare' in c_type.lower() or 'vanzare' in c_type.lower())
+            unit_p = round(amount / len(series_list), 2) if len(series_list) > 0 and amount > 0 else 0.0
+            
+            for s_nr in series_list:
+                if is_sale:
+                    pg_qry("""
+                        INSERT INTO cp2_slot_inventory (
+                            serial_nr, status, exit_type, exit_date,
+                            sale_contract_id, sale_contract_number,
+                            sale_invoice_id, sale_invoice_number, sale_invoice_date,
+                            sale_buyer, sale_price, sale_currency, notes
+                        ) VALUES (
+                            %s, 'Vândut', 'Vânzare', %s,
+                            %s, %s,
+                            %s, %s, %s,
+                            %s, %s, %s, %s
+                        )
+                        ON CONFLICT (serial_nr) DO UPDATE SET
+                            status = 'Vândut',
+                            exit_type = 'Vânzare',
+                            exit_date = EXCLUDED.exit_date,
+                            sale_contract_id = EXCLUDED.sale_contract_id,
+                            sale_contract_number = EXCLUDED.sale_contract_number,
+                            sale_invoice_id = EXCLUDED.sale_invoice_id,
+                            sale_invoice_number = EXCLUDED.sale_invoice_number,
+                            sale_invoice_date = EXCLUDED.sale_invoice_date,
+                            sale_buyer = EXCLUDED.sale_buyer,
+                            sale_price = EXCLUDED.sale_price,
+                            sale_currency = EXCLUDED.sale_currency,
+                            notes = COALESCE(EXCLUDED.notes, cp2_slot_inventory.notes),
+                            updated_at = CURRENT_TIMESTAMP
+                    """, (
+                        s_nr, inv_date,
+                        contract_id, c_num,
+                        iid, inv_number, inv_date,
+                        supplier, unit_p, currency, notes
+                    ))
+                else:
+                    pg_qry("""
+                        INSERT INTO cp2_slot_inventory (
+                            serial_nr, status, entry_type, entry_date,
+                            purchase_contract_id, purchase_contract_number,
+                            purchase_invoice_id, purchase_invoice_number, purchase_invoice_date,
+                            purchase_supplier, purchase_price, purchase_currency, notes
+                        ) VALUES (
+                            %s, 'În Stoc', 'Achiziție', %s,
+                            %s, %s,
+                            %s, %s, %s,
+                            %s, %s, %s, %s
+                        )
+                        ON CONFLICT (serial_nr) DO UPDATE SET
+                            purchase_contract_id = EXCLUDED.purchase_contract_id,
+                            purchase_contract_number = EXCLUDED.purchase_contract_number,
+                            purchase_invoice_id = EXCLUDED.purchase_invoice_id,
+                            purchase_invoice_number = EXCLUDED.purchase_invoice_number,
+                            purchase_invoice_date = EXCLUDED.purchase_invoice_date,
+                            purchase_supplier = EXCLUDED.purchase_supplier,
+                            purchase_price = EXCLUDED.purchase_price,
+                            purchase_currency = EXCLUDED.purchase_currency,
+                            entry_date = COALESCE(cp2_slot_inventory.entry_date, EXCLUDED.entry_date),
+                            notes = COALESCE(EXCLUDED.notes, cp2_slot_inventory.notes),
+                            updated_at = CURRENT_TIMESTAMP
+                    """, (
+                        s_nr, inv_date,
+                        contract_id, c_num,
+                        iid, inv_number, inv_date,
+                        supplier, unit_p, currency, notes
+                    ))
+        except Exception as ex_sync:
+            print("Warning: could not sync inventory on invoice add:", ex_sync)
+
     return jsonify({"success": True, "id": iid})
 
 @app.route('/api/contracts/invoices/<invoice_id>', methods=['DELETE'])
 def delete_contract_invoice(invoice_id):
+    try:
+        # Revert any sales associated with this invoice
+        pg_qry('''
+            UPDATE cp2_slot_inventory
+            SET status = CASE WHEN current_location IS NOT NULL AND current_location != 'Depozit' THEN 'În Sală (Activ)' ELSE 'În Stoc' END,
+                exit_type = NULL, exit_date = NULL,
+                sale_contract_id = NULL, sale_contract_number = NULL,
+                sale_invoice_id = NULL, sale_invoice_number = NULL, sale_invoice_date = NULL,
+                sale_buyer = NULL, sale_price = NULL, sale_currency = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE sale_invoice_id = %s
+        ''', (invoice_id,))
+        # Clear purchase links if purchase invoice is deleted
+        pg_qry('''
+            UPDATE cp2_slot_inventory
+            SET purchase_invoice_id = NULL, purchase_invoice_number = NULL, purchase_price = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE purchase_invoice_id = %s
+        ''', (invoice_id,))
+    except Exception as ex_del:
+        print("Warning on delete invoice inventory revert:", ex_del)
+
     pg_qry("DELETE FROM cp2_contract_invoices WHERE id = %s", (invoice_id,))
     return jsonify({"success": True})
 
@@ -5509,6 +5609,12 @@ def get_contract_slots_details():
             for r in rows:
                 stations_map[r['serial_nr']] = r
 
+        inventory_map = {}
+        if all_series:
+            inv_rows = pg_qry('SELECT * FROM cp2_slot_inventory WHERE serial_nr = ANY(%s)', (all_series,))
+            for ir in inv_rows:
+                inventory_map[ir['serial_nr']] = ir
+
         results = []
         total_slots = len(all_series)
         total_valoare = 0.0
@@ -5518,16 +5624,22 @@ def get_contract_slots_details():
 
         for idx, s in enumerate(all_series):
             st = stations_map.get(s)
-            vnd = (st.get('vendor_name') if st else None) or vendor_pdf_map.get(s) or 'Necunoscut'
-            mdl = (st.get('model_name') if st else None) or '-'
-            cab = (st.get('cabinet_name') if st else None) or '-'
-            loc = (st.get('location_name') if st else None) or 'În Stoc / Depozit'
-            yr = (st.get('fabrication_year') if st else None) or year_pdf_map.get(s) or '-'
-            u_pr = price_map.get(s)
-            if u_pr is not None:
-                total_valoare += u_pr
+            ir = inventory_map.get(s)
+            
+            vnd = (ir.get('vendor') if ir else None) or (st.get('vendor_name') if st else None) or vendor_pdf_map.get(s) or 'Necunoscut'
+            mdl = (ir.get('model') if ir else None) or (st.get('model_name') if st else None) or '-'
+            cab = (ir.get('cabinet') if ir else None) or (st.get('cabinet_name') if st else None) or '-'
+            loc = (ir.get('current_location') if ir else None) or (st.get('location_name') if st else None) or 'În Stoc / Depozit'
+            yr = (ir.get('fabrication_year') if ir else None) or (st.get('fabrication_year') if st else None) or year_pdf_map.get(s) or '-'
+            
+            p_price = (float(ir['purchase_price']) if ir and ir.get('purchase_price') is not None else None) or price_map.get(s)
+            s_price = float(ir['sale_price']) if ir and ir.get('sale_price') is not None else None
+            profit = round(s_price - p_price, 2) if (s_price is not None and p_price is not None) else None
+
+            if p_price is not None:
+                total_valoare += p_price
             is_del = st.get('is_deleted') if st else None
-            status = 'Inactiv' if is_del else ('Activ' if st else 'În stoc')
+            status = (ir.get('status') if ir else None) or ('Inactiv' if is_del else ('Activ' if st else 'În stoc'))
 
             vendors_count[vnd] = vendors_count.get(vnd, 0) + 1
             locations_count[loc] = locations_count.get(loc, 0) + 1
@@ -5540,7 +5652,12 @@ def get_contract_slots_details():
                 'cabinet': cab,
                 'location': loc,
                 'fabrication_year': yr,
-                'unit_price': u_pr,
+                'unit_price': p_price,
+                'sale_price': s_price,
+                'sale_buyer': ir.get('sale_buyer') if ir else None,
+                'sale_invoice_number': ir.get('sale_invoice_number') if ir else None,
+                'sale_date': str(ir['exit_date']) if ir and ir.get('exit_date') else None,
+                'profit': profit,
                 'currency': currency,
                 'status': status
             })
@@ -5558,6 +5675,307 @@ def get_contract_slots_details():
             'slots': results
         })
     except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ------------------ GESTIUNE & CICLU DE VIATA SLOTURI (INVENTAR / VANZARI) ------------------
+@app.route('/api/slots/inventory-lifecycle', methods=['GET'])
+def get_slot_inventory_lifecycle():
+    try:
+        status_filter = request.args.get('status', 'all')
+        search = request.args.get('search', '').strip().lower()
+        sort_by = request.args.get('sort_by', 'serial_nr')
+        sort_dir = request.args.get('sort_dir', 'asc').lower()
+        
+        where_clauses = []
+        params = []
+        
+        if status_filter == 'active':
+            where_clauses.append("status = 'În Sală (Activ)'")
+        elif status_filter == 'in_stock':
+            where_clauses.append("status = 'În Stoc'")
+        elif status_filter == 'sold':
+            where_clauses.append("status = 'Vândut'")
+        elif status_filter == 'available':
+            where_clauses.append("status IN ('În Sală (Activ)', 'În Stoc')")
+            
+        if search:
+            where_clauses.append("""(
+                LOWER(serial_nr) LIKE %s OR
+                LOWER(COALESCE(vendor, '')) LIKE %s OR
+                LOWER(COALESCE(model, '')) LIKE %s OR
+                LOWER(COALESCE(cabinet, '')) LIKE %s OR
+                LOWER(COALESCE(current_location, '')) LIKE %s OR
+                LOWER(COALESCE(purchase_supplier, '')) LIKE %s OR
+                LOWER(COALESCE(purchase_invoice_number, '')) LIKE %s OR
+                LOWER(COALESCE(sale_buyer, '')) LIKE %s OR
+                LOWER(COALESCE(sale_invoice_number, '')) LIKE %s
+            )""")
+            s_pat = f"%{search}%"
+            params.extend([s_pat]*9)
+            
+        where_str = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+        
+        allowed_sorts = {
+            'serial_nr': 'serial_nr',
+            'vendor': 'vendor',
+            'location': 'current_location',
+            'status': 'status',
+            'purchase_price': 'purchase_price',
+            'sale_price': 'sale_price',
+            'entry_date': 'entry_date',
+            'exit_date': 'exit_date',
+            'profit': '(COALESCE(sale_price,0) - COALESCE(purchase_price,0))'
+        }
+        col = allowed_sorts.get(sort_by, 'serial_nr')
+        direction = 'DESC' if sort_dir == 'desc' else 'ASC'
+        
+        limit = int(request.args.get('limit', 1000))
+        offset = int(request.args.get('offset', 0))
+        
+        q = f"""
+            SELECT id, serial_nr, vendor, model, cabinet, fabrication_year,
+                   status, current_location,
+                   entry_type, entry_date,
+                   purchase_contract_id, purchase_contract_number,
+                   purchase_invoice_id, purchase_invoice_number, purchase_invoice_date,
+                   purchase_supplier, purchase_price, purchase_currency,
+                   exit_type, exit_date,
+                   sale_contract_id, sale_contract_number,
+                   sale_invoice_id, sale_invoice_number, sale_invoice_date,
+                   sale_buyer, sale_price, sale_currency,
+                   notes, created_at, updated_at
+            FROM cp2_slot_inventory
+            {where_str}
+            ORDER BY {col} {direction} NULLS LAST
+            LIMIT %s OFFSET %s
+        """
+        p_copy = list(params)
+        p_copy.extend([limit, offset])
+        rows = pg_qry(q, tuple(p_copy))
+        
+        items = []
+        for r in rows:
+            p_pr = float(r['purchase_price']) if r['purchase_price'] is not None else None
+            s_pr = float(r['sale_price']) if r['sale_price'] is not None else None
+            profit = round(s_pr - p_pr, 2) if (p_pr is not None and s_pr is not None) else None
+            
+            items.append({
+                'id': str(r['id']),
+                'serial_nr': r['serial_nr'],
+                'vendor': r['vendor'] or '-',
+                'model': r['model'] or '-',
+                'cabinet': r['cabinet'] or '-',
+                'fabrication_year': r['fabrication_year'] or '-',
+                'status': r['status'],
+                'current_location': r['current_location'] or 'În Stoc / Depozit',
+                'entry_type': r['entry_type'],
+                'entry_date': str(r['entry_date']) if r['entry_date'] else None,
+                'purchase_contract_id': str(r['purchase_contract_id']) if r['purchase_contract_id'] else None,
+                'purchase_contract_number': r['purchase_contract_number'] or '-',
+                'purchase_invoice_id': str(r['purchase_invoice_id']) if r['purchase_invoice_id'] else None,
+                'purchase_invoice_number': r['purchase_invoice_number'] or '-',
+                'purchase_invoice_date': str(r['purchase_invoice_date']) if r['purchase_invoice_date'] else None,
+                'purchase_supplier': r['purchase_supplier'] or '-',
+                'purchase_price': p_pr,
+                'purchase_currency': r['purchase_currency'] or 'RON',
+                'exit_type': r['exit_type'],
+                'exit_date': str(r['exit_date']) if r['exit_date'] else None,
+                'sale_contract_id': str(r['sale_contract_id']) if r['sale_contract_id'] else None,
+                'sale_contract_number': r['sale_contract_number'] or '-',
+                'sale_invoice_id': str(r['sale_invoice_id']) if r['sale_invoice_id'] else None,
+                'sale_invoice_number': r['sale_invoice_number'] or '-',
+                'sale_invoice_date': str(r['sale_invoice_date']) if r['sale_invoice_date'] else None,
+                'sale_buyer': r['sale_buyer'] or '-',
+                'sale_price': s_pr,
+                'sale_currency': r['sale_currency'] or 'RON',
+                'profit': profit,
+                'notes': r['notes']
+            })
+            
+        kpi_rows = pg_qry("""
+            SELECT 
+                COUNT(*) as total_slots,
+                COUNT(*) FILTER (WHERE status = 'În Sală (Activ)') as total_active,
+                COUNT(*) FILTER (WHERE status = 'În Stoc') as total_stock,
+                COUNT(*) FILTER (WHERE status = 'Vândut') as total_sold,
+                COALESCE(SUM(purchase_price), 0) as total_purchase_val,
+                COALESCE(SUM(sale_price), 0) as total_sale_val,
+                COALESCE(SUM(CASE WHEN sale_price IS NOT NULL AND purchase_price IS NOT NULL THEN (sale_price - purchase_price) ELSE 0 END), 0) as total_profit
+            FROM cp2_slot_inventory
+        """)
+        kpi = dict(kpi_rows[0]) if kpi_rows else {}
+        for k in ['total_slots', 'total_active', 'total_stock', 'total_sold']:
+            kpi[k] = int(kpi.get(k) or 0)
+        for k in ['total_purchase_val', 'total_sale_val', 'total_profit']:
+            kpi[k] = round(float(kpi.get(k) or 0), 2)
+            
+        return jsonify({
+            'success': True,
+            'kpi': kpi,
+            'items': items,
+            'count': len(items)
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/slots/sell', methods=['POST'])
+def sell_slots():
+    try:
+        import uuid
+        import re
+        iid = str(uuid.uuid4())
+        
+        if request.content_type and 'multipart/form-data' in request.content_type:
+            inv_number = request.form.get('invoice_number', '').strip()
+            inv_date = request.form.get('invoice_date') or None
+            buyer = request.form.get('buyer', '').strip()
+            amount_raw = request.form.get('amount', '0').replace(' ', '').replace(',', '.')
+            try: amount = float(amount_raw)
+            except: amount = 0.0
+            currency = request.form.get('currency', 'EUR').strip() or 'EUR'
+            slots_series = request.form.get('slots_series', '').strip()
+            notes = request.form.get('notes', '').strip()
+            file = request.files.get('file')
+            filename = secure_filename(file.filename) if file and file.filename else None
+            file_data = file.read() if file and file.filename else None
+        else:
+            data = request.json or {}
+            inv_number = str(data.get('invoice_number', '')).strip()
+            inv_date = data.get('invoice_date') or None
+            buyer = str(data.get('buyer', '')).strip()
+            try: amount = float(data.get('amount', 0))
+            except: amount = 0.0
+            currency = str(data.get('currency', 'EUR')).strip() or 'EUR'
+            slots_series = str(data.get('slots_series', '')).strip()
+            notes = str(data.get('notes', '')).strip()
+            filename = None
+            file_data = None
+            
+        series_list = [s.strip() for s in re.split(r'[\s,;]+', slots_series) if s.strip()] if slots_series else []
+        if not inv_number:
+            return jsonify({"success": False, "error": "Numărul de factură este obligatoriu."}), 400
+        if not buyer:
+            return jsonify({"success": False, "error": "Cumpărătorul este obligatoriu."}), 400
+        if not series_list:
+            return jsonify({"success": False, "error": "Trebuie specificată cel puțin o serie de aparat."}), 400
+
+        # Find or create a Sale Contract
+        c_rows = pg_qry("SELECT id, contract_number FROM cp2_contracts WHERE type = 'Vânzare Sloturi' AND (owner_name = %s OR contract_number LIKE %s) LIMIT 1", (buyer, f"%{inv_number}%"))
+        if c_rows:
+            cid = c_rows[0]['id']
+            c_num = c_rows[0]['contract_number']
+        else:
+            cid = str(uuid.uuid4())
+            c_num = f"VNZ-{inv_number}"
+            pg_qry("""
+                INSERT INTO cp2_contracts (id, type, owner_name, contract_number, start_date, total_amount, currency, details)
+                VALUES (%s, 'Vânzare Sloturi', %s, %s, %s, %s, %s, %s)
+            """, (cid, buyer, c_num, inv_date or datetime.now().strftime('%Y-%m-%d'), amount, currency, f"Vânzare {len(series_list)} sloturi către {buyer}"))
+
+        # Insert sale invoice
+        pg_qry("""
+            INSERT INTO cp2_contract_invoices
+            (id, contract_id, invoice_number, invoice_date, amount, currency, supplier, slots_count, slots_series, filename, notes)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (iid, cid, inv_number, inv_date, amount, currency, buyer, len(series_list), slots_series, filename, notes))
+
+        if file_data:
+            pg_qry("INSERT INTO cp2_contract_invoice_data (invoice_id, file_data) VALUES (%s, %s)", (iid, file_data))
+
+        unit_sale_p = round(amount / len(series_list), 2) if len(series_list) > 0 and amount > 0 else 0.0
+
+        # Discharge from inventory (mark as Vândut)
+        for s_nr in series_list:
+            pg_qry("""
+                INSERT INTO cp2_slot_inventory (
+                    serial_nr, status, exit_type, exit_date,
+                    sale_contract_id, sale_contract_number,
+                    sale_invoice_id, sale_invoice_number, sale_invoice_date,
+                    sale_buyer, sale_price, sale_currency, notes
+                ) VALUES (
+                    %s, 'Vândut', 'Vânzare', %s,
+                    %s, %s,
+                    %s, %s, %s,
+                    %s, %s, %s, %s
+                )
+                ON CONFLICT (serial_nr) DO UPDATE SET
+                    status = 'Vândut',
+                    exit_type = 'Vânzare',
+                    exit_date = EXCLUDED.exit_date,
+                    sale_contract_id = EXCLUDED.sale_contract_id,
+                    sale_contract_number = EXCLUDED.sale_contract_number,
+                    sale_invoice_id = EXCLUDED.sale_invoice_id,
+                    sale_invoice_number = EXCLUDED.sale_invoice_number,
+                    sale_invoice_date = EXCLUDED.sale_invoice_date,
+                    sale_buyer = EXCLUDED.sale_buyer,
+                    sale_price = EXCLUDED.sale_price,
+                    sale_currency = EXCLUDED.sale_currency,
+                    notes = COALESCE(EXCLUDED.notes, cp2_slot_inventory.notes),
+                    updated_at = CURRENT_TIMESTAMP
+            """, (
+                s_nr, inv_date,
+                cid, c_num,
+                iid, inv_number, inv_date,
+                buyer, unit_sale_p, currency, notes
+            ))
+
+        return jsonify({"success": True, "count": len(series_list), "invoice_id": iid, "contract_id": cid})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/slots/revert-sale', methods=['POST'])
+def revert_slot_sale():
+    try:
+        data = request.json or {}
+        serial_nr = data.get('serial_nr')
+        invoice_id = data.get('invoice_id')
+        if serial_nr:
+            pg_qry('''
+                UPDATE cp2_slot_inventory
+                SET status = CASE WHEN current_location IS NOT NULL AND current_location != 'Depozit' THEN 'În Sală (Activ)' ELSE 'În Stoc' END,
+                    exit_type = NULL, exit_date = NULL,
+                    sale_contract_id = NULL, sale_contract_number = NULL,
+                    sale_invoice_id = NULL, sale_invoice_number = NULL, sale_invoice_date = NULL,
+                    sale_buyer = NULL, sale_price = NULL, sale_currency = NULL,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE serial_nr = %s
+            ''', (str(serial_nr).strip(),))
+            return jsonify({"success": True})
+        elif invoice_id:
+            pg_qry('''
+                UPDATE cp2_slot_inventory
+                SET status = CASE WHEN current_location IS NOT NULL AND current_location != 'Depozit' THEN 'În Sală (Activ)' ELSE 'În Stoc' END,
+                    exit_type = NULL, exit_date = NULL,
+                    sale_contract_id = NULL, sale_contract_number = NULL,
+                    sale_invoice_id = NULL, sale_invoice_number = NULL, sale_invoice_date = NULL,
+                    sale_buyer = NULL, sale_price = NULL, sale_currency = NULL,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE sale_invoice_id = %s
+            ''', (invoice_id,))
+            return jsonify({"success": True})
+        return jsonify({"success": False, "error": "Missing serial_nr or invoice_id"}), 400
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/slots/available-series', methods=['GET'])
+def get_available_slots_series():
+    try:
+        rows = pg_qry('''
+            SELECT serial_nr, vendor, model, cabinet, current_location, status, purchase_price, purchase_currency
+            FROM cp2_slot_inventory
+            WHERE status != 'Vândut' AND status != 'Casat'
+            ORDER BY serial_nr ASC
+        ''')
+        for r in rows:
+            if r.get('purchase_price') is not None:
+                r['purchase_price'] = float(r['purchase_price'])
+        return jsonify(rows)
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

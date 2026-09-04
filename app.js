@@ -12301,7 +12301,7 @@ window.handleContractTypeChange = function() {
   if (!typeEl) return;
   const type = typeEl.value;
   const isRent = (type === 'Chirie Spațiu' || type === 'Subînchiriere spațiu');
-  const isSlotAcq = (type === 'Achiziție Sloturi');
+  const isSlotAcq = (type === 'Achiziție Sloturi' || type === 'Vânzare Sloturi');
 
   // Rent specific fields
   const rentFields = document.querySelectorAll('.contract-rent-field');
@@ -12315,10 +12315,14 @@ window.handleContractTypeChange = function() {
     toggleBtn.style.display = (!isRent && !isSlotAcq) ? 'block' : 'none';
   }
 
-  // Slot acquisition section (serii & factură achiziție)
+  // Slot acquisition / sale section (serii & factură)
   const slotSection = document.getElementById('contract-slot-acquisition-section');
   if (slotSection) {
     slotSection.style.display = isSlotAcq ? 'block' : 'none';
+    const titleEl = slotSection.querySelector('.slot-section-title');
+    if (titleEl) {
+      titleEl.innerText = (type === 'Vânzare Sloturi') ? 'Date Factură Vânzare & Serii Sloturi Ieșite' : 'Date Factură & Serii Sloturi Achiziționate';
+    }
   }
 };
 
@@ -12662,7 +12666,7 @@ window.saveContract = async function() {
     locations: []
   };
   
-  const isSlotAcq = (payload.type === 'Achiziție Sloturi');
+  const isSlotAcq = (payload.type === 'Achiziție Sloturi' || payload.type === 'Vânzare Sloturi');
   if (isSlotAcq) {
     const modalSupp = document.getElementById('contract-modal-supplier')?.value;
     if (modalSupp) payload.owner_name = modalSupp;
@@ -13839,5 +13843,496 @@ window.copyInvoiceSlotsToClipboard = function() {
     else alert('Seriile au fost copiate!');
   });
 };
+
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GESTIUNE & CICLU DE VIAȚĂ SLOTURI (INVENTAR / INTRĂRI / IEȘIRI VÂNZĂRI)
+// ══════════════════════════════════════════════════════════════════════════════
+
+let _currentContractSubTab = 'contracts';
+let _lifecycleData = [];
+let _lifecycleFilter = 'all';
+let _lifecycleSearch = '';
+let _lifecycleSortCol = 'serial_nr';
+let _lifecycleSortAsc = true;
+let _sellSlotSeriesTags = [];
+let _availableSlotsCache = [];
+
+window.switchContractSubTab = function(tab) {
+  _currentContractSubTab = tab;
+  const listEl = document.getElementById('contracte-subview-list');
+  const lifeEl = document.getElementById('contracte-subview-lifecycle');
+  const btnContracts = document.getElementById('tab-btn-contracts');
+  const btnLife = document.getElementById('tab-btn-slot-lifecycle');
+
+  if (tab === 'lifecycle') {
+    if (listEl) listEl.style.display = 'none';
+    if (lifeEl) lifeEl.style.display = 'block';
+    if (btnContracts) {
+      btnContracts.className = 'btn-ghost';
+      btnContracts.style.background = 'transparent';
+      btnContracts.style.color = 'var(--text)';
+    }
+    if (btnLife) {
+      btnLife.className = 'btn btn-primary';
+      btnLife.style.background = 'var(--accent)';
+      btnLife.style.color = 'white';
+    }
+    loadSlotLifecycle();
+  } else {
+    if (lifeEl) lifeEl.style.display = 'none';
+    if (listEl) listEl.style.display = 'block';
+    if (btnContracts) {
+      btnContracts.className = 'btn btn-primary';
+      btnContracts.style.background = 'var(--accent)';
+      btnContracts.style.color = 'white';
+    }
+    if (btnLife) {
+      btnLife.className = 'btn-ghost';
+      btnLife.style.background = 'transparent';
+      btnLife.style.color = 'var(--text)';
+    }
+  }
+};
+
+window.loadSlotLifecycle = async function() {
+  const tbody = document.getElementById('lifecycle-tbody');
+  if (tbody) {
+    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; padding:30px; color:var(--muted);"><span class="spinner" style="display:inline-block; width:20px; height:20px; border-width:2px; vertical-align:middle; margin-right:8px;"></span> Se încarcă parcul de sloturi...</td></tr>';
+  }
+
+  try {
+    const params = new URLSearchParams({
+      status: _lifecycleFilter,
+      search: _lifecycleSearch,
+      sort_by: _lifecycleSortCol,
+      sort_dir: _lifecycleSortAsc ? 'asc' : 'desc'
+    });
+
+    const res = await fetch('/api/slots/inventory-lifecycle?' + params.toString());
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Eroare necunoscută');
+
+    _lifecycleData = data.items || [];
+    const k = data.kpi || {};
+
+    // Update KPI Cards
+    const elTot = document.getElementById('lifecycle-kpi-total');
+    if (elTot) elTot.innerText = k.total_slots || 0;
+
+    const elAct = document.getElementById('lifecycle-kpi-active');
+    if (elAct) elAct.innerText = k.total_active || 0;
+
+    const elStk = document.getElementById('lifecycle-kpi-stock');
+    if (elStk) elStk.innerText = k.total_stock || 0;
+
+    const elSld = document.getElementById('lifecycle-kpi-sold');
+    if (elSld) elSld.innerText = k.total_sold || 0;
+
+    const elPur = document.getElementById('lifecycle-kpi-purchase');
+    if (elPur) elPur.innerText = (k.total_purchase_val || 0).toLocaleString('ro-RO') + ' RON';
+
+    const elSal = document.getElementById('lifecycle-kpi-sale');
+    if (elSal) elSal.innerText = (k.total_sale_val || 0).toLocaleString('ro-RO') + ' RON';
+
+    const elPrf = document.getElementById('lifecycle-kpi-profit');
+    if (elPrf) {
+      const pVal = k.total_profit || 0;
+      elPrf.innerText = (pVal >= 0 ? '+' : '') + pVal.toLocaleString('ro-RO') + ' RON';
+      elPrf.style.color = pVal >= 0 ? '#10b981' : '#ef4444';
+    }
+
+    renderLifecycleTable();
+  } catch (err) {
+    console.error('Error loadSlotLifecycle:', err);
+    if (tbody) {
+      tbody.innerHTML = `<tr><td colspan="12" style="text-align:center; padding:20px; color:#ef4444;">Eroare la încărcare: ${escapeHtml(err.message || String(err))}</td></tr>`;
+    }
+  }
+};
+
+window.renderLifecycleTable = function() {
+  const tbody = document.getElementById('lifecycle-tbody');
+  const countEl = document.getElementById('lifecycle-count-info');
+  if (!tbody) return;
+
+  if (!_lifecycleData || _lifecycleData.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="12" style="text-align:center; padding:30px; color:var(--muted);">Niciun aparat găsit conform filtrelor selectate.</td></tr>';
+    if (countEl) countEl.innerText = 'Afișate: 0 aparate';
+    return;
+  }
+
+  if (countEl) {
+    countEl.innerText = `Afișate: ${_lifecycleData.length} aparate`;
+  }
+
+  tbody.innerHTML = _lifecycleData.map((item, idx) => {
+    let statusBadge = '';
+    if (item.status === 'În Sală (Activ)') {
+      statusBadge = '<span style="display:inline-block; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:700; background:rgba(16,185,129,0.15); color:#10b981;">În Sală</span>';
+    } else if (item.status === 'În Stoc') {
+      statusBadge = '<span style="display:inline-block; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:700; background:rgba(59,130,246,0.15); color:#3b82f6;">În Stoc</span>';
+    } else if (item.status === 'Vândut') {
+      statusBadge = '<span style="display:inline-block; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:700; background:rgba(245,158,11,0.15); color:#f59e0b;">Vândut</span>';
+    } else {
+      statusBadge = `<span style="display:inline-block; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:700; background:rgba(148,163,184,0.15); color:var(--muted);">${escapeHtml(item.status || '-')}</span>`;
+    }
+
+    // Purchase column formatting
+    let purchaseHtml = '<span style="color:var(--muted);">-</span>';
+    if (item.purchase_supplier && item.purchase_supplier !== '-') {
+      purchaseHtml = `<div style="font-weight:700; color:var(--text); font-size:12px;">${escapeHtml(item.purchase_supplier)}</div>`;
+      if (item.purchase_invoice_number && item.purchase_invoice_number !== '-') {
+        purchaseHtml += `<div style="font-size:11px; color:var(--muted);">Fact: ${escapeHtml(item.purchase_invoice_number)} ${item.purchase_invoice_date ? '(' + item.purchase_invoice_date + ')' : ''}</div>`;
+      }
+    }
+
+    const pPriceStr = item.purchase_price !== null && item.purchase_price !== undefined
+      ? `<span style="font-weight:700; color:var(--text);">${Number(item.purchase_price).toLocaleString('ro-RO')} ${escapeHtml(item.purchase_currency || 'RON')}</span>`
+      : '<span style="color:var(--muted);">-</span>';
+
+    // Sale column formatting
+    let saleHtml = '<span style="color:var(--muted);">-</span>';
+    if (item.status === 'Vândut' && item.sale_buyer && item.sale_buyer !== '-') {
+      saleHtml = `<div style="font-weight:700; color:#f59e0b; font-size:12px;">${escapeHtml(item.sale_buyer)}</div>`;
+      if (item.sale_invoice_number && item.sale_invoice_number !== '-') {
+        saleHtml += `<div style="font-size:11px; color:var(--muted);">Fact: ${escapeHtml(item.sale_invoice_number)} ${item.sale_date ? '(' + item.sale_date + ')' : ''}</div>`;
+      }
+    }
+
+    const sPriceStr = item.sale_price !== null && item.sale_price !== undefined
+      ? `<span style="font-weight:700; color:#10b981;">${Number(item.sale_price).toLocaleString('ro-RO')} ${escapeHtml(item.sale_currency || 'RON')}</span>`
+      : '<span style="color:var(--muted);">-</span>';
+
+    // Profit formatting
+    let profitStr = '<span style="color:var(--muted);">-</span>';
+    if (item.profit !== null && item.profit !== undefined) {
+      const pSign = item.profit >= 0 ? '+' : '';
+      const pColor = item.profit >= 0 ? '#10b981' : '#ef4444';
+      profitStr = `<span style="font-weight:800; color:${pColor};">${pSign}${Number(item.profit).toLocaleString('ro-RO')} ${escapeHtml(item.sale_currency || 'RON')}</span>`;
+    }
+
+    // Actions
+    let actionBtn = '';
+    if (item.status === 'Vândut') {
+      actionBtn = `
+        <div style="display:flex; justify-content:center; gap:4px;">
+          <button type="button" onclick="revertSlotSale('${escapeHtml(item.serial_nr)}')" class="btn-ghost" style="padding:3px 8px; font-size:11px; color:var(--muted); border:1px solid var(--border); border-radius:6px;" title="Anulează vânzarea (reintroduce în stoc)">Anulează</button>
+          ${item.sale_invoice_id ? `<a href="/api/contracts/invoices/${item.sale_invoice_id}/download" target="_blank" class="btn-ghost" style="padding:3px 8px; font-size:11px; color:var(--accent); border:1px solid var(--border); border-radius:6px; text-decoration:none;" title="Descarcă Factură PDF">PDF</a>` : ''}
+        </div>
+      `;
+    } else {
+      actionBtn = `
+        <button type="button" onclick="openSellSlotModal('${escapeHtml(item.serial_nr)}')" class="btn-ghost" style="padding:3px 10px; font-size:11px; font-weight:700; color:#f59e0b; border:1px solid rgba(245,158,11,0.3); border-radius:6px; background:rgba(245,158,11,0.08);" title="Vinde acest aparat">+ Vinde</button>
+      `;
+    }
+
+    return `
+      <tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:10px 12px; text-align:center; color:var(--muted); font-size:11px;">${idx + 1}</td>
+        <td style="padding:10px 12px; font-weight:800; font-family:monospace; font-size:13px; color:var(--text);">${escapeHtml(item.serial_nr)}</td>
+        <td style="padding:10px 12px; font-size:12px;">
+          <span style="font-weight:700; color:var(--text);">${escapeHtml(item.vendor)}</span>
+          ${item.model !== '-' ? `<span style="color:var(--muted); margin-left:4px;">${escapeHtml(item.model)}</span>` : ''}
+          ${item.cabinet !== '-' ? `<div style="font-size:11px; color:var(--muted);">${escapeHtml(item.cabinet)}</div>` : ''}
+        </td>
+        <td style="padding:10px 12px; text-align:center; font-size:12px; color:var(--muted);">${escapeHtml(item.fabrication_year)}</td>
+        <td style="padding:10px 12px; font-size:12px;">
+          <span style="font-weight:600; color:var(--text);">${escapeHtml(item.current_location)}</span>
+        </td>
+        <td style="padding:10px 12px; text-align:center;">${statusBadge}</td>
+        <td style="padding:10px 12px;">${purchaseHtml}</td>
+        <td style="padding:10px 12px; text-align:right; font-size:12px;">${pPriceStr}</td>
+        <td style="padding:10px 12px;">${saleHtml}</td>
+        <td style="padding:10px 12px; text-align:right; font-size:12px;">${sPriceStr}</td>
+        <td style="padding:10px 12px; text-align:right; font-size:12px;">${profitStr}</td>
+        <td style="padding:10px 12px; text-align:center;">${actionBtn}</td>
+      </tr>
+    `;
+  }).join('');
+};
+
+window.setLifecycleStatusFilter = function(status) {
+  _lifecycleFilter = status;
+  ['all', 'active', 'in_stock', 'sold'].forEach(s => {
+    const btn = document.getElementById('flt-life-' + s);
+    if (btn) {
+      if (s === status) {
+        btn.style.background = 'var(--accent)';
+        btn.style.color = 'white';
+        btn.style.fontWeight = '700';
+      } else {
+        btn.style.background = 'transparent';
+        btn.style.color = 'var(--text)';
+        btn.style.fontWeight = '600';
+      }
+    }
+  });
+  loadSlotLifecycle();
+};
+
+let _lifecycleSearchTimer = null;
+window.handleLifecycleSearch = function(val) {
+  clearTimeout(_lifecycleSearchTimer);
+  _lifecycleSearchTimer = setTimeout(() => {
+    _lifecycleSearch = (val || '').trim();
+    loadSlotLifecycle();
+  }, 300);
+};
+
+// ─── MODAL VÂNZARE SLOTURI ────────────────────────────────────────────────────
+window.openSellSlotModal = async function(preselectedSerial) {
+  const form = document.getElementById('form-sell-slots');
+  if (form) form.reset();
+
+  const dateInput = document.getElementById('sell-slot-inv-date');
+  if (dateInput) {
+    dateInput.value = new Date().toISOString().split('T')[0];
+  }
+
+  _sellSlotSeriesTags = [];
+  if (preselectedSerial) {
+    _sellSlotSeriesTags.push(String(preselectedSerial).trim());
+  }
+
+  renderSellSlotChips();
+  updateSellSlotPriceCalc();
+
+  const modal = document.getElementById('modal-sell-slots');
+  if (modal) modal.classList.add('show');
+
+  // Load available series for picker
+  try {
+    const picker = document.getElementById('sell-slot-picker-dropdown');
+    if (picker) {
+      picker.innerHTML = '<option value="">Se încarcă aparatele disponibile...</option>';
+      const res = await fetch('/api/slots/available-series');
+      const data = await res.json();
+      _availableSlotsCache = data || [];
+      picker.innerHTML = '<option value="">Alege aparat din stoc / săli (' + _availableSlotsCache.length + ' disponibile)...</option>' +
+        _availableSlotsCache.map(s => {
+          const locStr = s.current_location ? ` [${s.current_location}]` : '';
+          const prStr = s.purchase_price ? ` - Achiziție: ${Number(s.purchase_price).toLocaleString('ro-RO')} ${s.purchase_currency || 'RON'}` : '';
+          return `<option value="${escapeHtml(s.serial_nr)}">Serie: ${escapeHtml(s.serial_nr)} - ${escapeHtml(s.vendor || '')}${locStr}${prStr}</option>`;
+        }).join('');
+    }
+  } catch (e) {
+    console.error('Error fetching available series:', e);
+  }
+};
+
+window.closeSellSlotModal = function() {
+  const modal = document.getElementById('modal-sell-slots');
+  if (modal) modal.classList.remove('show');
+};
+
+window.handleSellSlotPickerSelect = function(dropdown) {
+  const val = dropdown.value;
+  if (val && !_sellSlotSeriesTags.includes(val)) {
+    _sellSlotSeriesTags.push(val);
+    renderSellSlotChips();
+    updateSellSlotPriceCalc();
+  }
+  dropdown.value = '';
+};
+
+window.handleSellSlotManualKey = function(e) {
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    const raw = e.target.value.trim().replace(/,/g, '');
+    if (raw) {
+      const parts = raw.split(/\s+/).filter(Boolean);
+      parts.forEach(p => {
+        if (!_sellSlotSeriesTags.includes(p)) {
+          _sellSlotSeriesTags.push(p);
+        }
+      });
+      e.target.value = '';
+      renderSellSlotChips();
+      updateSellSlotPriceCalc();
+    }
+  }
+};
+
+window.removeSellSlotTag = function(idx) {
+  _sellSlotSeriesTags.splice(idx, 1);
+  renderSellSlotChips();
+  updateSellSlotPriceCalc();
+};
+
+window.renderSellSlotChips = function() {
+  const container = document.getElementById('sell-slot-chips-container');
+  const badge = document.getElementById('sell-slot-calc-badge');
+
+  if (badge) {
+    badge.innerText = `${_sellSlotSeriesTags.length} aparate selectate`;
+  }
+
+  if (!container) return;
+  if (_sellSlotSeriesTags.length === 0) {
+    container.innerHTML = '<span style="font-size:11px; color:var(--muted); padding:4px;">Niciun aparat selectat încă</span>';
+    return;
+  }
+
+  container.innerHTML = _sellSlotSeriesTags.map((tag, idx) => `
+    <span style="display:inline-flex; align-items:center; gap:5px; background:rgba(245,158,11,0.15); color:#f59e0b; border:1px solid rgba(245,158,11,0.3); padding:3px 8px; border-radius:6px; font-size:12px; font-weight:700;">
+      ${escapeHtml(tag)}
+      <button type="button" onclick="removeSellSlotTag(${idx})" style="background:none; border:none; color:#f59e0b; cursor:pointer; font-weight:bold; font-size:14px; line-height:1; padding:0 2px; margin-left:2px;" title="Elimină">&times;</button>
+    </span>
+  `).join('');
+};
+
+window.updateSellSlotPriceCalc = function() {
+  const amount = parseFloat(document.getElementById('sell-slot-amount')?.value) || 0;
+  const curr = document.getElementById('sell-slot-currency')?.value || 'RON';
+  const badge = document.getElementById('sell-slot-calc-badge');
+  const count = _sellSlotSeriesTags.length;
+
+  if (badge) {
+    if (count > 0 && amount > 0) {
+      const perUnit = Math.round(amount / count);
+      badge.innerText = `${count} aparate | ~${perUnit.toLocaleString('ro-RO')} ${curr}/aparat`;
+    } else {
+      badge.innerText = `${count} aparate selectate`;
+    }
+  }
+};
+
+window.submitSellSlotModal = async function(e) {
+  e.preventDefault();
+  if (_sellSlotSeriesTags.length === 0) {
+    if (typeof showAlert === 'function') showAlert('Selectați cel puțin un aparat pentru vânzare.');
+    else alert('Selectați cel puțin un aparat pentru vânzare.');
+    return;
+  }
+
+  const btn = document.getElementById('btn-submit-sell-slot');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = 'Se salvează...';
+  }
+
+  try {
+    const formData = new FormData();
+    formData.append('invoice_number', document.getElementById('sell-slot-inv-num').value.trim());
+    formData.append('invoice_date', document.getElementById('sell-slot-inv-date').value);
+    formData.append('buyer', document.getElementById('sell-slot-buyer').value.trim());
+    formData.append('amount', document.getElementById('sell-slot-amount').value || 0);
+    formData.append('currency', document.getElementById('sell-slot-currency').value || 'RON');
+    formData.append('slots_series', _sellSlotSeriesTags.join(','));
+    formData.append('notes', document.getElementById('sell-slot-notes').value.trim());
+
+    const fileInput = document.getElementById('sell-slot-pdf-file');
+    if (fileInput && fileInput.files.length > 0) {
+      formData.append('file', fileInput.files[0]);
+    }
+
+    const res = await fetch('/api/slots/sell', {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Eroare la salvare');
+
+    if (typeof showAlert === 'function') {
+      showAlert(`Vânzarea a fost înregistrată cu succes! ${data.count} aparate au fost descărcate din gestiune.`);
+    } else {
+      alert(`Vânzarea a fost înregistrată cu succes! ${data.count} aparate au fost descărcate din gestiune.`);
+    }
+
+    closeSellSlotModal();
+    loadSlotLifecycle();
+    if (typeof loadContracts === 'function') loadContracts();
+  } catch (err) {
+    console.error('Error submitSellSlotModal:', err);
+    if (typeof showAlert === 'function') showAlert('Eroare: ' + err.message);
+    else alert('Eroare: ' + err.message);
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `
+        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"></path></svg>
+        <span>Confirmă Vânzarea</span>
+      `;
+    }
+  }
+};
+
+window.revertSlotSale = async function(serialNr) {
+  if (!confirm(`Sigur doriți să anulați vânzarea pentru seria ${serialNr}? Aparatul va fi reintrodus în stoc.`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/slots/revert-sale', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ serial_nr: serialNr })
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'Eroare la anulare');
+
+    if (typeof showAlert === 'function') showAlert(`Vânzarea aparatului cu seria ${serialNr} a fost anulată. Aparatul este acum în stoc.`);
+    else alert(`Vânzarea aparatului cu seria ${serialNr} a fost anulată.`);
+
+    loadSlotLifecycle();
+  } catch (err) {
+    if (typeof showAlert === 'function') showAlert('Eroare la anulare vânzare: ' + err.message);
+    else alert('Eroare la anulare: ' + err.message);
+  }
+};
+
+window.exportLifecycleExcel = function() {
+  if (!_lifecycleData || _lifecycleData.length === 0) {
+    if (typeof showAlert === 'function') showAlert('Nu există date de exportat.');
+    return;
+  }
+
+  const exportRows = _lifecycleData.map((s, idx) => ({
+    'Nr.': idx + 1,
+    'Serie Aparat': s.serial_nr,
+    'Producător': s.vendor,
+    'Model': s.model,
+    'Cabinet': s.cabinet,
+    'An Fabr.': s.fabrication_year,
+    'Locație Curentă': s.current_location,
+    'Status': s.status,
+    'Furnizor Achiziție': s.purchase_supplier,
+    'Nr. Factură Intrare': s.purchase_invoice_number,
+    'Dată Intrare': s.purchase_invoice_date || s.entry_date,
+    'Preț Achiziție': s.purchase_price,
+    'Monedă Achiziție': s.purchase_currency,
+    'Cumpărător Vânzare': s.sale_buyer,
+    'Nr. Factură Ieșire': s.sale_invoice_number,
+    'Dată Ieșire': s.sale_date || s.exit_date,
+    'Preț Vânzare': s.sale_price,
+    'Monedă Vânzare': s.sale_currency,
+    'Profit / Marjă': s.profit
+  }));
+
+  if (typeof XLSX !== 'undefined') {
+    const ws = XLSX.utils.json_to_sheet(exportRows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Parc Sloturi');
+    XLSX.writeFile(wb, `Gestiune_Parc_Sloturi_${new Date().toISOString().split('T')[0]}.xlsx`);
+  } else {
+    // Fallback CSV
+    const headers = Object.keys(exportRows[0]);
+    const csvContent = [
+      headers.join(';'),
+      ...exportRows.map(row => headers.map(h => `"${String(row[h] || '').replace(/"/g, '""')}"`).join(';'))
+    ].join('\n');
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Gestiune_Parc_Sloturi_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+};
+
 
 
