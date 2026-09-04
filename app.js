@@ -811,7 +811,7 @@ function renderMonthCalendar(){
       
       cell.innerHTML=`<div class="cal-day-num">${d}</div><div class="cal-day-val">${fmtK(ggr)}</div>`+
         `<div class="cal-day-metrics">IN: ${fmtK(row.tin)} <span style="color:${inColor}; font-size:9px;">${inArr}${Math.abs(inPct).toFixed(1)}%</span><br>BET:${fmtK(row.bet)} &bull; HH:${fmtK(row.hh)}</div>`+
-        `<div class="cal-analyze-btn" title="Vezi Analiza Zilei" onclick="event.stopPropagation(); window.openDayAnalysis('${k}');">📈</div>`;
+        `<div class="cal-analyze-btn" title="Analiza Zilei" onclick="event.stopPropagation(); window.openDayAnalysis('${k}');"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg></div>`;
       
       let htmlTip = `
         <div class="tt-header">${k}</div>
@@ -830,7 +830,7 @@ function renderMonthCalendar(){
         });
         htmlTip += `</table>`;
       }
-      htmlTip += `<div style="margin-top:12px;"><button class="btn" style="width:100%; justify-content:center; padding:6px; font-size:11px; background:var(--accent); color:#fff; border:none; border-radius:6px; cursor:pointer;" onclick="window.openDayAnalysis('${k}');">📈 Vezi Analiza Zilei</button></div>`;
+      htmlTip += `<div style="margin-top:12px;"><button class="btn" style="width:100%; justify-content:center; padding:6px; font-size:11px; background:var(--accent); color:#fff; border:none; border-radius:6px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;" onclick="window.openDayAnalysis('${k}');"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></svg> <span>Analiza Zilei</span></button></div>`;
       const _showTooltip = () => {
         clearTimeout(window.globalTooltipTimer);
         let tt = document.getElementById('global-tooltip');
@@ -12191,10 +12191,16 @@ window.renderContractsTable = function() {
     if (c.m2) detaliiContractHtml += `${c.contract_number ? '<br>' : ''}<span style="font-size:11px; color:var(--muted)">${c.m2} m²</span>`;
     
     const totalSlots = (c.invoices || []).reduce((sum, inv) => sum + (parseInt(inv.slots_count) || (inv.slots_series ? inv.slots_series.split(',').filter(Boolean).length : 0)), 0);
-    const hasSlots = totalSlots > 0 || c.type === 'Achiziție Sloturi' || (c.invoices && c.invoices.length > 0) || (c.slots_series && c.slots_series.trim()) || (c.slots_count && parseInt(c.slots_count) > 0);
+    const isSale = (c.type === 'Vânzare Sloturi');
+    const hasSlots = totalSlots > 0 || c.type === 'Achiziție Sloturi' || isSale || (c.invoices && c.invoices.length > 0) || (c.slots_series && c.slots_series.trim()) || (c.slots_count && parseInt(c.slots_count) > 0);
     if (hasSlots) {
-      const label = totalSlots > 0 ? `${totalSlots} sloturi (vezi serii)` : (c.slots_series ? 'Vezi serii sloturi' : 'Adaugă serii');
-      detaliiContractHtml += `${detaliiContractHtml ? '<br>' : ''}<button type="button" onclick="event.stopPropagation(); openContractSlotsSeries('${c.id}')" style="display:inline-flex; align-items:center; gap:5px; margin-top:4px; cursor:pointer; background:rgba(16,185,129,0.12); color:#10b981; border:1px solid rgba(16,185,129,0.3); padding:2px 8px; border-radius:12px; font-size:11px; font-weight:700; transition:0.2s;" onmouseover="this.style.background='rgba(16,185,129,0.22)'" onmouseout="this.style.background='rgba(16,185,129,0.12)'" title="Deschide Tabel Sloturi & Serii (${label})"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg><span>${label}</span></button>`;
+      const label = totalSlots > 0 ? `${totalSlots} sloturi` : (c.slots_series ? 'Sloturi' : 'Adaugă sloturi');
+      const badgeColor = isSale ? '#ef4444' : '#10b981';
+      const badgeBg = isSale ? 'rgba(239, 68, 68, 0.12)' : 'rgba(16, 185, 129, 0.12)';
+      const badgeHoverBg = isSale ? 'rgba(239, 68, 68, 0.22)' : 'rgba(16, 185, 129, 0.22)';
+      const badgeBorder = isSale ? 'rgba(239, 68, 68, 0.3)' : 'rgba(16, 185, 129, 0.3)';
+
+      detaliiContractHtml += `${detaliiContractHtml ? '<br>' : ''}<button type="button" onclick="event.stopPropagation(); openContractSlotsSeries('${c.id}')" style="display:inline-flex; align-items:center; gap:5px; margin-top:4px; cursor:pointer; background:${badgeBg}; color:${badgeColor}; border:1px solid ${badgeBorder}; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:700; transition:0.2s;" onmouseover="this.style.background='${badgeHoverBg}'" onmouseout="this.style.background='${badgeBg}'" title="Tabel Sloturi (${label})"><svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg><span>${label}</span></button>`;
     }
     if (!detaliiContractHtml) detaliiContractHtml = '-';
 
@@ -12227,7 +12233,7 @@ window.renderContractsTable = function() {
               <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
             </button>` : ''}
             ${hasSlots ? `
-            <button type="button" onclick="openContractSlotsSeries('${c.id}')" style="width:32px; height:32px; border-radius:50%; border:1px solid rgba(16,185,129,0.4); background:rgba(16,185,129,0.08); display:flex; align-items:center; justify-content:center; cursor:pointer; color:#10b981; transition:0.2s;" onmouseover="this.style.background='rgba(16,185,129,0.22)'; this.style.borderColor='#10b981';" onmouseout="this.style.background='rgba(16,185,129,0.08)'; this.style.borderColor='rgba(16,185,129,0.4)';" title="Tabel & Listă Aparate Slot (${totalSlots > 0 ? totalSlots + ' sloturi' : 'Serii'})">
+            <button type="button" onclick="openContractSlotsSeries('${c.id}')" style="width:32px; height:32px; border-radius:50%; border:1px solid ${isSale ? 'rgba(239,68,68,0.4)' : 'rgba(16,185,129,0.4)'}; background:${isSale ? 'rgba(239,68,68,0.08)' : 'rgba(16,185,129,0.08)'}; display:flex; align-items:center; justify-content:center; cursor:pointer; color:${isSale ? '#ef4444' : '#10b981'}; transition:0.2s;" onmouseover="this.style.background='${isSale ? 'rgba(239,68,68,0.22)' : 'rgba(16,185,129,0.22)'}'; this.style.borderColor='${isSale ? '#ef4444' : '#10b981'}';" onmouseout="this.style.background='${isSale ? 'rgba(239,68,68,0.08)' : 'rgba(16,185,129,0.08)'}'; this.style.borderColor='${isSale ? 'rgba(239,68,68,0.4)' : 'rgba(16,185,129,0.4)'}';" title="Tabel Aparate Slot (${totalSlots > 0 ? totalSlots + ' sloturi' : 'Sloturi'})">
               <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
             </button>` : ''}
             <button onclick="openContractModal('${c.id}')" style="width:32px; height:32px; border-radius:50%; border:1px solid var(--border); background:var(--surface); display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--text); transition:0.2s;" onmouseover="this.style.borderColor='var(--text)'" onmouseout="this.style.borderColor='var(--border)'" title="Modifică">
@@ -12797,13 +12803,15 @@ window.openContractModal = function(id = null, defaultType = null, preselectedSe
         const existingInvContainer = document.getElementById('contract-modal-existing-invoices');
         if (existingInvContainer) existingInvContainer.style.display = 'block';
         if (invSummaryEl) {
+          const isSale = (c.type === 'Vânzare Sloturi');
+          const pillColor = isSale ? '#ef4444' : '#10b981';
           invSummaryEl.innerHTML = c.invoices.map(inv => `
             <div style="padding:6px 10px; background:var(--surface); border:1px solid var(--border); border-radius:8px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
               <div>
-                <b>${inv.invoice_number}</b> (${inv.invoice_date || '-'}) &bull; <span style="color:#10b981; font-weight:700;">${inv.slots_count || 0} sloturi</span> &bull; ${fmt(inv.amount)} ${inv.currency}
+                <b>${inv.invoice_number}</b> (${inv.invoice_date || '-'}) &bull; <span style="color:${pillColor}; font-weight:700;">${inv.slots_count || 0} sloturi</span> &bull; ${fmt(inv.amount)} ${inv.currency}
                 ${inv.slots_series ? `<div style="font-size:11px; color:var(--muted); margin-top:2px;">Serii: ${inv.slots_series.split(',').slice(0, 8).join(', ')}${inv.slots_series.split(',').length > 8 ? '...' : ''}</div>` : ''}
               </div>
-              <button type="button" class="btn-ghost" onclick="openInvoiceSlotsModal('${inv.id}', '${inv.invoice_number}')" style="font-size:11px; color:#10b981; padding:3px 8px;">Vezi Serii</button>
+              <button type="button" class="btn-ghost" onclick="openInvoiceSlotsModal('${inv.id}', '${inv.invoice_number}')" style="font-size:11px; color:${pillColor}; padding:3px 8px;">Sloturi</button>
             </div>
           `).join('');
         }
@@ -13638,8 +13646,11 @@ window.renderContractInvoicesTable = function() {
 
   if (!tbody) return;
 
+  const parentContract = (_contractsData || []).find(c => String(c.id) === String(_currentContractInvoicesId));
+  const isSale = parentContract && (parentContract.type === 'Vânzare Sloturi');
+
   if (list.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:28px; color:var(--text-muted);">Nu este înregistrată nicio factură de achiziție pentru acest contract.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:28px; color:var(--text-muted);">Nu este înregistrată nicio factură pentru acest contract.</td></tr>';
     return;
   }
 
@@ -13649,24 +13660,25 @@ window.renderContractInvoicesTable = function() {
     let seriesHtml = '-';
     if (seriesArr.length > 0) {
       const visible = seriesArr.slice(0, 3);
-      const remaining = seriesArr.length - 3;
       seriesHtml = `
         <div style="display:flex; flex-wrap:wrap; gap:4px; align-items:center;">
           ${visible.map(s => `<span style="display:inline-block; font-size:11px; background:rgba(99, 102, 241, 0.12); color:var(--accent); border:1px solid rgba(99, 102, 241, 0.25); padding:2px 6px; border-radius:4px; font-weight:600;">${escapeHtml(s)}</span>`).join('')}
           <button onclick="openInvoiceSlotsModal('${inv.id}')" style="background:rgba(99,102,241,0.12); border:1px solid rgba(99,102,241,0.3); border-radius:6px; font-size:11px; font-weight:700; color:var(--accent); padding:3px 8px; cursor:pointer; transition:0.2s; display:inline-flex; align-items:center; gap:4px;" onmouseover="this.style.background='rgba(99,102,241,0.2)'" onmouseout="this.style.background='rgba(99,102,241,0.12)'" title="Deschide Tabel Sloturi (Provider, Model, Cabinet, Sală, Preț)">
-            Vezi Tabel Sloturi (${seriesArr.length}) &rarr;
+            Tabel Sloturi (${seriesArr.length}) &rarr;
           </button>
         </div>
       `;
     }
+
+    const colorStatus = isSale ? '#ef4444' : '#10b981';
 
     return `
       <tr style="border-bottom:1px solid var(--border);">
         <td style="padding:12px; text-align:center; color:var(--muted);">${idx + 1}</td>
         <td style="padding:12px; font-weight:700; color:var(--accent);">${inv.invoice_number || '-'}</td>
         <td style="padding:12px;">${inv.invoice_date || '-'}</td>
-        <td style="padding:12px; font-weight:600;">${inv.supplier || '-'}</td>
-        <td style="padding:12px; text-align:right; font-weight:700; color:#10b981;">
+        <td style="padding:12px; font-weight:600;">${inv.customer || inv.supplier || '-'}</td>
+        <td style="padding:12px; text-align:right; font-weight:700; color:${colorStatus};">
           <div>${fmt(inv.amount)} ${inv.currency || 'EUR'}</div>
           ${inv.currency === 'EUR' && inv.amount_ron ? `<div style="font-size:11px; color:var(--muted); font-weight:500;">(${fmt(inv.amount_ron)} LEI)</div>` : ''}
         </td>
@@ -13674,7 +13686,7 @@ window.renderContractInvoicesTable = function() {
         <td style="padding:12px;">${seriesHtml}</td>
         <td style="padding:12px; text-align:right;">
           <div style="display:flex; justify-content:flex-end; gap:6px;">
-            <button type="button" onclick="openInvoiceSlotsModal('${inv.id}')" style="width:30px; height:30px; border-radius:50%; border:1px solid rgba(16,185,129,0.4); background:rgba(16,185,129,0.08); display:flex; align-items:center; justify-content:center; cursor:pointer; color:#10b981; transition:0.2s;" onmouseover="this.style.background='rgba(16,185,129,0.2)'" onmouseout="this.style.background='rgba(16,185,129,0.08)'" title="Vezi Tabel Sloturi & Serii Factură">
+            <button type="button" onclick="openInvoiceSlotsModal('${inv.id}')" style="width:30px; height:30px; border-radius:50%; border:1px solid ${isSale ? 'rgba(239,68,68,0.4)' : 'rgba(16,185,129,0.4)'}; background:${isSale ? 'rgba(239,68,68,0.08)' : 'rgba(16,185,129,0.08)'}; display:flex; align-items:center; justify-content:center; cursor:pointer; color:${colorStatus}; transition:0.2s;" onmouseover="this.style.background='${isSale ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.2)'}'" onmouseout="this.style.background='${isSale ? 'rgba(239,68,68,0.08)' : 'rgba(16,185,129,0.08)'}'" title="Tabel Sloturi Factură">
               <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
             </button>
             ${hasPdf ? `
@@ -13810,8 +13822,10 @@ window.openContractSlotsSeries = async function(contractId) {
         c = (_contractsData || []).find(x => String(x.id) === String(contractId));
       } catch (_) {}
     }
+    const isSale = c && (c.type === 'Vânzare Sloturi');
+    const partnerLabel = isSale ? 'Cumpărător' : 'Furnizor';
     const title = `Tabel Sloturi: ${c && c.contract_number ? 'Nr. ' + c.contract_number : (c ? c.type : 'Contract')}`;
-    const sub = c ? `Furnizor: ${c.owner_name || '-'} • Dată: ${c.start_date || '-'} • Valoare Contract: ${fmt(c.total_amount)} ${c.currency || 'LEI'}` : '';
+    const sub = c ? `${partnerLabel}: ${c.owner_name || '-'} • Dată: ${c.start_date || '-'} • Valoare Contract: ${fmt(c.total_amount)} ${c.currency || 'LEI'}` : '';
     await loadAndShowSlotsModal({ contract_id: contractId }, title, sub);
   } catch (err) {
     console.error('Error in openContractSlotsSeries:', err);
@@ -13833,7 +13847,9 @@ window.openInvoiceSlotsModal = async function(invoiceId, invoiceNumber) {
     if (inv && inv.contract_id) window._currentSlotsContractId = inv.contract_id;
     const numStr = invoiceNumber || (inv && inv.invoice_number ? inv.invoice_number : '');
     const title = `Tabel Sloturi: Factura ${numStr}`;
-    const sub = inv ? `Furnizor: ${inv.supplier || '-'} • Dată: ${inv.invoice_date || '-'} • Valoare Factură: ${fmt(inv.amount)} ${inv.currency || 'LEI'}` : '';
+    const isSaleInv = inv && (inv.customer || (inv.contract_type === 'Vânzare Sloturi'));
+    const partnerInvLabel = isSaleInv ? 'Cumpărător' : 'Furnizor';
+    const sub = inv ? `${partnerInvLabel}: ${inv.customer || inv.supplier || '-'} • Dată: ${inv.invoice_date || '-'} • Valoare Factură: ${fmt(inv.amount)} ${inv.currency || 'LEI'}` : '';
     await loadAndShowSlotsModal({ invoice_id: invoiceId }, title, sub);
   } catch (err) {
     console.error('Error in openInvoiceSlotsModal:', err);
