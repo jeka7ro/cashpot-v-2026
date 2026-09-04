@@ -367,6 +367,13 @@
               </svg>
               Contracte
             </a>
+            <a href="#inventar" class="nav-item" id="nav-item-inventar">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+              </svg>
+              Inventar Sloturi
+            </a>
             <a href="#onjn" class="nav-item">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
@@ -3863,15 +3870,18 @@
 
         <!-- VIEW: CONTRACTE -->
         <div id="view-contracte" class="view-panel" style="padding:24px;">
-          <!-- SUBTABS CONTRACTE & GESTIUNE -->
+          <!-- SUBTABS CONTRACTE & INVENTAR -->
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; border-bottom:1px solid var(--border); padding-bottom:12px; flex-wrap:wrap; gap:12px;">
             <div style="display:flex; gap:8px;">
-              <button type="button" id="tab-btn-contracts" class="btn btn-primary" onclick="switchContractSubTab('contracts')" style="padding:8px 18px; border-radius:9999px; font-weight:700; font-size:13px; cursor:pointer;">
+              <a href="#contracte" class="btn btn-primary" style="padding:8px 18px; border-radius:9999px; font-weight:700; font-size:13px; text-decoration:none;">
                 Contracte Generale
-              </button>
-              <button type="button" id="tab-btn-slot-lifecycle" class="btn-ghost" onclick="switchContractSubTab('lifecycle')" style="padding:8px 18px; border-radius:9999px; font-weight:700; font-size:13px; cursor:pointer;">
-                Gestiune & Parc Sloturi (Intrări / Ieșiri)
-              </button>
+              </a>
+              <a href="#inventar" class="btn-ghost" style="padding:8px 18px; border-radius:9999px; font-weight:700; font-size:13px; text-decoration:none;">
+                Inventar Sloturi (Intrări / Ieșiri)
+              </a>
+            </div>
+            <div>
+              <span style="font-size:12px; color:var(--muted); font-weight:500;">Gestiune contracte, facturi și documente</span>
             </div>
           </div>
 
@@ -3986,95 +3996,110 @@
             </div>
           </div>
           </div> <!-- /contracte-subview-list -->
+        </div> <!-- /view-contracte -->
 
-          <!-- SUBVIEW: GESTIUNE & PARC SLOTURI (INTRARI / IESIRI) -->
-          <div id="contracte-subview-lifecycle" style="display:none;">
-            <!-- Lifecycle KPIs -->
-            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:16px;">
-              <div class="kpi-card" style="padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:8px;">
-                <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Total Sloturi Parc</div>
-                <div id="lifecycle-kpi-total" style="font-size:20px; font-weight:800; color:var(--text); line-height:1.2;">0</div>
-              </div>
-              <div class="kpi-card" style="padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:8px; border-left:4px solid #10b981;">
-                <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">În Sală (Active)</div>
-                <div id="lifecycle-kpi-active" style="font-size:20px; font-weight:800; color:#10b981; line-height:1.2;">0</div>
-              </div>
-              <div class="kpi-card" style="padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:8px; border-left:4px solid #3b82f6;">
-                <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">În Stoc / Depozit</div>
-                <div id="lifecycle-kpi-stock" style="font-size:20px; font-weight:800; color:#3b82f6; line-height:1.2;">0</div>
-              </div>
-              <div class="kpi-card" style="padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:8px; border-left:4px solid #f59e0b;">
-                <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Vândute (Ieșite)</div>
-                <div id="lifecycle-kpi-sold" style="font-size:20px; font-weight:800; color:#f59e0b; line-height:1.2;">0</div>
-              </div>
-              <div class="kpi-card" style="padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:8px;">
-                <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Valoare Totală Achiziție</div>
-                <div id="lifecycle-kpi-purchase" style="font-size:18px; font-weight:800; color:var(--text); line-height:1.2;">0 RON</div>
-              </div>
-              <div class="kpi-card" style="padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:8px;">
-                <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Valoare Totală Vânzări</div>
-                <div id="lifecycle-kpi-sale" style="font-size:18px; font-weight:800; color:#10b981; line-height:1.2;">0 RON</div>
-              </div>
-              <div class="kpi-card" style="padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:8px; border-left:4px solid #8b5cf6;">
-                <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Profit / Marjă Realizată</div>
-                <div id="lifecycle-kpi-profit" style="font-size:18px; font-weight:800; color:#8b5cf6; line-height:1.2;">0 RON</div>
-              </div>
+        <!-- VIEW: INVENTAR SLOTURI -->
+        <div id="view-inventar" class="view-panel" style="padding:24px;">
+          <!-- SUBTABS CONTRACTE & INVENTAR -->
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; border-bottom:1px solid var(--border); padding-bottom:12px; flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; gap:8px;">
+              <a href="#contracte" class="btn-ghost" style="padding:8px 18px; border-radius:9999px; font-weight:700; font-size:13px; text-decoration:none;">
+                Contracte Generale
+              </a>
+              <a href="#inventar" class="btn btn-primary" style="padding:8px 18px; border-radius:9999px; font-weight:700; font-size:13px; text-decoration:none;">
+                Inventar Sloturi (Intrări / Ieșiri)
+              </a>
             </div>
-
-            <!-- Toolbar Filters -->
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
-              <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                <!-- Status filter pills -->
-                <div style="display:flex; background:var(--surface); border:1px solid var(--border); border-radius:9999px; padding:3px; gap:2px;">
-                  <button type="button" onclick="setLifecycleStatusFilter('all')" id="flt-life-all" class="btn-ghost" style="padding:5px 14px; border-radius:9999px; font-size:12px; font-weight:700; background:var(--accent); color:white;">Toate</button>
-                  <button type="button" onclick="setLifecycleStatusFilter('active')" id="flt-life-active" class="btn-ghost" style="padding:5px 14px; border-radius:9999px; font-size:12px; font-weight:600; color:var(--text);">În Sală (Active)</button>
-                  <button type="button" onclick="setLifecycleStatusFilter('in_stock')" id="flt-life-in_stock" class="btn-ghost" style="padding:5px 14px; border-radius:9999px; font-size:12px; font-weight:600; color:var(--text);">În Stoc</button>
-                  <button type="button" onclick="setLifecycleStatusFilter('sold')" id="flt-life-sold" class="btn-ghost" style="padding:5px 14px; border-radius:9999px; font-size:12px; font-weight:600; color:var(--text);">Vândute (Ieșite)</button>
-                </div>
-
-                <!-- Search box -->
-                <div style="position:relative;">
-                  <svg style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--muted); width:14px; height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                  <input type="text" id="lifecycle-search-input" placeholder="Caută serie, furnizor, cumpărător..." oninput="handleLifecycleSearch(this.value)" style="padding:6px 16px 6px 32px; border:1px solid var(--border); border-radius:9999px; background:var(--surface); color:var(--text); font-size:13px; outline:none; min-width:240px;">
-                </div>
-              </div>
-
-              <div style="display:flex; align-items:center; gap:8px;">
-                <button type="button" onclick="loadSlotLifecycle()" class="btn-ghost" style="padding:8px 14px; font-size:12px; display:inline-flex; align-items:center; gap:6px;" title="Reîmprospătează datele">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-                  <span>Refresh</span>
-                </button>
-                <button type="button" onclick="exportLifecycleExcel()" class="btn-ghost" style="padding:8px 16px;">Export Excel</button>
-                <button type="button" onclick="openContractModal(null, 'Vânzare Sloturi')" class="btn btn-primary" style="background:var(--accent); color:white; padding:8px 16px; border:none; border-radius:9999px; cursor:pointer; font-weight:600;">+ Adaugă Contract Vânzare</button>
-              </div>
+            <div>
+              <span style="font-size:12px; color:var(--muted); font-weight:500;">Evidență aparate intrate prin facturi & istoricul de vânzare</span>
             </div>
-
-            <!-- Table Container -->
-            <div class="table-container" style="background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow-x:auto;">
-              <table class="data-table" style="width:100%; border-collapse:collapse; min-width:1300px;">
-                <thead style="background:var(--surface2);">
-                  <tr>
-                    <th style="padding:12px; width:40px; text-align:center; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">#</th>
-                    <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Serie Aparat</th>
-                    <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Aparat / Model / Cabinet</th>
-                    <th style="padding:12px; text-align:center; width:80px; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">An Fabr.</th>
-                    <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Locație Curentă</th>
-                    <th style="padding:12px; text-align:center; width:110px; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Status</th>
-                    <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Intrare: Factură & Furnizor</th>
-                    <th style="padding:12px; text-align:right; width:110px; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Preț Achiziție</th>
-                    <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Ieșire: Factură & Cumpărător</th>
-                    <th style="padding:12px; text-align:right; width:110px; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Preț Vânzare</th>
-                    <th style="padding:12px; text-align:right; width:110px; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Marjă / Profit</th>
-                    <th style="padding:12px; text-align:center; width:90px; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Acțiuni</th>
-                  </tr>
-                </thead>
-                <tbody id="lifecycle-tbody">
-                  <!-- Rendered via JS -->
-                </tbody>
-              </table>
-            </div>
-            <div id="lifecycle-count-info" style="font-size:12px; color:var(--muted); margin-top:10px; padding:0 4px;">Afișate: 0 aparate</div>
           </div>
+
+          <!-- Lifecycle KPIs -->
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:16px;">
+            <div class="kpi-card" style="padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:8px;">
+              <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Total Sloturi Parc</div>
+              <div id="lifecycle-kpi-total" style="font-size:20px; font-weight:800; color:var(--text); line-height:1.2;">0</div>
+            </div>
+            <div class="kpi-card" style="padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:8px; border-left:4px solid #10b981;">
+              <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">În Sală (Active)</div>
+              <div id="lifecycle-kpi-active" style="font-size:20px; font-weight:800; color:#10b981; line-height:1.2;">0</div>
+            </div>
+            <div class="kpi-card" style="padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:8px; border-left:4px solid #3b82f6;">
+              <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">În Stoc / Depozit</div>
+              <div id="lifecycle-kpi-stock" style="font-size:20px; font-weight:800; color:#3b82f6; line-height:1.2;">0</div>
+            </div>
+            <div class="kpi-card" style="padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:8px; border-left:4px solid #f59e0b;">
+              <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Vândute (Ieșite)</div>
+              <div id="lifecycle-kpi-sold" style="font-size:20px; font-weight:800; color:#f59e0b; line-height:1.2;">0</div>
+            </div>
+            <div class="kpi-card" style="padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:8px;">
+              <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Valoare Totală Achiziție</div>
+              <div id="lifecycle-kpi-purchase" style="font-size:18px; font-weight:800; color:var(--text); line-height:1.2;">0 RON</div>
+            </div>
+            <div class="kpi-card" style="padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:8px;">
+              <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Valoare Totală Vânzări</div>
+              <div id="lifecycle-kpi-sale" style="font-size:18px; font-weight:800; color:#10b981; line-height:1.2;">0 RON</div>
+            </div>
+            <div class="kpi-card" style="padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:8px; border-left:4px solid #8b5cf6;">
+              <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Profit / Marjă Realizată</div>
+              <div id="lifecycle-kpi-profit" style="font-size:18px; font-weight:800; color:#8b5cf6; line-height:1.2;">0 RON</div>
+            </div>
+          </div>
+
+          <!-- Toolbar Filters -->
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+              <!-- Status filter pills -->
+              <div style="display:flex; background:var(--surface); border:1px solid var(--border); border-radius:9999px; padding:3px; gap:2px;">
+                <button type="button" onclick="setLifecycleStatusFilter('all')" id="flt-life-all" class="btn-ghost" style="padding:5px 14px; border-radius:9999px; font-size:12px; font-weight:700; background:var(--accent); color:white;">Toate</button>
+                <button type="button" onclick="setLifecycleStatusFilter('active')" id="flt-life-active" class="btn-ghost" style="padding:5px 14px; border-radius:9999px; font-size:12px; font-weight:600; color:var(--text);">În Sală (Active)</button>
+                <button type="button" onclick="setLifecycleStatusFilter('in_stock')" id="flt-life-in_stock" class="btn-ghost" style="padding:5px 14px; border-radius:9999px; font-size:12px; font-weight:600; color:var(--text);">În Stoc</button>
+                <button type="button" onclick="setLifecycleStatusFilter('sold')" id="flt-life-sold" class="btn-ghost" style="padding:5px 14px; border-radius:9999px; font-size:12px; font-weight:600; color:var(--text);">Vândute (Ieșite)</button>
+              </div>
+
+              <!-- Search box -->
+              <div style="position:relative;">
+                <svg style="position:absolute; left:10px; top:50%; transform:translateY(-50%); color:var(--muted); width:14px; height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" id="lifecycle-search-input" placeholder="Caută serie, furnizor, cumpărător..." oninput="handleLifecycleSearch(this.value)" style="padding:6px 16px 6px 32px; border:1px solid var(--border); border-radius:9999px; background:var(--surface); color:var(--text); font-size:13px; outline:none; min-width:240px;">
+              </div>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button type="button" onclick="loadSlotLifecycle()" class="btn-ghost" style="padding:8px 14px; font-size:12px; display:inline-flex; align-items:center; gap:6px;" title="Reîmprospătează datele">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                <span>Refresh</span>
+              </button>
+              <button type="button" onclick="exportLifecycleExcel()" class="btn-ghost" style="padding:8px 16px;">Export Excel</button>
+              <button type="button" onclick="openContractModal(null, 'Vânzare Sloturi')" class="btn btn-primary" style="background:var(--accent); color:white; padding:8px 16px; border:none; border-radius:9999px; cursor:pointer; font-weight:600;">+ Adaugă Contract Vânzare</button>
+            </div>
+          </div>
+
+          <!-- Table Container -->
+          <div class="table-container" style="background:var(--surface); border:1px solid var(--border); border-radius:12px; overflow-x:auto;">
+            <table class="data-table" style="width:100%; border-collapse:collapse; min-width:1300px;">
+              <thead style="background:var(--surface2);">
+                <tr>
+                  <th style="padding:12px; width:40px; text-align:center; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">#</th>
+                  <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Serie Aparat</th>
+                  <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Aparat / Model / Cabinet</th>
+                  <th style="padding:12px; text-align:center; width:80px; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">An Fabr.</th>
+                  <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Locație Curentă</th>
+                  <th style="padding:12px; text-align:center; width:110px; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Status</th>
+                  <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Intrare: Factură & Furnizor</th>
+                  <th style="padding:12px; text-align:right; width:110px; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Preț Achiziție</th>
+                  <th style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Ieșire: Factură & Cumpărător</th>
+                  <th style="padding:12px; text-align:right; width:110px; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Preț Vânzare</th>
+                  <th style="padding:12px; text-align:right; width:110px; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Marjă / Profit</th>
+                  <th style="padding:12px; text-align:center; width:90px; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase;">Acțiuni</th>
+                </tr>
+              </thead>
+              <tbody id="lifecycle-tbody">
+                <!-- Rendered via JS -->
+              </tbody>
+            </table>
+          </div>
+          <div id="lifecycle-count-info" style="font-size:12px; color:var(--muted); margin-top:10px; padding:0 4px;">Afișate: 0 aparate</div>
         </div>
 
         <!-- VIEW ONJN -->
@@ -4336,6 +4361,12 @@
                 type="checkbox" class="eu-page-cb" value="rapoarte"> Rapoarte</label>
             <label style="display:flex; align-items:center; gap:6px; font-size:11px; cursor:pointer;"><input
                 type="checkbox" class="eu-page-cb" value="dispozitive"> Dispozitive</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:11px; cursor:pointer;"><input
+                type="checkbox" class="eu-page-cb" value="contracte"> Contracte</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:11px; cursor:pointer;"><input
+                type="checkbox" class="eu-page-cb" value="inventar"> Inventar Sloturi</label>
+            <label style="display:flex; align-items:center; gap:6px; font-size:11px; cursor:pointer;"><input
+                type="checkbox" class="eu-page-cb" value="onjn"> Conformitate ONJN</label>
             <label style="display:flex; align-items:center; gap:6px; font-size:11px; cursor:pointer;"><input
                 type="checkbox" class="eu-page-cb" value="live"> Live</label>
             <label style="display:flex; align-items:center; gap:6px; font-size:11px; cursor:pointer;"><input

@@ -2929,7 +2929,7 @@ window.addEventListener('hashchange', () => {
   }
 
   // Exceptii specifice pentru afisare header:
-  if (mainHash === 'contracte' || mainHash === 'onjn') {
+  if (mainHash === 'contracte' || mainHash === 'inventar' || mainHash === 'onjn') {
     if (kpiSection) kpiSection.style.display = 'none'; // hide general KPIs
     if (timelineSection) timelineSection.style.display = 'none'; // hide date picker
     if (headerFilters) headerFilters.style.display = 'none'; // hide top location/type filters
@@ -2953,6 +2953,11 @@ window.addEventListener('hashchange', () => {
       window.loadContracts();
     }
   }
+  if (mainHash === 'inventar') {
+    if (typeof window.loadSlotLifecycle === 'function') {
+      window.loadSlotLifecycle();
+    }
+  }
   if (mainHash === 'onjn') {
     if (typeof window.initOnjnApp === 'function') {
       window.initOnjnApp();
@@ -2962,7 +2967,7 @@ window.addEventListener('hashchange', () => {
   // Hide period selector on Live and Admin-Floorplan
   const tlSection = document.querySelector('.timeline-section');
   if(tlSection) {
-    if (mainHash === 'live' || mainHash === 'admin-floorplan' || mainHash === 'contracte' || mainHash === 'onjn') {
+    if (mainHash === 'live' || mainHash === 'admin-floorplan' || mainHash === 'contracte' || mainHash === 'inventar' || mainHash === 'onjn') {
       tlSection.style.display = 'none';
     } else {
       tlSection.style.display = 'flex';
@@ -2988,8 +2993,8 @@ window.addEventListener('hashchange', () => {
     loadExpensesReport();
     const btnExpSettings = document.getElementById('btn-exp-settings');
     if (btnExpSettings) btnExpSettings.style.display = (currentUser && currentUser.role === 'Super Admin') ? 'inline-flex' : 'none';
-  } else if (mainHash === 'contracte' || mainHash === 'onjn') {
-    // Hide ALL global KPIs for contracte/onjn, because they have their own inline KPIs
+  } else if (mainHash === 'contracte' || mainHash === 'inventar' || mainHash === 'onjn') {
+    // Hide ALL global KPIs for contracte/inventar/onjn, because they have their own inline KPIs
     ['kpi-in', 'kpi-ggr', 'kpi-profit', 'kpi-total-expenses', 'kpi-marketing', 'kpi-games', 'kpi-aparate', 'kpi-jp'].forEach(id => {
       const el = document.getElementById(id);
       if(el) el.style.display = 'none';
@@ -5738,7 +5743,8 @@ async function checkAuth() {
         document.querySelectorAll('a.nav-item').forEach(link => {
           if (link.getAttribute('href').startsWith('#admin')) return;
           const pageId = link.getAttribute('href').replace('#', '');
-          if (!perms.pages.includes(pageId)) {
+          const isAllowed = perms.pages.includes(pageId) || (pageId === 'inventar' && perms.pages.includes('contracte'));
+          if (!isAllowed) {
             link.style.display = 'none';
           }
         });
@@ -5746,7 +5752,8 @@ async function checkAuth() {
         const currentHash = window.location.hash.replace('#', '') || 'dashboard';
         const mainHash = currentHash.split('/')[0];
         const isManagerFloorplan = (mainHash === 'admin-floorplan' && currentUser.role === 'Manager');
-        if (!perms.pages.includes(mainHash) && perms.pages.length > 0 && !isManagerFloorplan) {
+        const isMainAllowed = perms.pages.includes(mainHash) || (mainHash === 'inventar' && perms.pages.includes('contracte'));
+        if (!isMainAllowed && perms.pages.length > 0 && !isManagerFloorplan) {
           window.location.hash = '#' + perms.pages[0];
         }
       }
@@ -13925,38 +13932,10 @@ let _availableSlotsCache = [];
 
 window.switchContractSubTab = function(tab) {
   _currentContractSubTab = tab;
-  const listEl = document.getElementById('contracte-subview-list');
-  const lifeEl = document.getElementById('contracte-subview-lifecycle');
-  const btnContracts = document.getElementById('tab-btn-contracts');
-  const btnLife = document.getElementById('tab-btn-slot-lifecycle');
-
-  if (tab === 'lifecycle') {
-    if (listEl) listEl.style.display = 'none';
-    if (lifeEl) lifeEl.style.display = 'block';
-    if (btnContracts) {
-      btnContracts.className = 'btn-ghost';
-      btnContracts.style.background = 'transparent';
-      btnContracts.style.color = 'var(--text)';
-    }
-    if (btnLife) {
-      btnLife.className = 'btn btn-primary';
-      btnLife.style.background = 'var(--accent)';
-      btnLife.style.color = 'white';
-    }
-    loadSlotLifecycle();
+  if (tab === 'lifecycle' || tab === 'inventar') {
+    window.location.hash = '#inventar';
   } else {
-    if (lifeEl) lifeEl.style.display = 'none';
-    if (listEl) listEl.style.display = 'block';
-    if (btnContracts) {
-      btnContracts.className = 'btn btn-primary';
-      btnContracts.style.background = 'var(--accent)';
-      btnContracts.style.color = 'white';
-    }
-    if (btnLife) {
-      btnLife.className = 'btn-ghost';
-      btnLife.style.background = 'transparent';
-      btnLife.style.color = 'var(--text)';
-    }
+    window.location.hash = '#contracte';
   }
 };
 
