@@ -9,6 +9,7 @@ import secrets
 import json
 import csv
 import time
+import re
 
 _API_CACHE = {}
 
@@ -249,44 +250,48 @@ def loc_filter(req, alias='mas'):
 # ─── Filters ────────────────────────────────────────────────────────────────
 @app.route('/api/filters')
 def filters():
-    # Only return canonical (parent) locations — E.S. are merged
-    canonical_ids = [lid for lid in [1,3,4,5,6,7] ]  # parent IDs + Depozit
-    locs_raw = qry("""
-        SELECT DISTINCT l.id, COALESCE(l.display_code, l.code) AS name, l.city, l.address 
-        FROM locations l
-        JOIN machines m ON m.location_id = l.id
-        WHERE l.deleted_at IS NULL AND m.deleted_at IS NULL
-          AND m.slot_machine_id IS NOT NULL AND TRIM(m.slot_machine_id) != ''
-          AND l.id != 3
-        ORDER BY l.city, l.id
-    """)
-    # Build canonical list: skip child E.S. locations
-    seen = set()
-    locs = []
-    for l in locs_raw:
-        canon = LOC_PARENT.get(l['id'], l['id'])
-        if canon not in seen:
-            seen.add(canon)
-            locs.append({'id': canon,
-                         'name': LOC_NAMES.get(canon, l['name']),
-                         'city': l['city'],
-                         'all_ids': LOC_CHILDREN.get(canon, [canon])})
-    provs = qry("""
-        SELECT DISTINCT mm.id, mm.name 
-        FROM machine_manufacturers mm
-        JOIN machine_types mt ON mt.manufacturer_id = mm.id
-        JOIN machines m ON m.machine_type_id = mt.id
-        WHERE m.deleted_at IS NULL AND mm.deleted_at IS NULL
-        ORDER BY mm.name
-    """)
-    cabs  = qry("""
-        SELECT DISTINCT mct.id, mct.name 
-        FROM machine_cabinet_types mct
-        JOIN machines m ON m.cabinet_type_id = mct.id
-        WHERE m.deleted_at IS NULL AND mct.deleted_at IS NULL
-        ORDER BY mct.name
-    """)
-    return jsonify(locations=locs, providers=provs, cabinets=cabs)
+    try:
+        # Only return canonical (parent) locations — E.S. are merged
+        canonical_ids = [lid for lid in [1,3,4,5,6,7] ]  # parent IDs + Depozit
+        locs_raw = qry("""
+            SELECT DISTINCT l.id, COALESCE(l.display_code, l.code) AS name, l.city, l.address 
+            FROM locations l
+            JOIN machines m ON m.location_id = l.id
+            WHERE l.deleted_at IS NULL AND m.deleted_at IS NULL
+              AND m.slot_machine_id IS NOT NULL AND TRIM(m.slot_machine_id) != ''
+              AND l.id != 3
+            ORDER BY l.city, l.id
+        """)
+        # Build canonical list: skip child E.S. locations
+        seen = set()
+        locs = []
+        for l in locs_raw:
+            canon = LOC_PARENT.get(l['id'], l['id'])
+            if canon not in seen:
+                seen.add(canon)
+                locs.append({'id': canon,
+                             'name': LOC_NAMES.get(canon, l['name']),
+                             'city': l['city'],
+                             'all_ids': LOC_CHILDREN.get(canon, [canon])})
+        provs = qry("""
+            SELECT DISTINCT mm.id, mm.name 
+            FROM machine_manufacturers mm
+            JOIN machine_types mt ON mt.manufacturer_id = mm.id
+            JOIN machines m ON m.machine_type_id = mt.id
+            WHERE m.deleted_at IS NULL AND mm.deleted_at IS NULL
+            ORDER BY mm.name
+        """)
+        cabs  = qry("""
+            SELECT DISTINCT mct.id, mct.name 
+            FROM machine_cabinet_types mct
+            JOIN machines m ON m.cabinet_type_id = mct.id
+            WHERE m.deleted_at IS NULL AND mct.deleted_at IS NULL
+            ORDER BY mct.name
+        """)
+        return jsonify(locations=locs, providers=provs, cabinets=cabs)
+    except Exception as e:
+        print(f"[ERROR] /api/filters database error: {e}")
+        return jsonify(locations=[], providers=[], cabinets=[], error=str(e)), 500
 
 # ─── KPI ────────────────────────────────────────────────────────────────────
 @app.route('/api/kpi')
@@ -4802,18 +4807,100 @@ def create_contract():
         
     return jsonify({"success": True, "id": cid})
 
+def sync_contract_inventory_slots(contract_id):
+    try:
+        c_info = pg_qry("SELECT id, type, contract_number, owner_name, currency, total_amount, exchange_rate, amount_ron, start_date FROM cp2_contracts WHERE id = %s", (contract_id,))
+        if not c_info: return
+        contract = c_info[0]
+        c_type = (contract.get('type') or '').lower()
+        is_sale = ('vânzare' in c_type or 'vanzare' in c_type)
+        is_acq = ('achiziție' in c_type or 'achizitie' in c_type)
+        if not is_sale and not is_acq: return
+
+        invoices = pg_qry("SELECT * FROM cp2_contract_invoices WHERE contract_id = %s", (contract_id,))
+        for inv in invoices:
+            s_raw = inv.get('slots_series') or ''
+            raw_list = [s.strip() for s in re.split(r'[\s,;]+', s_raw) if s.strip()]
+            seen = set()
+            s_list = [x for x in raw_list if not (x in seen or seen.add(x))]
+            if not s_list: continue
+
+            inv_amount = float(inv.get('amount') or 0)
+            inv_curr = inv.get('currency') or contract.get('currency') or 'RON'
+            inv_rate = float(inv.get('exchange_rate') or contract.get('exchange_rate') or 1.0)
+            unit_p = round(inv_amount / len(s_list), 2) if len(s_list) > 0 and inv_amount > 0 else 0.0
+            unit_p_ron = round(unit_p * inv_rate, 2) if (inv_rate and inv_curr == 'EUR') else unit_p
+            inv_date = inv.get('invoice_date') or contract.get('start_date')
+            partner = inv.get('customer') or inv.get('supplier') or contract.get('owner_name') or ''
+
+            for s_nr in s_list:
+                if is_sale:
+                    pg_qry("""
+                        UPDATE cp2_slot_inventory SET
+                            status = 'Vândut',
+                            exit_type = 'Vânzare',
+                            exit_date = %s,
+                            sale_contract_id = %s,
+                            sale_contract_number = %s,
+                            sale_invoice_id = %s,
+                            sale_invoice_number = %s,
+                            sale_invoice_date = %s,
+                            sale_buyer = %s,
+                            sale_price = %s,
+                            sale_currency = %s,
+                            sale_exchange_rate = %s,
+                            sale_price_ron = %s,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE serial_nr = %s
+                    """, (
+                        inv_date, contract_id, contract.get('contract_number'),
+                        inv.get('id'), inv.get('invoice_number'), inv_date,
+                        partner, unit_p, inv_curr,
+                        inv_rate, unit_p_ron, s_nr
+                    ))
+                    pg_qry("""
+                        UPDATE cp2_slot_inventory SET
+                            purchase_contract_id = NULL,
+                            purchase_contract_number = NULL,
+                            purchase_invoice_id = NULL,
+                            purchase_invoice_number = NULL,
+                            purchase_invoice_date = NULL,
+                            purchase_supplier = NULL,
+                            purchase_price = NULL,
+                            purchase_price_ron = NULL,
+                            purchase_currency = 'RON',
+                            purchase_exchange_rate = NULL
+                        WHERE serial_nr = %s AND purchase_contract_id = %s
+                    """, (s_nr, contract_id))
+    except Exception as e:
+        print("sync_contract_inventory_slots error:", e)
+
 @app.route('/api/contracts/<contract_id>', methods=['PUT'])
 def update_contract(contract_id):
     data = request.json
+    curr = data.get('currency', 'LEI')
+    tot_amt = float(data.get('total_amount', 0))
+    s_date = data.get('start_date') or None
+    ex_rate = None
+    amt_ron = None
+    if curr == 'EUR':
+        ex_rate = get_exchange_rate_for_date(s_date, 'EUR')
+        amt_ron = round(tot_amt * ex_rate, 2)
+    elif curr in ['RON', 'LEI']:
+        ex_rate = 1.0
+        amt_ron = tot_amt
+
     pg_qry("""
         UPDATE cp2_contracts 
-        SET type = %s, currency = %s, total_amount = %s, start_date = %s, end_date = %s, details = %s, m2 = %s, notice_period_months = %s, sublease_agreement = %s, auto_expense = %s, owner_name = %s, contract_number = %s, address = %s, manual_location = %s, updated_at = CURRENT_TIMESTAMP
+        SET type = %s, currency = %s, total_amount = %s, exchange_rate = %s, amount_ron = %s, start_date = %s, end_date = %s, details = %s, m2 = %s, notice_period_months = %s, sublease_agreement = %s, auto_expense = %s, owner_name = %s, contract_number = %s, address = %s, manual_location = %s, updated_at = CURRENT_TIMESTAMP
         WHERE id = %s
     """, (
         data.get('type'),
-        data.get('currency', 'LEI'),
-        float(data.get('total_amount', 0)),
-        data.get('start_date') or None,
+        curr,
+        tot_amt,
+        ex_rate,
+        amt_ron,
+        s_date,
         data.get('end_date') or None,
         data.get('details'),
         float(data.get('m2')) if data.get('m2') else None,
@@ -4836,6 +4923,7 @@ def update_contract(contract_id):
             VALUES (%s, %s, %s)
         """, (contract_id, loc.get('location_id'), float(loc.get('amount', 0))))
         
+    sync_contract_inventory_slots(contract_id)
     return jsonify({"success": True})
 
 @app.route('/api/contracts/<contract_id>', methods=['DELETE'])
@@ -4954,26 +5042,36 @@ def load_contract_file_bytes(file_id):
 
 @app.route('/api/contracts/<contract_id>/files', methods=['POST'])
 def upload_contract_file(contract_id):
-    if 'file' not in request.files: return jsonify({"error": "No file"}), 400
-    file = request.files['file']
-    if file.filename == '': return jsonify({"error": "Empty filename"}), 400
+    uploaded_files = request.files.getlist('files')
+    if not uploaded_files:
+        uploaded_files = request.files.getlist('file')
+    if not uploaded_files and 'file' in request.files:
+        uploaded_files = [request.files['file']]
+    
+    valid_files = [f for f in uploaded_files if f and f.filename and f.filename.strip()]
+    if not valid_files:
+        return jsonify({"error": "No file"}), 400
     
     is_annex = str(request.form.get('is_annex', 'false')).lower() == 'true'
-    
     import uuid
-    fid = str(uuid.uuid4())
-    filename = secure_filename(file.filename)
+    saved_count = 0
     
-    file_data = file.read()
+    for file in valid_files:
+        fid = str(uuid.uuid4())
+        filename = secure_filename(file.filename)
+        file_data = file.read()
+        
+        file_is_annex = is_annex or ('anex' in filename.lower() or 'annex' in filename.lower())
+        
+        pg_qry("""
+            INSERT INTO cp2_contract_files (id, contract_id, is_annex, filename, filepath)
+            VALUES (%s, %s, %s, %s, %s)
+        """, (fid, contract_id, file_is_annex, filename, ''))
+        
+        save_contract_file_bytes(fid, file_data, filename)
+        saved_count += 1
     
-    pg_qry("""
-        INSERT INTO cp2_contract_files (id, contract_id, is_annex, filename, filepath)
-        VALUES (%s, %s, %s, %s, %s)
-    """, (fid, contract_id, is_annex, filename, ''))
-    
-    save_contract_file_bytes(fid, file_data, filename)
-    
-    return jsonify({"success": True})
+    return jsonify({"success": True, "count": saved_count})
 
 @app.route('/api/contracts/files/<file_id>', methods=['DELETE'])
 def delete_contract_file(file_id):
@@ -5495,52 +5593,80 @@ def extract_invoice_pdf():
             supplier = re.sub(r'\s*(?:INVOICE|FACTURA|VAT|CIF|CUI|Reg|Adresa|Address|IBAN|Country|Tara|Nr\.).*$', '', supplier, flags=re.IGNORECASE).strip()
             supplier = supplier.strip('":\' ')
         else:
-            for supp_name in ['EURO GAMES TECHNOLOGY', 'EGT', 'NOVOMATIC', 'AMUSNET', 'APEX', 'MERKUR', 'CT GAMING', 'CASINO TECHNOLOGY', 'INTERBLOCK', 'SYNOT', 'IGT', 'ENTERTAINMENT SOLUTIONS', 'SMARTFLIX SRL', 'SMARTFLIX']:
+            # Match trading companies / operators, NEVER generic slot machine brands from table columns
+            for supp_name in ['SMARTFLIX SRL', 'SMARTFLIX', 'SIA BEST ELECTRONICS', 'TWIN SOLUTIONS SRL', 'EURO GAMES TECHNOLOGY ROMANIA', 'NOVOMATIC ROMANIA SRL', 'CASHPOT SRL', 'JOLLYGAMES SRL', 'ENTERTAINMENT SOLUTIONS']:
                 if supp_name in full_text.upper():
-                    supplier = supp_name.title()
+                    supplier = supp_name.title() if not supp_name.endswith('SRL') else supp_name
                     break
 
-        # 3. Invoice number
+        # 2b. Machine Manufacturer / Brand (e.g. Novomatic, EGT)
+        manufacturer = None
+        for mfg in ['Novomatic', 'EGT', 'Apex', 'Amusnet', 'Merkur', 'CT Gaming', 'Casino Technology', 'Interblock', 'Synot', 'IGT', 'Alfastreet']:
+            if mfg.upper() in full_text.upper():
+                manufacturer = mfg
+                break
+
+        # 3. Invoice number & Date
         inv_number = None
-        m_seria_nr = re.search(r'(?:Series\s+and\s+no[^\n:]*|Seria\s*(?:si)?\s*nr\.?|Seria\b)[\s:]*([A-Za-z0-9\-]+)(?:[\s\n]+([0-9]+))?', full_text, re.IGNORECASE)
-        if m_seria_nr:
-            s_part = (m_seria_nr.group(1) or '').strip()
-            n_part = (m_seria_nr.group(2) or '').strip()
-            inv_number = f'{s_part} {n_part}'.strip() if n_part else s_part
-        
+        inv_date = None
+
+        # Check annex reference e.g. 'Anexa nr. 1 la fact. nr. 40/11.08.2026' or 'to the invoice no. 43/04.09.2026'
+        m_annex_inv = re.search(r'(?:to\s+(?:the\s+)?invoice|la\s+fact(?:ur[aă]|\.)?|invoice|fact(?:ur[aă]|\.)?)\s*(?:No\.?|nr\.?)[\s:]*([0-9A-Za-z\-_]+)(?:/(\d{1,2}[./-]\d{1,2}[./-]\d{4}))?', full_text, re.IGNORECASE)
+        if m_annex_inv:
+            cand = m_annex_inv.group(1).strip()
+            if cand.lower() not in ['fiscala', 'document', 'anexa', 'nr']:
+                inv_number = cand
+                if m_annex_inv.group(2):
+                    parts = re.split(r'[./-]', m_annex_inv.group(2))
+                    inv_date = f'{parts[2]}-{int(parts[1]):02d}-{int(parts[0]):02d}'
+
+        # Check Seria SM nr. 0040 or Seria SM 40 or Seria SM
+        if not inv_number or inv_number.lower() in ['factura', 'fiscala', 'document']:
+            m_seria_nr = re.search(r'Seria\s+([A-Za-z0-9\-]+)\s*(?:nr\.?|no\.?)?[\s:]*([0-9]+)', full_text, re.IGNORECASE)
+            if m_seria_nr:
+                s_part = (m_seria_nr.group(1) or '').strip()
+                n_part = (m_seria_nr.group(2) or '').strip()
+                inv_number = f'{s_part} {n_part}'.strip() if n_part else s_part
+            else:
+                m_seria_gen = re.search(r'(?:Series\s+and\s+no[^\n:]*|Seria\s*(?:si)?\s*nr\.?|Seria\b)[\s:]*([A-Za-z0-9\-]+)(?:[\s\n]+([0-9]+))?', full_text, re.IGNORECASE)
+                if m_seria_gen:
+                    s_part = (m_seria_gen.group(1) or '').strip()
+                    n_part = (m_seria_gen.group(2) or '').strip()
+                    inv_number = f'{s_part} {n_part}'.strip() if n_part else s_part
+
         if not inv_number or inv_number.lower() in ['factura', 'fiscala', 'document']:
             m_inv = re.search(r'(?:invoice\s+no\.?|factur[aă]\s*(?:fiscal[aă])?\s*nr\.?|nr\.?\s*factur[aă])[\s:]*([A-Za-z0-9\-_/]+)', full_text, re.IGNORECASE)
-            if m_inv: inv_number = m_inv.group(1).strip()
-            
+            if m_inv:
+                cand = m_inv.group(1).strip()
+                cand = re.sub(r'/\d{1,2}[./-]\d{1,2}[./-]\d{4}$', '', cand)
+                cand = re.sub(r'/\d{1,2}$', '', cand)
+                inv_number = cand
+
         if not inv_number:
             m_facturis = re.search(r'SERIA\s*:\s*\n\s*NR\.?\s*(?:FACTURII?)?\s*:\s*(?:\n\s*DATA[^\n]*:\s*)?\n\s*([A-Za-z0-9\-_]+)\s*\n\s*([0-9]+)', full_text, re.IGNORECASE)
             if m_facturis:
                 inv_number = f'{m_facturis.group(1).strip()} {m_facturis.group(2).strip()}'.strip()
 
         # Check for annex reference to invoice number if inv_number is missing or just series letters (e.g. "SM")
-        m_annex_inv = re.search(r'(?:to\s+the\s+invoice|la\s+factura)\s+(?:No\.?|nr\.?)\s*([0-9]+)', full_text, re.IGNORECASE)
-        if m_annex_inv:
-            num = m_annex_inv.group(1).strip()
-            if inv_number and not any(ch.isdigit() for ch in inv_number):
-                inv_number = f"{inv_number} {num.zfill(4)}"
-            elif not inv_number:
-                inv_number = num
+        if not inv_number or not any(ch.isdigit() for ch in inv_number):
+            m_annex_tail = re.search(r'(?:to\s+(?:the\s+)?invoice|la\s+fact(?:ur[aă]|\.)?)\s+(?:No\.?|nr\.?)\s*([0-9]+)', full_text, re.IGNORECASE)
+            if m_annex_tail:
+                num = m_annex_tail.group(1).strip()
+                if inv_number and not any(ch.isdigit() for ch in inv_number):
+                    inv_number = f"{inv_number} {num.zfill(4)}"
+                else:
+                    inv_number = num
 
         # 4. Invoice date
-        inv_date = None
-        m_date = re.search(r'(?:Date|Dat[aă])\s*(?:\([^\)]*\))?[\s:]*(\d{1,2})[\s.\-/]+(\d{1,2})[\s.\-/]+(\d{4})', full_text, re.IGNORECASE)
-        if m_date:
-            d, m, y = m_date.group(1), m_date.group(2), m_date.group(3)
-            inv_date = f'{y}-{int(m):02d}-{int(d):02d}'
-        else:
-            m_date2 = re.search(r'\b(\d{1,2})/(\d{1,2})/(\d{4})\b', full_text)
-            if m_date2:
-                d, m, y = m_date2.group(1), m_date2.group(2), m_date2.group(3)
+        if not inv_date:
+            m_date = re.search(r'(?:Date|Dat[aă])\s*(?:\([^\)]*\))?[\s:]*(\d{1,2})[\s.\-/]+(\d{1,2})[\s.\-/]+(\d{4})', full_text, re.IGNORECASE)
+            if m_date:
+                d, m, y = m_date.group(1), m_date.group(2), m_date.group(3)
                 inv_date = f'{y}-{int(m):02d}-{int(d):02d}'
             else:
-                m_date3 = re.search(r'\b(\d{1,2})\.(\d{1,2})\.(\d{4})\b', full_text)
-                if m_date3:
-                    d, m, y = m_date3.group(1), m_date3.group(2), m_date3.group(3)
+                m_date2 = re.search(r'\b(\d{1,2})[./](\d{1,2})[./](\d{4})\b', full_text)
+                if m_date2:
+                    d, m, y = m_date2.group(1), m_date2.group(2), m_date2.group(3)
                     inv_date = f'{y}-{int(m):02d}-{int(d):02d}'
 
         # 5. Currency & Total Amount
@@ -5549,11 +5675,32 @@ def extract_invoice_pdf():
         tot_m = re.search(r'Total\s*(?:\([^\)]*\))?\s*\n?[|\s]*([0-9.,]+)\s*(EUR|RON|LEI|USD|€|\$)?', full_text, re.IGNORECASE)
         if tot_m:
             val = parse_num(tot_m.group(1))
-            if val > 10.0:
+            if val > 10.0 and val not in [30000, 40000, 50000]:
                 amount = val
                 if tot_m.group(2):
                     c_str = tot_m.group(2).upper()
                     currency = 'RON' if c_str in ['RON', 'LEI'] else ('USD' if c_str in ['USD', '$'] else 'EUR')
+
+        if amount <= 0:
+            tot_sb = re.search(r'Total[\s\S]{0,180}?\b([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{2}))\b', full_text, re.IGNORECASE)
+            if tot_sb:
+                val = parse_num(tot_sb.group(1))
+                if val > 10.0 and val not in [30000, 40000, 50000]:
+                    amount = val
+
+        if amount <= 0:
+            m_val = re.search(r'(?:Valoarea|Pret\s*total|Total\s*plata)[\s\S]{0,100}?\b([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{2}))\b', full_text, re.IGNORECASE)
+            if m_val:
+                val = parse_num(m_val.group(1))
+                if val > 10.0 and val not in [30000, 40000, 50000]:
+                    amount = val
+
+        if amount <= 0:
+            m_end_tot = re.findall(r'([0-9]{1,3}(?:[.,][0-9]{3})*(?:[.,][0-9]{2})?)\s*(?:€|EUR|RON|LEI)', full_text, re.IGNORECASE)
+            if m_end_tot:
+                val = parse_num(m_end_tot[-1])
+                if val > 10.0 and val not in [30000, 40000, 50000]:
+                    amount = val
 
         # 6. Exchange rate
         exchange_rate = None
@@ -5566,71 +5713,150 @@ def extract_invoice_pdf():
             
         amount_ron = round(amount * exchange_rate, 2) if (exchange_rate and currency == 'EUR') else amount
 
-        # 7. Series & Prices extraction from table
+        # 7. Series & Prices extraction
         series = []
-        prices = []
+        series_prices = {}
         lines = [l.strip() for l in full_text.split('\n') if l.strip()]
-        
-        in_serial = False
-        in_price = False
-        for l in lines:
-            if l.lower() == 'serial':
-                in_serial = True; in_price = False; continue
-            if l.lower() == 'price':
-                in_price = True; in_serial = False; continue
-            if l.lower() in ['manufacturer', 'cabinet', 'game', 'year', 'total']:
-                in_serial = False; in_price = False; continue
-            if in_serial:
-                if re.match(r'^[A-Za-z0-9\-]{5,15}$', l) and l not in ['Novomatic', 'Alfastreet', 'Total', 'Serial', 'Cabinet']:
-                    series.append(l)
-            if in_price:
-                try:
-                    v = parse_num(l)
-                    if v > 0 and v != amount and v not in range(2010, 2030):
-                        prices.append(v)
-                except: pass
-                
-        # If no table serials found, use regex pattern matching
+
+        # Stop words that can NEVER be a serial
+        bad_words = {'novomatic', 'egt', 'patir', 'alfastreet', 'total', 'upright', 'slant', 'super', 'gaminator', 'edition', 'premier', 'classic', 'cabinet', 'buc', 'lei', 'ron', 'eur', '-lei-', 'an', 'fabr', 'cant', 'pret', 'valoare', 'producator', 'slot', 'machines', 'according', 'annex', 'anexa', 'smartflix', 'jollygames'}
+
+        # Strategy 1: Numbered table rows
+        current_nr = 1
+        i = 0
+        while i < len(lines):
+            l = lines[i]
+            if l == str(current_nr) or l == f'{current_nr}.':
+                found_serial = None
+                found_price = None
+                j = i + 1
+                has_annex_ref = False
+                while j < min(len(lines), i + 10):
+                    lj = lines[j]
+                    if lj == str(current_nr + 1) or lj == f'{current_nr + 1}.':
+                        break
+                    if any(w in lj.lower() for w in ['according to annex', 'conform anexa', 'according to', 'annex no']):
+                        has_annex_ref = True
+                    
+                    if '.' not in lj and ',' not in lj:
+                        clean_cand = re.sub(r'[^A-Za-z0-9\-]', '', lj)
+                        if clean_cand.lower() not in bad_words and not clean_cand.startswith('-'):
+                            if re.match(r'^\d{5,8}$', clean_cand) and int(clean_cand) not in range(2010, 2030) and clean_cand not in ['10000', '15000', '20000', '25000', '30000', '40000', '50000']:
+                                found_serial = clean_cand
+                            elif not found_serial and re.match(r'^[A-Za-z0-9\-]{5,15}$', clean_cand) and len(clean_cand) >= 5:
+                                if not any(bw in clean_cand.lower() for bw in bad_words):
+                                    found_serial = clean_cand
+
+                    m_pr = re.search(r'^\s*([0-9]+(?:[.,][0-9]{2})?)\s*$', lj)
+                    if m_pr and float(m_pr.group(1).replace(',', '.')) not in range(2010, 2030):
+                        try:
+                            val_p = float(m_pr.group(1).replace(',', '.'))
+                            if val_p > 0 and val_p != current_nr and val_p != (current_nr + 1) and val_p not in [10000, 15000, 20000, 30000]:
+                                if not found_serial or str(int(val_p)) != found_serial:
+                                    found_price = val_p
+                        except: pass
+                    j += 1
+
+                if has_annex_ref:
+                    i += 1
+                    continue
+
+                if found_serial:
+                    series.append(found_serial)
+                    if found_price:
+                        series_prices[found_serial] = found_price
+                    current_nr += 1
+                    i = j - 1
+            i += 1
+
+        # Strategy 2: Column Blocks (Vision OCR grouped columns)
+        if not series:
+            in_serial = False
+            in_price = False
+            ser_list = []
+            pr_list = []
+            for l in lines:
+                if l.lower() in ['serial', 'serie ap.', 'serie', 's/n']:
+                    in_serial = True; in_price = False; continue
+                if l.lower() in ['price', 'pret']:
+                    in_price = True; in_serial = False; continue
+                if l.lower() in ['manufacturer', 'cabinet', 'game', 'total', 'an fabr.', 'an']:
+                    in_serial = False; in_price = False; continue
+                if in_serial:
+                    clean_cand = re.sub(r'[^A-Za-z0-9\-]', '', l)
+                    if '.' not in l and ',' not in l and clean_cand.lower() not in bad_words:
+                        if re.match(r'^[A-Za-z0-9\-]{5,15}$', clean_cand) and (int(clean_cand) not in range(2010, 2030) if clean_cand.isdigit() else True):
+                            ser_list.append(clean_cand)
+                if in_price:
+                    try:
+                        v = float(l.replace(',', '.'))
+                        if v > 0 and v not in range(2010, 2030):
+                            pr_list.append(v)
+                    except: pass
+            if ser_list:
+                series = ser_list
+                if len(pr_list) >= len(ser_list):
+                    for s, p in zip(ser_list, pr_list[:len(ser_list)]):
+                        series_prices[s] = p
+
+        # Strategy 3: Regex pattern matching for inline series
         if not series:
             for m in re.finditer(r'(?:serie|seria|serii|s/n|serial|sn)[\s:]*([A-Za-z0-9\-_]+)', full_text, re.IGNORECASE):
                 s = m.group(1).strip()
                 if len(s) >= 4 and s.lower() not in ['factura', 'fiscala', 'nr', 'data', 'total', 'lei', 'eur', 'ron', 'an', 'fabricatie', 'model', 'anul']:
                     if not (s.startswith(('199', '200', '201', '202', '203')) and len(s) == 4):
-                        series.append(s)
+                        if s not in ['10000', '15000', '20000', '25000', '30000', '40000', '50000', '100000']:
+                            series.append(s)
             if not series:
                 for m in re.finditer(r'\b([0-9]{5,8})\b', full_text):
                     s = m.group(1)
                     if s.startswith(('199', '200', '201', '202', '203')) and len(s) == 4:
                         continue
+                    if s in ['10000', '15000', '20000', '25000', '30000', '40000', '50000', '100000']:
+                        continue
                     if s not in series:
                         idx = m.start()
-                        context = full_text[max(0, idx-60):min(len(full_text), idx+60)].lower()
-                        if any(w in context for w in ['serie', 'seria', 'aparat', 'slot', 'cabinet', 'premier', 'model', 'sn', 'buc']):
+                        context = full_text[max(0, idx-80):min(len(full_text), idx+80)].lower()
+                        if any(w in context for w in ['serie', 'seria', 'aparat', 'slot', 'cabinet', 'premier', 'model', 'sn', 'upright', 'novomatic', 'anexa']):
                             series.append(s)
-                            
+
         # Clean series
         clean_series = []
         amt_digits = str(int(amount)) if amount > 0 else ""
         inv_digits = re.sub(r'[^0-9]', '', inv_number or '')
         for s in series:
             if amt_digits and s == amt_digits: continue
-            if inv_digits and s == inv_digits: continue
+            if inv_digits and s == inv_digits and len(s) < 5: continue
             if s.startswith('RO') or s.upper() in ['RON', 'EUR', 'LEI', 'USD', 'TOTAL']: continue
-            if s in ['2016', '2017', '2018', '2019', '2020', '2021', '2022', '2023', '2024', '2025', '2026']: continue
+            if s in [str(y) for y in range(2010, 2030)]: continue
+            if s in ['10000', '15000', '20000', '25000', '30000', '40000', '50000', '100000']: continue
             clean_series.append(s)
         series = clean_series
-        
-        series_prices = {}
-        if len(series) > 0 and len(prices) == len(series):
-            for s, p in zip(series, prices):
-                series_prices[s] = p
+
+        # If series has machines and amount > 0, set default unit price if not already set
+        if amount > 0 and series and not series_prices:
+            unit_avg = round(amount / len(series), 2)
+            for s in series:
+                series_prices[s] = unit_avg
+
+        # If amount was 0, calculate sum of series_prices
+        if amount <= 0 and series_prices:
+            amount = sum(series_prices.values())
+            if exchange_rate and currency == 'EUR':
+                amount_ron = round(amount * exchange_rate, 2)
+            else:
+                amount_ron = amount
+
+        doc_type = "annex" if (len(series) > 0 and amount <= 0) else ("invoice_with_annex" if (len(series) > 0 and amount > 0) else "invoice")
 
         return jsonify({
             "success": True,
+            "document_type": doc_type,
             "invoice_number": inv_number,
             "invoice_date": inv_date,
             "customer": customer,
             "supplier": supplier,
+            "manufacturer": manufacturer,
             "amount": amount,
             "currency": currency,
             "exchange_rate": exchange_rate,
@@ -5657,6 +5883,29 @@ def get_contract_slots_details():
         elif contract_id:
             invs = pg_qry('SELECT * FROM cp2_contract_invoices WHERE contract_id = %s', (contract_id,))
 
+        is_sale = False
+        c_currency = None
+        c_amount = None
+        if contract_id:
+            c_info = pg_qry('SELECT type, currency, total_amount, contract_number, owner_name FROM cp2_contracts WHERE id = %s', (contract_id,))
+            if c_info:
+                c_type = (c_info[0].get('type') or '').lower()
+                if 'vanzare' in c_type or 'vânzare' in c_type:
+                    is_sale = True
+                c_currency = c_info[0].get('currency')
+                c_amount = float(c_info[0].get('total_amount') or 0)
+        if not is_sale and invoice_id:
+            inv_info = pg_qry('SELECT contract_id, customer, currency, amount FROM cp2_contract_invoices WHERE id = %s', (invoice_id,))
+            if inv_info:
+                if inv_info[0].get('customer'):
+                    is_sale = True
+                elif inv_info[0].get('contract_id'):
+                    c_info = pg_qry('SELECT type FROM cp2_contracts WHERE id = %s', (inv_info[0]['contract_id'],))
+                    if c_info and ('vanzare' in (c_info[0].get('type') or '').lower() or 'vânzare' in (c_info[0].get('type') or '').lower()):
+                        is_sale = True
+                c_currency = inv_info[0].get('currency')
+                c_amount = float(inv_info[0].get('amount') or 0)
+
         price_map = {}
         vendor_pdf_map = {}
         year_pdf_map = {}
@@ -5673,7 +5922,6 @@ def get_contract_slots_details():
             import fitz
         except ImportError:
             fitz = None
-        import re
 
         if fitz:
             for cid in contracts_to_check:
@@ -5723,6 +5971,15 @@ def get_contract_slots_details():
         if pdf_items and len(pdf_items) > len(all_series):
             all_series = [item['serial_nr'] for item in pdf_items]
 
+        # Deduplicate all_series while preserving order
+        seen_s = set()
+        dedup_series = []
+        for s in all_series:
+            if s and s not in seen_s:
+                seen_s.add(s)
+                dedup_series.append(s)
+        all_series = dedup_series
+
         stations_map = {}
         if all_series:
             q = '''
@@ -5755,9 +6012,12 @@ def get_contract_slots_details():
         results = []
         total_slots = len(all_series)
         total_valoare = 0.0
-        currency = (invs[0].get('currency') if invs else 'RON') or 'RON'
+        currency = (invs[0].get('currency') if invs else c_currency) or 'RON'
         vendors_count = {}
         locations_count = {}
+
+        inv_total = sum(float(inv.get('amount') or 0) for inv in invs) if invs else (c_amount or 0.0)
+        unit_sale_fallback = round(inv_total / total_slots, 2) if (total_slots > 0 and inv_total > 0) else None
 
         for idx, s in enumerate(all_series):
             st = stations_map.get(s)
@@ -5771,14 +6031,22 @@ def get_contract_slots_details():
             
             p_price = (float(ir['purchase_price']) if ir and ir.get('purchase_price') is not None else None) or price_map.get(s)
             s_price = float(ir['sale_price']) if ir and ir.get('sale_price') is not None else None
+            if is_sale and (s_price is None or s_price == 0) and unit_sale_fallback is not None:
+                s_price = unit_sale_fallback
+
             p_price_ron = float(ir['purchase_price_ron']) if ir and ir.get('purchase_price_ron') is not None else p_price
             s_price_ron = float(ir['sale_price_ron']) if ir and ir.get('sale_price_ron') is not None else s_price
+            if is_sale and (s_price_ron is None or s_price_ron == 0) and s_price is not None:
+                s_price_ron = s_price
+
             profit = round(s_price_ron - p_price_ron, 2) if (s_price_ron is not None and p_price_ron is not None) else None
 
-            if p_price is not None:
-                total_valoare += p_price
+            price_for_display = s_price if is_sale else p_price
+            if price_for_display is not None:
+                total_valoare += price_for_display
+
             is_del = st.get('is_deleted') if st else None
-            status = (ir.get('status') if ir else None) or ('Inactiv' if is_del else ('Activ' if st else 'În stoc'))
+            status = (ir.get('status') if ir else None) or ('Vândut' if is_sale else ('Inactiv' if is_del else ('Activ' if st else 'În stoc')))
 
             vendors_count[vnd] = vendors_count.get(vnd, 0) + 1
             locations_count[loc] = locations_count.get(loc, 0) + 1
@@ -5791,11 +6059,16 @@ def get_contract_slots_details():
                 'cabinet': cab,
                 'location': loc,
                 'fabrication_year': yr,
-                'unit_price': p_price,
-                'unit_price_ron': p_price_ron,
+                'is_sale': is_sale,
+                'unit_price': s_price if is_sale else p_price,
+                'unit_price_ron': s_price_ron if is_sale else p_price_ron,
+                'purchase_price': p_price,
+                'purchase_price_ron': p_price_ron,
+                'purchase_currency': (ir.get('purchase_currency') if ir else None) or 'LEI',
                 'purchase_exchange_rate': float(ir['purchase_exchange_rate']) if ir and ir.get('purchase_exchange_rate') is not None else None,
                 'sale_price': s_price,
                 'sale_price_ron': s_price_ron,
+                'sale_currency': (ir.get('sale_currency') if ir else None) or currency,
                 'sale_exchange_rate': float(ir['sale_exchange_rate']) if ir and ir.get('sale_exchange_rate') is not None else None,
                 'sale_buyer': ir.get('sale_buyer') if ir else None,
                 'sale_invoice_number': ir.get('sale_invoice_number') if ir else None,
@@ -5805,13 +6078,13 @@ def get_contract_slots_details():
                 'status': status
             })
 
-        inv_total = sum(float(inv.get('amount') or 0) for inv in invs) if invs else 0.0
         return jsonify({
             'success': True,
             'stats': {
                 'total_slots': total_slots,
                 'total_amount': inv_total if inv_total > 0 else total_valoare,
                 'currency': currency,
+                'is_sale': is_sale,
                 'vendors_count': vendors_count,
                 'locations_count': locations_count
             },

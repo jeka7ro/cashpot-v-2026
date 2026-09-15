@@ -1888,7 +1888,12 @@ function tBadge(curr, prev) {
 }
 // ─── API Loaders ──────────────────────────────────────────────────────────────
 async function loadFilters(){
-  filtersData=await api('/api/filters');
+  try {
+    filtersData = await api('/api/filters');
+  } catch(e) {
+    console.warn('Nu s-au putut incarca filtrele din baza de date:', e);
+    filtersData = { locations: [], providers: [], cabinets: [] };
+  }
   window.filtersData = filtersData;
   const ex=getExcluded();
   const fs=document.getElementById('global-loc-select');
@@ -5462,13 +5467,15 @@ window.exportCashoutExcel = window.exportCashoutCSV = function() {
 // ─── POS DEPOSITS REPORT ──────────────────────────────────────────────────────
 let _posData = null;
 
+window.applyPosLocFilter = function() {
+  renderPosView();
+};
+
 window.loadPosReport = async function() {
   const { s, e } = getPeriod();
   if (!s || !e) return;
   
   const tbody = document.getElementById('body-pos');
-  const thead = document.getElementById('head-pos');
-  const tfoot = document.getElementById('foot-pos');
   if (!tbody) return;
   
   tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; color:var(--muted); padding:30px;">Se încarcă...</td></tr>';
@@ -5477,50 +5484,93 @@ window.loadPosReport = async function() {
     const data = await api(`/api/reports/pos?start=${s}&end=${e}${locParam()}`);
     _posData = data;
     
-    const locs = data.locations || [];
-    const days = data.days || [];
-    
-    // KPI
-    let grandTotal = 0, totalTrx = 0;
-    days.forEach(d => {
-      locs.forEach(loc => {
-        const cell = d.locations[loc] || {};
-        grandTotal += cell.amount || 0;
-        totalTrx += cell.count || 0;
+    // Sync pos-filter-loc options
+    const locSel = document.getElementById('pos-filter-loc');
+    if (locSel) {
+      const currentVal = locSel.value;
+      const locs = data.locations || [];
+      let optHtml = '<option value="">Toate locațiile</option>';
+      locs.forEach(l => {
+        let label = l;
+        if (typeof filtersData !== 'undefined' && filtersData.locations) {
+          const match = filtersData.locations.find(x => 
+            x.name.toLowerCase() === l.toLowerCase() ||
+            l.toLowerCase().includes(x.name.toLowerCase()) ||
+            x.name.toLowerCase().includes(l.toLowerCase())
+          );
+          if (match) label = match.name;
+        }
+        optHtml += `<option value="${l}">${label}</option>`;
       });
-    });
-    
-    const numDays = days.length;
-    const avgPerDay = numDays > 0 ? grandTotal / numDays : 0;
-    
-    const el = id => document.getElementById(id);
-    if (el('pos-kpi-total')) el('pos-kpi-total').textContent = fmt(grandTotal);
-    if (el('pos-kpi-avg')) el('pos-kpi-avg').textContent = fmt(avgPerDay);
-    if (el('pos-kpi-trx')) el('pos-kpi-trx').textContent = totalTrx.toLocaleString('ro-RO');
-    if (el('pos-kpi-days')) el('pos-kpi-days').textContent = numDays;
-    
-    // Footer - totals per location (unchanged logic, just keep it here before sort)
-    if (tfoot) {
-      let footHtml = '<tr style="font-weight:700;"><td colspan="2">TOTAL</td>';
-      let footGrand = 0;
-      locs.forEach(loc => {
-        let locTotal = 0;
-        days.forEach(d => { locTotal += (d.locations[loc] || {}).amount || 0; });
-        footGrand += locTotal;
-        footHtml += `<td class="num">${fmt(locTotal)}</td>`;
-      });
-      footHtml += `<td class="num" style="font-weight:800;">${fmt(footGrand)}</td></tr>`;
-      tfoot.innerHTML = footHtml;
+      locSel.innerHTML = optHtml;
+      if (currentVal && locs.includes(currentVal)) {
+        locSel.value = currentVal;
+      } else {
+        locSel.value = '';
+      }
     }
 
-    // Keep existing sort from variables, just render
-    renderPosBody();
+    renderPosView();
     
   } catch(err) {
     console.error('Eroare loadPosReport:', err);
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; color:var(--danger);">Eroare la încărcarea datelor POS: ' + (err.message || err) + '</td></tr>';
   }
 };
+
+function renderPosView() {
+  if (!_posData) return;
+  const tbody = document.getElementById('body-pos');
+  const tfoot = document.getElementById('foot-pos');
+  if (!tbody) return;
+
+  const allLocs = _posData.locations || [];
+  const selectedLoc = document.getElementById('pos-filter-loc')?.value || '';
+  const locs = selectedLoc ? allLocs.filter(l => l === selectedLoc) : allLocs;
+  const days = _posData.days || [];
+
+  // KPI Calculations based on filtered locs
+  let grandTotal = 0, totalTrx = 0;
+  let activeDaysCount = 0;
+
+  days.forEach(d => {
+    let dayAmt = 0;
+    locs.forEach(loc => {
+      const cell = d.locations[loc] || {};
+      const amt = cell.amount || 0;
+      grandTotal += amt;
+      totalTrx += cell.count || 0;
+      dayAmt += amt;
+    });
+    if (dayAmt > 0) activeDaysCount++;
+  });
+
+  const numDays = days.length;
+  const avgPerDay = numDays > 0 ? grandTotal / numDays : 0;
+
+  const el = id => document.getElementById(id);
+  if (el('pos-kpi-total')) el('pos-kpi-total').textContent = fmt(grandTotal);
+  if (el('pos-kpi-avg')) el('pos-kpi-avg').textContent = fmt(avgPerDay);
+  if (el('pos-kpi-trx')) el('pos-kpi-trx').textContent = totalTrx.toLocaleString('ro-RO');
+  if (el('pos-kpi-days')) el('pos-kpi-days').textContent = selectedLoc ? activeDaysCount : numDays;
+
+  // Footer - totals per active location
+  if (tfoot) {
+    let footHtml = '<tr style="font-weight:700;"><td colspan="2">TOTAL</td>';
+    let footGrand = 0;
+    locs.forEach(loc => {
+      let locTotal = 0;
+      days.forEach(d => { locTotal += (d.locations[loc] || {}).amount || 0; });
+      footGrand += locTotal;
+      footHtml += `<td class="num">${fmt(locTotal)}</td>`;
+    });
+    footHtml += `<td class="num" style="font-weight:800;">${fmt(footGrand)}</td></tr>`;
+    tfoot.innerHTML = footHtml;
+  }
+
+  // Render table body & head
+  renderPosBody(locs);
+}
 
 let _posSortCol = localStorage.getItem('posSortCol') || 'date';
 let _posSortAsc = localStorage.getItem('posSortAsc') === null ? false : localStorage.getItem('posSortAsc') === 'true';
@@ -5534,17 +5584,23 @@ window.sortPos = function(col) {
   }
   localStorage.setItem('posSortCol', _posSortCol);
   localStorage.setItem('posSortAsc', _posSortAsc);
-  renderPosBody();
+  renderPosView();
 };
 
-function renderPosBody() {
+function renderPosBody(filteredLocs) {
   if (!_posData) return;
   const tbody = document.getElementById('body-pos');
   const thead = document.getElementById('head-pos');
   
-  const locs = _posData.locations || [];
+  const allLocs = _posData.locations || [];
+  const selectedLoc = document.getElementById('pos-filter-loc')?.value || '';
+  const locs = filteredLocs || (selectedLoc ? allLocs.filter(l => l === selectedLoc) : allLocs);
   let days = [...(_posData.days || [])];
   
+  if (_posSortCol !== 'date' && _posSortCol !== 'total' && !locs.includes(_posSortCol)) {
+    _posSortCol = 'date';
+  }
+
   // Sort days
   days.sort((a, b) => {
     let valA, valB;
@@ -5572,7 +5628,16 @@ function renderPosBody() {
     let thHtml = '<tr><th style="text-align:center; width:40px;">Nr.</th>';
     thHtml += `<th style="cursor:pointer;" onclick="sortPos('date')">Data ${_posSortCol === 'date' ? arr : '↕'}</th>`;
     locs.forEach(loc => { 
-      thHtml += `<th class="num" style="cursor:pointer;" onclick="sortPos('${loc}')">${loc} ${_posSortCol === loc ? arr : '↕'}</th>`; 
+      let label = loc;
+      if (typeof filtersData !== 'undefined' && filtersData.locations) {
+        const match = filtersData.locations.find(x => 
+          x.name.toLowerCase() === loc.toLowerCase() ||
+          loc.toLowerCase().includes(x.name.toLowerCase()) ||
+          x.name.toLowerCase().includes(loc.toLowerCase())
+        );
+        if (match) label = match.name;
+      }
+      thHtml += `<th class="num" style="cursor:pointer;" onclick="sortPos('${loc}')">${label} ${_posSortCol === loc ? arr : '↕'}</th>`; 
     });
     thHtml += `<th class="num" style="font-weight:800; cursor:pointer;" onclick="sortPos('total')">TOTAL ${_posSortCol === 'total' ? arr : '↕'}</th></tr>`;
     thead.innerHTML = thHtml;
@@ -5612,11 +5677,25 @@ function renderPosBody() {
 
 window.exportPosExcel = function() {
   if (!_posData || !_posData.days || _posData.days.length === 0) return;
-  const locs = _posData.locations || [];
+  const allLocs = _posData.locations || [];
+  const selectedLoc = document.getElementById('pos-filter-loc')?.value || '';
+  const locs = selectedLoc ? allLocs.filter(l => l === selectedLoc) : allLocs;
   const days = _posData.days || [];
   
+  const headers = locs.map(l => {
+    if (typeof filtersData !== 'undefined' && filtersData.locations) {
+      const match = filtersData.locations.find(x => 
+        x.name.toLowerCase() === l.toLowerCase() ||
+        l.toLowerCase().includes(x.name.toLowerCase()) ||
+        x.name.toLowerCase().includes(l.toLowerCase())
+      );
+      if (match) return match.name;
+    }
+    return l;
+  });
+
   const aoa = [];
-  aoa.push(['Nr.', 'Data', ...locs, 'TOTAL']);
+  aoa.push(['Nr.', 'Data', ...headers, 'TOTAL']);
 
   days.forEach((d, idx) => {
     let rowTotal = 0;
@@ -5639,20 +5718,21 @@ window.exportPosExcel = function() {
   });
   aoa.push(['', 'TOTAL', ...footVals, footGrand]);
   
+  const fileSuffix = selectedLoc ? `_${selectedLoc.replace(/[^a-zA-Z0-9]/g, '_')}` : '';
   if (typeof XLSX !== 'undefined') {
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Depuneri POS");
-    XLSX.writeFile(wb, `POS_Depuneri_${_posData.days[0]?.date || 'export'}.xlsx`);
+    XLSX.writeFile(wb, `POS_Depuneri${fileSuffix}_${_posData.days[0]?.date || 'export'}.xlsx`);
   } else {
     // Fallback in case XLSX failed to load
-    let csv = 'Nr.,Data,' + locs.join(',') + ',TOTAL\n';
+    let csv = 'Nr.,Data,' + headers.join(',') + ',TOTAL\n';
     for (let i = 1; i < aoa.length; i++) {
       csv += aoa[i].join(',') + '\n';
     }
     const blob = new Blob(['\uFEFF' + csv], {type: 'text/csv;charset=utf-8;'});
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `POS_Depuneri_${_posData.days[0]?.date || 'export'}.csv`; a.click();
+    const a = document.createElement('a'); a.href = url; a.download = `POS_Depuneri${fileSuffix}_${_posData.days[0]?.date || 'export'}.csv`; a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 };
@@ -12230,7 +12310,11 @@ window.renderContractsTable = function() {
         <td>${statusHtml}</td>
         <td class="num" style="font-weight:700">
           ${fmt(c.total_amount)} ${c.currency === 'EUR' ? '€' : c.currency}
-          ${c.currency === 'EUR' ? `<br><span style="font-size:10px; color:var(--muted); font-weight:normal;">(${fmt(c.total_amount * EUR_RATE)} RON)</span>` : ''}
+          ${c.currency === 'EUR' ? (() => {
+            const cRate = c.exchange_rate || c.invoices?.[0]?.exchange_rate || EUR_RATE;
+            const cRon = c.amount_ron || c.invoices?.[0]?.amount_ron || (c.total_amount * cRate);
+            return `<br><span style="font-size:10px; color:var(--muted); font-weight:normal;">(${fmt(cRon)} RON)</span>${cRate ? `<br><span style="font-size:9.5px; color:#6366f1; font-weight:600;">BNR: ${Number(cRate).toFixed(4)}</span>` : ''}`;
+          })() : ''}
         </td>
         <td style="text-align:center;">
           <div style="display:flex; justify-content:flex-end; gap:8px;">
@@ -12469,9 +12553,9 @@ window.handleContractTypeChange = async function() {
       if (seriesLabel) seriesLabel.innerText = 'Serii Aparate / Sloturi Achiziționate (Tag-uri)';
     }
   }
-  // If a PDF file is already chosen in the file input and we don't have series tags yet, run extraction
+  // If a PDF file is already chosen in the file input and we don't have series tags yet, run extraction (only if not already extracting)
   const uploadFileInput = document.getElementById('contract-upload-file');
-  if (uploadFileInput && uploadFileInput.files && uploadFileInput.files.length > 0 && (!_contractModalSeriesTags || _contractModalSeriesTags.length === 0)) {
+  if (!window._isExtractingContractPdf && uploadFileInput && uploadFileInput.files && uploadFileInput.files.length > 0 && (!_contractModalSeriesTags || _contractModalSeriesTags.length === 0)) {
     handleContractModalPdfUpload(uploadFileInput);
   }
 };
@@ -12533,6 +12617,9 @@ window.renderContractModalSeriesTags = function() {
   if (hiddenInput) {
     hiddenInput.value = _contractModalSeriesTags.join(',');
   }
+  if (typeof window.updateContractModalAutoCalc === 'function') {
+    window.updateContractModalAutoCalc();
+  }
 };
 
 window.addContractModalSeriesTags = function(seriesArray) {
@@ -12541,7 +12628,7 @@ window.addContractModalSeriesTags = function(seriesArray) {
   }
   seriesArray.forEach(raw => {
     const clean = raw.trim().replace(/^,+|,+$/g, '');
-    if (clean) {
+    if (clean && !_contractModalSeriesTags.includes(clean)) {
       _contractModalSeriesTags.push(clean);
     }
   });
@@ -12594,23 +12681,95 @@ window.handleContractModalSeriesBlur = function(input) {
   }
 };
 
-window.handleContractModalPdfUpload = async function(fileInput) {
-  const filenameSpan = document.getElementById('contract-upload-filename');
-  if (fileInput.files.length > 0) {
-    filenameSpan.innerText = fileInput.files[0].name;
+window._contractSelectedFiles = [];
+window._contractSelectedFacturaFile = null;
+window._contractSelectedAnexaFile = null;
+window._isExtractingContractPdf = false;
+
+window.syncContractSelectedFiles = function() {
+  const list = [];
+  if (window._contractSelectedFacturaFile) list.push(window._contractSelectedFacturaFile);
+  if (window._contractSelectedAnexaFile && !list.includes(window._contractSelectedAnexaFile)) list.push(window._contractSelectedAnexaFile);
+  if (window._contractSelectedFiles && window._contractSelectedFiles.length > 0) {
+    window._contractSelectedFiles.forEach(f => {
+      if (!list.includes(f)) list.push(f);
+    });
+  }
+  window._contractSelectedFiles = list;
+
+  const fnSpan = document.getElementById('contract-upload-filename');
+  if (fnSpan) {
+    if (list.length === 1) fnSpan.innerText = list[0].name;
+    else if (list.length > 1) fnSpan.innerText = `${list.length} fișiere atașate`;
+  }
+};
+
+window.updateContractModalAutoCalc = function() {
+  const banner = document.getElementById('contract-modal-auto-calc-banner');
+  const textEl = document.getElementById('contract-modal-auto-calc-text');
+  if (!banner || !textEl) return;
+
+  const totalValStr = document.getElementById('contract-total')?.value || '';
+  const totalVal = (typeof window.parseNumberValue === 'function')
+    ? window.parseNumberValue(totalValStr)
+    : parseFloat(String(totalValStr).replace(/\./g, '').replace(',', '.'));
+  const cur = document.getElementById('contract-currency')?.value || 'LEI';
+  const seriesCount = (_contractModalSeriesTags || []).length;
+
+  if (totalVal > 0 && seriesCount > 0) {
+    const unitPrice = totalVal / seriesCount;
+    const unitPriceFmt = unitPrice.toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const totalFmt = totalVal.toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    textEl.innerHTML = `Repartizare automată: <b>${unitPriceFmt} ${cur} / slot</b> (${totalFmt} ${cur} împărțit la ${seriesCount} sloturi)`;
+    banner.style.display = 'flex';
+
+    window._extractedSeriesPrices = window._extractedSeriesPrices || {};
+    _contractModalSeriesTags.forEach(sn => {
+      window._extractedSeriesPrices[sn] = Math.round(unitPrice * 100) / 100;
+    });
   } else {
-    filenameSpan.innerText = '';
-    return;
+    banner.style.display = 'none';
+  }
+};
+
+window.handleContractModalSpecificUpload = async function(input, fileType) {
+  if (!input || !input.files || input.files.length === 0) return;
+  const file = input.files[0];
+
+  const factStatus = document.getElementById('contract-modal-factura-status');
+  const factName = document.getElementById('contract-modal-factura-filename');
+  const anexaStatus = document.getElementById('contract-modal-anexa-status');
+  const anexaName = document.getElementById('contract-modal-anexa-filename');
+
+  window._isExtractingContractPdf = true;
+
+  if (fileType === 'factura') {
+    window._contractSelectedFacturaFile = file;
+    if (factName) {
+      factName.innerText = file.name;
+      factName.title = file.name;
+    }
+    if (factStatus) {
+      factStatus.style.display = 'inline';
+      factStatus.style.color = 'var(--accent)';
+      factStatus.style.background = 'rgba(99, 102, 241, 0.12)';
+      factStatus.innerText = 'Se citește factura...';
+    }
+  } else {
+    window._contractSelectedAnexaFile = file;
+    if (anexaName) {
+      anexaName.innerText = file.name;
+      anexaName.title = file.name;
+    }
+    if (anexaStatus) {
+      anexaStatus.style.display = 'inline';
+      anexaStatus.style.color = 'var(--accent)';
+      anexaStatus.style.background = 'rgba(99, 102, 241, 0.12)';
+      anexaStatus.innerText = 'Se extrag seriile...';
+    }
   }
 
-  const file = fileInput.files[0];
-  const statusEl = document.getElementById('contract-modal-pdf-status');
-  const hintEl = document.getElementById('contract-modal-series-hint');
-  if (statusEl) {
-    statusEl.style.display = 'inline';
-    statusEl.style.color = 'var(--accent)';
-    statusEl.innerText = 'Se extrag datele și seriile din anexa PDF...';
-  }
+  syncContractSelectedFiles();
 
   try {
     const formData = new FormData();
@@ -12621,101 +12780,415 @@ window.handleContractModalPdfUpload = async function(fileInput) {
     });
     const data = await res.json();
     if (data.success) {
-      let contractType = document.getElementById('contract-type')?.value;
-      
-      // Auto-switch to slot contract type if series are found and type is not yet a slot type
-      if (data.series && data.series.length > 0 && contractType !== 'Achiziție Sloturi' && contractType !== 'Vânzare Sloturi') {
-        const typeEl = document.getElementById('contract-type');
-        if (typeEl) {
-          typeEl.value = (data.customer && !data.supplier) ? 'Vânzare Sloturi' : 'Achiziție Sloturi';
-          contractType = typeEl.value;
-          if (typeof handleContractTypeChange === 'function') {
-            await handleContractTypeChange();
+      const typeEl = document.getElementById('contract-type');
+      let contractType = typeEl?.value || 'Achiziție Sloturi';
+
+      // Auto-open slot section
+      const slotSection = document.getElementById('contract-slot-acquisition-section');
+      if (slotSection) slotSection.style.display = 'block';
+
+      if (fileType === 'factura') {
+        if (factStatus) {
+          factStatus.style.color = '#10b981';
+          factStatus.style.background = 'rgba(16, 185, 129, 0.12)';
+          const amtTxt = data.amount > 0 ? ` (${(typeof window.formatNumberValue === 'function' ? window.formatNumberValue(data.amount) : data.amount)} ${data.currency || 'LEI'})` : '';
+          factStatus.innerText = `Factură citită${amtTxt}`;
+        }
+
+        const nrInput = document.getElementById('contract-number');
+        const invNrInput = document.getElementById('contract-modal-inv-number');
+        if (data.invoice_number) {
+          if (nrInput && (!nrInput.value || nrInput.value.trim() === '')) nrInput.value = data.invoice_number;
+          if (invNrInput) invNrInput.value = data.invoice_number;
+        }
+        const dateInput = document.getElementById('contract-start');
+        if (dateInput && data.invoice_date) {
+          dateInput.value = data.invoice_date;
+        }
+        const totalInput = document.getElementById('contract-total');
+        if (totalInput && data.amount > 0) {
+          totalInput.value = (typeof window.formatNumberValue === 'function') ? window.formatNumberValue(data.amount) : String(data.amount);
+        }
+        if (data.currency) {
+          const curSelect = document.getElementById('contract-currency');
+          if (curSelect) {
+            curSelect.value = data.currency;
+            const curLbl = document.getElementById('contract-currency-label');
+            if (curLbl) curLbl.innerText = data.currency;
+          }
+        }
+
+        const suppInput = document.getElementById('contract-modal-supplier');
+        const ownerInput = document.getElementById('contract-owner');
+        if (contractType === 'Vânzare Sloturi') {
+          const clientName = data.customer || '';
+          if (clientName) {
+            if (suppInput) suppInput.value = clientName;
+            if (ownerInput && (!ownerInput.value || ownerInput.value.trim() === '')) ownerInput.value = clientName;
+          }
+        } else {
+          const supplierName = data.supplier || data.customer || '';
+          if (supplierName) {
+            if (suppInput) suppInput.value = supplierName;
+            if (ownerInput && (!ownerInput.value || ownerInput.value.trim() === '')) ownerInput.value = supplierName;
+          }
+        }
+
+        if (data.exchange_rate) {
+          window._extractedExchangeRate = data.exchange_rate;
+          window._extractedInvoiceDate = data.invoice_date || null;
+          window._extractedAmountRon = data.amount_ron || null;
+          if (typeof updateContractModalRateBanner === 'function') updateContractModalRateBanner();
+        }
+
+        // If invoice also had series embedded
+        if (data.series && data.series.length > 0) {
+          addContractModalSeriesTags(data.series);
+          if (anexaStatus && (!window._contractSelectedAnexaFile)) {
+            anexaStatus.style.display = 'inline';
+            anexaStatus.style.color = '#10b981';
+            anexaStatus.style.background = 'rgba(16, 185, 129, 0.12)';
+            anexaStatus.innerText = `${data.series.length} serii incluse în factură`;
           }
         }
       }
 
-      // Ensure slot section is displayed if series were found
-      if (data.series && data.series.length > 0) {
-        const slotSection = document.getElementById('contract-slot-acquisition-section');
-        if (slotSection) slotSection.style.display = 'block';
-      }
-
-      // Auto-fill fields from PDF
-      const nrInput = document.getElementById('contract-number');
-      const invNrInput = document.getElementById('contract-modal-inv-number');
-      if (data.invoice_number) {
-        if (nrInput && (!nrInput.value || nrInput.value.trim() === '')) nrInput.value = data.invoice_number;
-        if (invNrInput && (!invNrInput.value || invNrInput.value.trim() === '')) invNrInput.value = data.invoice_number;
-      }
-      const dateInput = document.getElementById('contract-start');
-      if (dateInput && data.invoice_date && (!dateInput.value || dateInput.value.trim() === '')) {
-        dateInput.value = data.invoice_date;
-      }
-      const totalInput = document.getElementById('contract-total');
-      if (totalInput && data.amount && data.amount > 0 && (!totalInput.value || totalInput.value === '0' || totalInput.value.trim() === '')) {
-        totalInput.value = (typeof window.formatNumberValue === 'function') ? window.formatNumberValue(data.amount) : String(data.amount);
-      }
-      if (data.currency) {
-        const curSelect = document.getElementById('contract-currency');
-        if (curSelect) {
-          curSelect.value = data.currency;
-          const curLbl = document.getElementById('contract-currency-label');
-          if (curLbl) curLbl.innerText = data.currency;
+      if (fileType === 'anexa') {
+        if (data.series && data.series.length > 0) {
+          addContractModalSeriesTags(data.series);
+          if (anexaStatus) {
+            anexaStatus.style.color = '#10b981';
+            anexaStatus.style.background = 'rgba(16, 185, 129, 0.12)';
+            anexaStatus.innerText = `${data.series.length} serii extrase`;
+          }
+        } else if (anexaStatus) {
+          anexaStatus.style.color = '#ef4444';
+          anexaStatus.innerText = '0 serii găsite';
         }
-      }
-      const suppInput = document.getElementById('contract-modal-supplier');
-      const ownerInput = document.getElementById('contract-owner');
-      const clientOrSupp = (contractType === 'Vânzare Sloturi') ? (data.customer || data.supplier) : (data.supplier || data.customer);
-      if (clientOrSupp) {
-        if (suppInput && (!suppInput.value || suppInput.value.trim() === '')) suppInput.value = clientOrSupp;
-        if (ownerInput && (!ownerInput.value || ownerInput.value.trim() === '')) ownerInput.value = clientOrSupp;
-      }
 
-      // Store extracted rate and series prices for saveContract
-      window._extractedExchangeRate = data.exchange_rate || null;
-      window._extractedSeriesPrices = data.series_prices || null;
-
-      // Show exchange rate banner if available
-      const rateBanner = document.getElementById('contract-modal-rate-banner');
-      if (rateBanner) {
-        if (data.exchange_rate && data.currency === 'EUR') {
-          rateBanner.style.display = 'flex';
-          const rateText = document.getElementById('contract-modal-rate-text');
-          const rateRon = document.getElementById('contract-modal-rate-ron');
-          if (rateText) rateText.innerText = `Curs Factură / BNR (${data.invoice_date || 'ziua vânzării'}): 1 EUR = ${Number(data.exchange_rate).toFixed(4)} LEI`;
-          if (rateRon && data.amount_ron) rateRon.innerText = `Total: ${Number(data.amount_ron).toLocaleString('ro-RO', { minimumFractionDigits: 2 })} LEI`;
-        } else {
-          rateBanner.style.display = 'none';
+        // Check if invoice number or date can be populated from annex header
+        const nrInput = document.getElementById('contract-number');
+        const invNrInput = document.getElementById('contract-modal-inv-number');
+        if (data.invoice_number) {
+          if (nrInput && (!nrInput.value || nrInput.value.trim() === '')) nrInput.value = data.invoice_number;
+          if (invNrInput && (!invNrInput.value || invNrInput.value.trim() === '')) invNrInput.value = data.invoice_number;
+        }
+        const dateInput = document.getElementById('contract-start');
+        if (dateInput && data.invoice_date && (!dateInput.value || dateInput.value.trim() === '')) {
+          dateInput.value = data.invoice_date;
         }
       }
 
-      if (data.series && data.series.length > 0) {
-        addContractModalSeriesTags(data.series);
-        if (hintEl) {
-          hintEl.style.display = 'inline';
-          hintEl.innerText = `${data.series.length} serii extrase automat din PDF`;
-        }
-      }
-      if (statusEl) {
-        statusEl.style.color = '#10b981';
-        statusEl.innerText = `${data.series ? data.series.length : 0} serii extrase cu succes`;
-      }
+      updateContractModalAutoCalc();
     } else {
-      if (statusEl) {
-        statusEl.style.color = 'var(--muted)';
-        statusEl.innerText = 'PDF atașat';
+      if (fileType === 'factura' && factStatus) {
+        factStatus.style.color = '#ef4444';
+        factStatus.innerText = 'Eroare la citire';
+      }
+      if (fileType === 'anexa' && anexaStatus) {
+        anexaStatus.style.color = '#ef4444';
+        anexaStatus.innerText = 'Eroare la citire';
       }
     }
   } catch (err) {
-    console.error('Eroare extract PDF:', err);
-    if (statusEl) {
-      statusEl.style.display = 'none';
-    }
+    console.error('Eroare extract specific:', err);
+  } finally {
+    window._isExtractingContractPdf = false;
   }
 };
 
-window.openContractModal = function(id = null, defaultType = null, preselectedSerial = null) {
+window.handleContractModalPdfUpload = async function(fileInput) {
+  if (!fileInput || !fileInput.files || fileInput.files.length === 0) return;
+  const files = Array.from(fileInput.files);
+  window._isExtractingContractPdf = true;
+
+  const filenameSpan = document.getElementById('contract-upload-filename');
+  if (filenameSpan) {
+    filenameSpan.innerText = (files.length === 1) ? files[0].name : `${files.length} fișiere selectate`;
+  }
+
+  const statusEl = document.getElementById('contract-modal-pdf-status');
+  const hintEl = document.getElementById('contract-modal-series-hint');
+  if (statusEl) {
+    statusEl.style.display = 'inline';
+    statusEl.style.color = 'var(--accent)';
+    statusEl.innerText = `Se extrag datele din ${files.length > 1 ? files.length + ' fișiere PDF...' : 'anexa PDF...'}`;
+  }
+
+  let totalSeriesAdded = 0;
+
+  for (const file of files) {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/contracts/invoices/extract-pdf', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (data.success) {
+        const isAnnex = data.document_type === 'annex' || (data.series && data.series.length > 0 && data.amount <= 0) || /anex|annex/i.test(file.name);
+        
+        if (isAnnex) {
+          window._contractSelectedAnexaFile = file;
+          const anexaStatus = document.getElementById('contract-modal-anexa-status');
+          const anexaName = document.getElementById('contract-modal-anexa-filename');
+          if (anexaName) anexaName.innerText = file.name;
+          if (anexaStatus && data.series) {
+            anexaStatus.style.display = 'inline';
+            anexaStatus.style.color = '#10b981';
+            anexaStatus.innerText = `${data.series.length} serii extrase`;
+          }
+        } else {
+          window._contractSelectedFacturaFile = file;
+          const factStatus = document.getElementById('contract-modal-factura-status');
+          const factName = document.getElementById('contract-modal-factura-filename');
+          if (factName) factName.innerText = file.name;
+          if (factStatus) {
+            factStatus.style.display = 'inline';
+            factStatus.style.color = '#10b981';
+            const amtTxt = data.amount > 0 ? ` (${(typeof window.formatNumberValue === 'function' ? window.formatNumberValue(data.amount) : data.amount)} ${data.currency || 'LEI'})` : '';
+            factStatus.innerText = `Factură citită${amtTxt}`;
+          }
+        }
+
+        let contractType = document.getElementById('contract-type')?.value;
+
+        // Auto-switch to slot contract type if series are found
+        if (data.series && data.series.length > 0) {
+          const typeEl = document.getElementById('contract-type');
+          if (typeEl) {
+            const isClientFile = files.some(f => /client|cumparator|customer|iesire|vanzare/i.test(f.name));
+            if (isClientFile || (data.customer && !data.supplier)) {
+              typeEl.value = 'Vânzare Sloturi';
+            } else if (contractType !== 'Vânzare Sloturi') {
+              typeEl.value = 'Achiziție Sloturi';
+            }
+            contractType = typeEl.value;
+          }
+        }
+
+        const slotSection = document.getElementById('contract-slot-acquisition-section');
+        if (slotSection) slotSection.style.display = 'block';
+
+        const nrInput = document.getElementById('contract-number');
+        const invNrInput = document.getElementById('contract-modal-inv-number');
+        if (data.invoice_number) {
+          if (nrInput && (!nrInput.value || nrInput.value.trim() === '')) nrInput.value = data.invoice_number;
+          if (invNrInput && (!invNrInput.value || invNrInput.value.trim() === '')) invNrInput.value = data.invoice_number;
+        }
+        const dateInput = document.getElementById('contract-start');
+        if (dateInput && data.invoice_date && (!dateInput.value || dateInput.value.trim() === '')) {
+          dateInput.value = data.invoice_date;
+        }
+        const totalInput = document.getElementById('contract-total');
+        if (totalInput && data.amount && data.amount > 0 && (!totalInput.value || totalInput.value === '0' || totalInput.value.trim() === '')) {
+          totalInput.value = (typeof window.formatNumberValue === 'function') ? window.formatNumberValue(data.amount) : String(data.amount);
+        }
+        if (data.currency) {
+          const curSelect = document.getElementById('contract-currency');
+          if (curSelect) {
+            curSelect.value = data.currency;
+            const curLbl = document.getElementById('contract-currency-label');
+            if (curLbl) curLbl.innerText = data.currency;
+          }
+        }
+        const suppInput = document.getElementById('contract-modal-supplier');
+        const ownerInput = document.getElementById('contract-owner');
+        if (contractType === 'Vânzare Sloturi') {
+          const clientName = data.customer || '';
+          if (clientName) {
+            if (suppInput && (!suppInput.value || suppInput.value.trim() === '')) suppInput.value = clientName;
+            if (ownerInput && (!ownerInput.value || ownerInput.value.trim() === '')) ownerInput.value = clientName;
+          }
+        } else {
+          const suppName = data.supplier || data.customer || '';
+          if (suppName) {
+            if (suppInput && (!suppInput.value || suppInput.value.trim() === '')) suppInput.value = suppName;
+            if (ownerInput && (!ownerInput.value || ownerInput.value.trim() === '')) ownerInput.value = suppName;
+          }
+        }
+
+        if (data.exchange_rate) {
+          window._extractedExchangeRate = data.exchange_rate;
+          window._extractedInvoiceDate = data.invoice_date || null;
+          window._extractedAmountRon = data.amount_ron || null;
+          if (typeof updateContractModalRateBanner === 'function') updateContractModalRateBanner();
+        }
+        if (data.series_prices) {
+          window._extractedSeriesPrices = Object.assign(window._extractedSeriesPrices || {}, data.series_prices);
+        }
+
+        if (data.series && data.series.length > 0) {
+          addContractModalSeriesTags(data.series);
+          totalSeriesAdded += data.series.length;
+        }
+      }
+    } catch (err) {
+      console.error('Eroare extract PDF:', err);
+    }
+  }
+
+  syncContractSelectedFiles();
+  updateContractModalAutoCalc();
+  window._isExtractingContractPdf = false;
+
+  if (totalSeriesAdded > 0) {
+    if (hintEl) {
+      hintEl.style.display = 'inline';
+      hintEl.innerText = `${totalSeriesAdded} serii extrase automat din PDF`;
+    }
+    if (statusEl) {
+      statusEl.style.color = '#10b981';
+      statusEl.innerText = `${totalSeriesAdded} serii extrase cu succes (${files.length} fișier(e))`;
+    }
+  } else if (statusEl) {
+    statusEl.style.color = '#10b981';
+    statusEl.innerText = `${files.length} fișier(e) PDF atașat(e)`;
+  }
+};
+
+window.handleUploadAdditionalContractFiles = async function(input) {
+  if (!input || !input.files || input.files.length === 0) return;
+  const cid = document.getElementById('contract-id')?.value;
+  if (!cid) {
+    // If new contract not yet created, pass to handleContractModalPdfUpload
+    handleContractModalPdfUpload(input);
+    return;
+  }
+
+  const files = Array.from(input.files);
+  const statusEl = document.getElementById('contract-modal-add-files-status');
+  if (statusEl) {
+    statusEl.style.display = 'inline';
+    statusEl.innerText = `Se încarcă ${files.length} fișier(e)...`;
+  }
+
+  const formData = new FormData();
+  for (const f of files) {
+    formData.append('files', f);
+  }
+
+  try {
+    const res = await fetch(`/api/contracts/${cid}/files`, {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+    if (data.success) {
+      if (typeof showAlert === 'function') showAlert(`${files.length} fișier(e) PDF atașat(e) cu succes la contract!`);
+
+      // Also extract any series or invoice data from newly uploaded files
+      for (const f of files) {
+        try {
+          const extForm = new FormData();
+          extForm.append('file', f);
+          const extRes = await fetch('/api/contracts/invoices/extract-pdf', {
+            method: 'POST',
+            body: extForm
+          });
+          const extData = await extRes.json();
+          if (extData.success && extData.data) {
+            if (extData.data.series && extData.data.series.length > 0) {
+              addContractModalSeriesTags(extData.data.series);
+            }
+            if (extData.data.invoice_number && !document.getElementById('contract-modal-inv-number')?.value) {
+              document.getElementById('contract-modal-inv-number').value = extData.data.invoice_number;
+            }
+            if (extData.data.exchange_rate && extData.data.currency === 'EUR') {
+              window._extractedExchangeRate = extData.data.exchange_rate;
+              window._extractedInvoiceDate = extData.data.invoice_date;
+              window._extractedAmountRon = extData.data.amount_ron;
+              updateContractModalRateBanner();
+            }
+          }
+        } catch (e) {
+          console.error('Note: error parsing additional PDF:', e);
+        }
+      }
+
+      await loadContractsData();
+      await openContractModal(cid);
+    } else {
+      alert('Eroare la încărcare fișiere: ' + (data.error || 'Necunoscută'));
+    }
+  } catch (err) {
+    alert('Eroare rețea: ' + err.message);
+  } finally {
+    if (statusEl) statusEl.style.display = 'none';
+    input.value = '';
+  }
+};
+
+window.updateContractModalRateBanner = async function() {
+  const rateBanner = document.getElementById('contract-modal-rate-banner');
+  if (!rateBanner) return;
+
+  const currEl = document.getElementById('contract-currency');
+  const currency = currEl ? currEl.value : 'LEI';
+
+  if (currency !== 'EUR') {
+    rateBanner.style.display = 'none';
+    return;
+  }
+
+  const dateEl = document.getElementById('contract-start');
+  const date = dateEl ? dateEl.value : '';
+  const totalInput = document.getElementById('contract-total');
+  const totalAmount = (typeof window.parseNumberInput === 'function') ? window.parseNumberInput(totalInput?.value) : (parseFloat(totalInput?.value) || 0);
+
+  // 1. Check if we already have an extracted rate or attached invoice with rate
+  let rate = window._extractedExchangeRate || null;
+  let rateDate = window._extractedInvoiceDate || date;
+  let amountRon = window._extractedAmountRon || null;
+
+  const contractId = document.getElementById('contract-id')?.value;
+  if (!rate && contractId && typeof _contractsData !== 'undefined') {
+    const c = _contractsData.find(x => String(x.id) === String(contractId));
+    if (c) {
+      if (c.invoices && c.invoices.length > 0) {
+        const invWithRate = c.invoices.find(i => i.exchange_rate && i.currency === 'EUR');
+        if (invWithRate) {
+          rate = Number(invWithRate.exchange_rate);
+          rateDate = invWithRate.invoice_date || rateDate;
+          amountRon = invWithRate.amount_ron || (totalAmount * rate);
+        }
+      }
+      if (!rate && c.exchange_rate) {
+        rate = Number(c.exchange_rate);
+        rateDate = c.start_date || rateDate;
+        amountRon = c.amount_ron || (totalAmount * rate);
+      }
+    }
+  }
+
+  const rateText = document.getElementById('contract-modal-rate-text');
+  const rateRon = document.getElementById('contract-modal-rate-ron');
+
+  if (rate) {
+    const rateNum = Number(rate);
+    const calculatedRon = (totalAmount > 0) ? (totalAmount * rateNum) : (amountRon || 0);
+    if (rateText) rateText.innerText = `Curs Factură / BNR (${rateDate || 'ziua facturii'}): 1 EUR = ${rateNum.toFixed(4)} LEI`;
+    if (rateRon) rateRon.innerText = `Total: ${Number(calculatedRon).toLocaleString('ro-RO', { minimumFractionDigits: 2 })} LEI`;
+    rateBanner.style.display = 'flex';
+    return;
+  }
+
+  // 2. If rate not found, fetch dynamically from /api/eur_rate?date=...
+  try {
+    const res = await api(`/api/eur_rate${date ? '?date=' + date : ''}`);
+    const rateNum = Number(res?.rate || EUR_RATE || 5.0);
+    const effDate = res?.date || date;
+    const calculatedRon = totalAmount * rateNum;
+    if (rateText) rateText.innerText = `Curs Factură / BNR (${effDate || 'ziua facturii'}): 1 EUR = ${rateNum.toFixed(4)} LEI`;
+    if (rateRon) rateRon.innerText = `Total: ${Number(calculatedRon).toLocaleString('ro-RO', { minimumFractionDigits: 2 })} LEI`;
+    rateBanner.style.display = 'flex';
+  } catch (err) {
+    console.error('Eroare updateContractModalRateBanner:', err);
+  }
+};
+
+window.openContractModal = async function(id = null, defaultType = null, preselectedSerial = null) {
   try {
     if (id && typeof id === 'object') id = null; // Ignore Event objects
     
@@ -12743,6 +13216,24 @@ window.openContractModal = function(id = null, defaultType = null, preselectedSe
   window._extractedSeriesPrices = null;
   const rateBanner = document.getElementById('contract-modal-rate-banner');
   if (rateBanner) rateBanner.style.display = 'none';
+
+  window._contractSelectedFacturaFile = null;
+  window._contractSelectedAnexaFile = null;
+  window._contractSelectedFiles = [];
+  const factInput = document.getElementById('contract-upload-factura-file');
+  if (factInput) factInput.value = '';
+  const anexaInput = document.getElementById('contract-upload-anexa-file');
+  if (anexaInput) anexaInput.value = '';
+  const factStatus = document.getElementById('contract-modal-factura-status');
+  if (factStatus) factStatus.style.display = 'none';
+  const factName = document.getElementById('contract-modal-factura-filename');
+  if (factName) { factName.innerText = ''; factName.title = ''; }
+  const anexaStatus = document.getElementById('contract-modal-anexa-status');
+  if (anexaStatus) anexaStatus.style.display = 'none';
+  const anexaName = document.getElementById('contract-modal-anexa-filename');
+  if (anexaName) { anexaName.innerText = ''; anexaName.title = ''; }
+  const autoCalcBanner = document.getElementById('contract-modal-auto-calc-banner');
+  if (autoCalcBanner) autoCalcBanner.style.display = 'none';
 
   if (document.getElementById('contract-modal-supplier')) document.getElementById('contract-modal-supplier').value = '';
   if (document.getElementById('contract-modal-inv-number')) document.getElementById('contract-modal-inv-number').value = '';
@@ -12821,36 +13312,54 @@ window.openContractModal = function(id = null, defaultType = null, preselectedSe
         if (invSummaryEl) {
           const isSale = (c.type === 'Vânzare Sloturi');
           const pillColor = isSale ? '#ef4444' : '#10b981';
-          invSummaryEl.innerHTML = c.invoices.map(inv => `
-            <div style="padding:6px 10px; background:var(--surface); border:1px solid var(--border); border-radius:8px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
+          invSummaryEl.innerHTML = c.invoices.map(inv => {
+            const invRate = inv.exchange_rate ? Number(inv.exchange_rate) : (inv.currency === 'EUR' ? EUR_RATE : null);
+            const invRon = inv.amount_ron ? Number(inv.amount_ron) : (invRate && inv.currency === 'EUR' ? inv.amount * invRate : null);
+            return `
+            <div style="padding:8px 12px; background:var(--surface); border:1px solid var(--border); border-radius:8px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
               <div>
-                <b>${inv.invoice_number}</b> (${inv.invoice_date || '-'}) &bull; <span style="color:${pillColor}; font-weight:700;">${inv.slots_count || 0} sloturi</span> &bull; ${fmt(inv.amount)} ${inv.currency}
-                ${inv.slots_series ? `<div style="font-size:11px; color:var(--muted); margin-top:2px;">Serii: ${inv.slots_series.split(',').slice(0, 8).join(', ')}${inv.slots_series.split(',').length > 8 ? '...' : ''}</div>` : ''}
+                <b>${escapeHtml(inv.invoice_number || '')}</b> (${inv.invoice_date || '-'}) &bull; <span style="color:${pillColor}; font-weight:700;">${inv.slots_count || 0} sloturi</span> &bull; <b>${fmt(inv.amount)} ${inv.currency}</b>
+                ${inv.currency === 'EUR' ? `
+                  <div style="font-size:11.5px; color:#6366f1; font-weight:600; margin-top:3px; display:flex; align-items:center; gap:6px;">
+                    <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    <span>Curs Factură / BNR (${inv.invoice_date || '-'}): <b>1 EUR = ${invRate ? invRate.toFixed(4) : '-'} LEI</b> &bull; Total: <span style="color:#10b981; font-weight:700;">${invRon ? Number(invRon).toLocaleString('ro-RO', { minimumFractionDigits: 2 }) : '-'} LEI</span></span>
+                  </div>
+                ` : ''}
+                ${inv.slots_series ? `<div style="font-size:11px; color:var(--muted); margin-top:3px;">Serii: ${inv.slots_series.split(',').slice(0, 8).join(', ')}${inv.slots_series.split(',').length > 8 ? '...' : ''}</div>` : ''}
               </div>
-              <button type="button" class="btn-ghost" onclick="openInvoiceSlotsModal('${inv.id}', '${inv.invoice_number}')" style="font-size:11px; color:${pillColor}; padding:3px 8px;">Sloturi</button>
+              <button type="button" class="btn-ghost" onclick="openInvoiceSlotsModal('${inv.id}', '${inv.invoice_number}')" style="font-size:11px; color:${pillColor}; padding:4px 10px; border:1px solid ${pillColor}40; border-radius:6px; font-weight:700;">Sloturi</button>
             </div>
-          `).join('');
+            `;
+          }).join('');
         }
       }
 
       // Render existing attached files inside Edit modal
       const filesSec = document.getElementById('contract-modal-files-section');
       const filesList = document.getElementById('contract-modal-files-list');
-      if (c.files && c.files.length > 0) {
-        if (filesSec) filesSec.style.display = 'block';
-        if (filesList) {
-          filesList.innerHTML = c.files.map(f => `
-            <div style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border-bottom:1px solid var(--border); font-size:12px;">
-              <a href="/api/contracts/files/${f.id}/download" target="_blank" style="color:var(--text); text-decoration:none; display:flex; align-items:center; gap:6px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:85%;" title="${escapeHtml(f.filename)}">
-                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-                <span>${escapeHtml(f.filename)}</span>
+      const countBadge = document.getElementById('contract-modal-files-count-badge');
+      const allFiles = (c.files || []);
+      
+      if (filesSec) filesSec.style.display = 'block';
+      if (countBadge) countBadge.innerText = `${allFiles.length} ${allFiles.length === 1 ? 'fișier' : 'fișiere'}`;
+      
+      if (filesList) {
+        if (allFiles.length > 0) {
+          filesList.innerHTML = allFiles.map(f => `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border-bottom:1px solid var(--border); font-size:12px; background:var(--surface); border-radius:8px; margin-bottom:6px;">
+              <a href="/api/contracts/files/${f.id}/download" target="_blank" style="color:var(--text); text-decoration:none; display:flex; align-items:center; gap:8px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:80%;" title="${escapeHtml(f.filename)}">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color:var(--red); flex-shrink:0;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                <span style="overflow:hidden; text-overflow:ellipsis;">${escapeHtml(f.filename)}</span>
               </a>
-              <button type="button" onclick="deleteContractFileModal('${c.id}', '${f.id}')" style="background:transparent; border:none; color:var(--red); cursor:pointer; font-size:18px; padding:2px 6px; line-height:1;" title="Șterge fișier">&times;</button>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <button type="button" onclick="window.viewContractPdfs('${c.id}')" class="btn-ghost" style="padding:3px 10px; font-size:11px; color:var(--accent); font-weight:600; border:1px solid var(--border); border-radius:6px;" title="Previzualizează în aplicație">Previzualizează</button>
+                <button type="button" onclick="deleteContractFileModal('${c.id}', '${f.id}')" style="background:transparent; border:none; color:var(--red); cursor:pointer; font-size:18px; padding:2px 6px; line-height:1;" title="Șterge fișier">&times;</button>
+              </div>
             </div>
           `).join('');
+        } else {
+          filesList.innerHTML = '<div style="font-size:12px; color:var(--muted); padding:8px 0;">Niciun fișier atașat încă. Apasă pe <b>Atașează alt PDF</b> pentru a încărca factura și/sau anexa cu serii.</div>';
         }
-      } else {
-        if (filesSec) filesSec.style.display = 'none';
       }
     }
   } else {
@@ -12868,7 +13377,9 @@ window.openContractModal = function(id = null, defaultType = null, preselectedSe
     if (filesSec) filesSec.style.display = 'none';
   }
   
+  window._contractSelectedFiles = [];
   handleContractTypeChange();
+  await updateContractModalRateBanner();
   modal.classList.add('show');
   } catch (e) {
     alert('Eroare JS în openContractModal: ' + e.message);
@@ -12924,11 +13435,28 @@ window.saveContract = async function() {
     if (res.success) {
       const finalId = id || res.id;
       
-      // Handle file upload if selected
+      // Handle multiple files upload if selected (Factură, Anexă, etc.)
       const fileInput = document.getElementById('contract-upload-file');
-      if (fileInput && fileInput.files.length > 0 && finalId) {
+      let filesToUpload = [];
+      if (window._contractSelectedFacturaFile) filesToUpload.push(window._contractSelectedFacturaFile);
+      if (window._contractSelectedAnexaFile && !filesToUpload.includes(window._contractSelectedAnexaFile)) {
+        filesToUpload.push(window._contractSelectedAnexaFile);
+      }
+      if (window._contractSelectedFiles && window._contractSelectedFiles.length > 0) {
+        window._contractSelectedFiles.forEach(f => {
+          if (!filesToUpload.includes(f)) filesToUpload.push(f);
+        });
+      }
+      if (filesToUpload.length === 0 && fileInput?.files && fileInput.files.length > 0) {
+        filesToUpload = Array.from(fileInput.files);
+      }
+      filesToUpload = filesToUpload.filter(f => f && f.name && f.size > 0);
+
+      if (filesToUpload.length > 0 && finalId) {
         const formData = new FormData();
-        formData.append('file', fileInput.files[0]);
+        for (const f of filesToUpload) {
+          formData.append('files', f);
+        }
         formData.append('is_annex', 'false');
         
         try {
@@ -12938,11 +13466,14 @@ window.saveContract = async function() {
           });
           const fData = await fRes.json();
           if (!fData.success) {
-            showAlert('Contractul a fost salvat, dar fișierul nu a putut fi încărcat: ' + (fData.error || 'Necunoscut'));
+            showAlert('Contractul a fost salvat, dar fișierele nu au putut fi încărcate: ' + (fData.error || 'Necunoscut'));
           }
         } catch (e) {
-          showAlert('Eroare rețea la încărcare fișier: ' + e);
+          showAlert('Eroare rețea la încărcare fișiere: ' + e);
         }
+        window._contractSelectedFiles = [];
+        window._contractSelectedFacturaFile = null;
+        window._contractSelectedAnexaFile = null;
       }
 
       // If Achiziție Sloturi / Vânzare Sloturi and series or invoice number were entered, save invoice
@@ -12963,8 +13494,9 @@ window.saveContract = async function() {
         if (window._extractedSeriesPrices) {
           invFormData.append('series_prices', JSON.stringify(window._extractedSeriesPrices));
         }
-        if (fileInput && fileInput.files.length > 0) {
-          invFormData.append('file', fileInput.files[0]);
+        if (filesToUpload.length > 0) {
+          const invFile = window._contractSelectedFacturaFile || filesToUpload[0];
+          invFormData.append('file', invFile);
         }
         try {
           await fetch(`/api/contracts/${finalId}/invoices`, {
@@ -13444,9 +13976,56 @@ window.toggleAddInvoiceForm = function(show) {
       statusEl.innerText = '';
     }
     window._extractedExchangeRate = null;
+    window._extractedInvoiceDate = null;
+    window._extractedAmountRon = null;
     window._extractedSeriesPrices = null;
-    const rateBanner = document.getElementById('inv-rate-banner');
-    if (rateBanner) rateBanner.style.display = 'none';
+    if (typeof updateInvoiceFormRateBanner === 'function') updateInvoiceFormRateBanner();
+  }
+};
+
+window.updateInvoiceFormRateBanner = async function() {
+  const rateBanner = document.getElementById('inv-rate-banner');
+  if (!rateBanner) return;
+
+  const currEl = document.getElementById('inv-currency');
+  const currency = currEl ? currEl.value : 'EUR';
+
+  if (currency !== 'EUR') {
+    rateBanner.style.display = 'none';
+    return;
+  }
+
+  const dateEl = document.getElementById('inv-date');
+  const date = dateEl ? dateEl.value : '';
+  const amtEl = document.getElementById('inv-amount');
+  const amount = parseFloat(amtEl?.value) || 0;
+
+  let rate = window._extractedExchangeRate || null;
+  let rateDate = window._extractedInvoiceDate || date;
+  let amountRon = window._extractedAmountRon || null;
+
+  const rateText = document.getElementById('inv-rate-text');
+  const rateRon = document.getElementById('inv-rate-ron');
+
+  if (rate) {
+    const rateNum = Number(rate);
+    const calculatedRon = (amount > 0) ? (amount * rateNum) : (amountRon || 0);
+    if (rateText) rateText.innerText = `Curs Factură / BNR (${rateDate || 'ziua facturii'}): 1 EUR = ${rateNum.toFixed(4)} LEI`;
+    if (rateRon) rateRon.innerText = `Total: ${Number(calculatedRon).toLocaleString('ro-RO', { minimumFractionDigits: 2 })} LEI`;
+    rateBanner.style.display = 'flex';
+    return;
+  }
+
+  try {
+    const res = await api(`/api/eur_rate${date ? '?date=' + date : ''}`);
+    const rateNum = Number(res?.rate || EUR_RATE || 5.0);
+    const effDate = res?.date || date;
+    const calculatedRon = amount * rateNum;
+    if (rateText) rateText.innerText = `Curs Factură / BNR (${effDate || 'ziua facturii'}): 1 EUR = ${rateNum.toFixed(4)} LEI`;
+    if (rateRon) rateRon.innerText = `Total: ${Number(calculatedRon).toLocaleString('ro-RO', { minimumFractionDigits: 2 })} LEI`;
+    rateBanner.style.display = 'flex';
+  } catch(e) {
+    console.error('Eroare updateInvoiceFormRateBanner:', e);
   }
 };
 
@@ -13839,10 +14418,11 @@ window.openContractSlotsSeries = async function(contractId) {
       } catch (_) {}
     }
     const isSale = c && (c.type === 'Vânzare Sloturi');
+    _currentSlotsIsSale = Boolean(isSale);
     const partnerLabel = isSale ? 'Cumpărător' : 'Furnizor';
     const title = `Tabel Sloturi: ${c && c.contract_number ? 'Nr. ' + c.contract_number : (c ? c.type : 'Contract')}`;
     const sub = c ? `${partnerLabel}: ${c.owner_name || '-'} • Dată: ${c.start_date || '-'} • Valoare Contract: ${fmt(c.total_amount)} ${c.currency || 'LEI'}` : '';
-    await loadAndShowSlotsModal({ contract_id: contractId }, title, sub);
+    await loadAndShowSlotsModal({ contract_id: contractId, is_sale: isSale }, title, sub);
   } catch (err) {
     console.error('Error in openContractSlotsSeries:', err);
     if (typeof showAlert === 'function') showAlert('Eroare la deschiderea listei de aparate: ' + err.message);
@@ -13863,10 +14443,11 @@ window.openInvoiceSlotsModal = async function(invoiceId, invoiceNumber) {
     if (inv && inv.contract_id) window._currentSlotsContractId = inv.contract_id;
     const numStr = invoiceNumber || (inv && inv.invoice_number ? inv.invoice_number : '');
     const title = `Tabel Sloturi: Factura ${numStr}`;
-    const isSaleInv = inv && (inv.customer || (inv.contract_type === 'Vânzare Sloturi'));
+    const isSaleInv = inv && (Boolean(inv.customer) || (inv.contract_type === 'Vânzare Sloturi'));
+    _currentSlotsIsSale = Boolean(isSaleInv);
     const partnerInvLabel = isSaleInv ? 'Cumpărător' : 'Furnizor';
     const sub = inv ? `${partnerInvLabel}: ${inv.customer || inv.supplier || '-'} • Dată: ${inv.invoice_date || '-'} • Valoare Factură: ${fmt(inv.amount)} ${inv.currency || 'LEI'}` : '';
-    await loadAndShowSlotsModal({ invoice_id: invoiceId }, title, sub);
+    await loadAndShowSlotsModal({ invoice_id: invoiceId, is_sale: isSaleInv }, title, sub);
   } catch (err) {
     console.error('Error in openInvoiceSlotsModal:', err);
     if (typeof showAlert === 'function') showAlert('Eroare: ' + err.message);
@@ -13916,7 +14497,14 @@ window.loadAndShowSlotsModal = async function(params, title, subtitle) {
 
       const stats = res.stats || {};
       if (kpiTotal) kpiTotal.innerText = stats.total_slots || _currentSlotsDetailsList.length;
-      if (kpiValoare) kpiValoare.innerText = (stats.total_amount ? fmt(stats.total_amount) : '0') + ' ' + (stats.currency || 'RON');
+      _currentSlotsIsSale = Boolean((res.stats && res.stats.is_sale) || params.is_sale);
+      if (kpiValoare) {
+        kpiValoare.innerText = (stats.total_amount ? fmt(stats.total_amount) : '0') + ' ' + (stats.currency || 'RON');
+        kpiValoare.style.color = _currentSlotsIsSale ? '#ef4444' : '#10b981';
+        if (kpiValoare.parentElement) {
+          kpiValoare.parentElement.style.borderLeftColor = _currentSlotsIsSale ? '#ef4444' : '#10b981';
+        }
+      }
 
       if (kpiVendors) {
         const vEntries = Object.entries(stats.vendors_count || {});
@@ -13927,6 +14515,12 @@ window.loadAndShowSlotsModal = async function(params, title, subtitle) {
         kpiLocations.innerText = lEntries.length > 0 ? lEntries.map(([k, v]) => `${k} (${v})`).join(', ') : '-';
       }
 
+      const priceColHeader = document.getElementById('slots-modal-price-col-header');
+      if (priceColHeader) {
+        priceColHeader.innerText = _currentSlotsIsSale ? 'Preț Vânzare' : 'Preț Achiziție';
+        priceColHeader.style.color = _currentSlotsIsSale ? '#ef4444' : '#10b981';
+      }
+
       populateSlotsFilters();
       renderSlotsDetailsTable();
     } else {
@@ -13935,6 +14529,40 @@ window.loadAndShowSlotsModal = async function(params, title, subtitle) {
   } catch (err) {
     console.error('Error loadAndShowSlotsModal:', err);
     if (tbody) tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:24px; color:var(--red);">Eroare rețea: ${err.message}</td></tr>`;
+  }
+};
+
+window._renderSlotModalPriceCell = function(s) {
+  const isSale = Boolean(s.is_sale || _currentSlotsIsSale);
+  if (isSale) {
+    const val = (s.sale_price !== null && s.sale_price !== undefined) ? s.sale_price : s.unit_price;
+    const cur = s.sale_currency || s.currency || 'LEI';
+    if (!val && val !== 0) return '-';
+    let html = `<div><span style="font-weight:700; color:#ef4444; font-size:12.5px;">${fmt(val)} ${cur}</span></div>`;
+    const ronVal = s.sale_price_ron || (cur === 'EUR' ? s.unit_price_ron : null);
+    if (cur === 'EUR' && ronVal) {
+      html += `<div style="font-size:11px; color:var(--muted); font-weight:500;">(${fmt(ronVal)} LEI)</div>`;
+    }
+    if (s.purchase_price) {
+      const pCur = s.purchase_currency || 'LEI';
+      html += `<div style="font-size:10.5px; color:var(--muted); margin-top:3px;">Achiziție: ${fmt(s.purchase_price)} ${pCur}</div>`;
+    }
+    if (s.profit !== null && s.profit !== undefined) {
+      const pColor = s.profit >= 0 ? '#10b981' : '#ef4444';
+      const sign = s.profit > 0 ? '+' : '';
+      html += `<div style="font-size:10.5px; font-weight:600; color:${pColor}; margin-top:2px;">Marjă: ${sign}${fmt(s.profit)} LEI</div>`;
+    }
+    return html;
+  } else {
+    const val = (s.purchase_price !== null && s.purchase_price !== undefined) ? s.purchase_price : s.unit_price;
+    const cur = s.purchase_currency || s.currency || 'LEI';
+    if (!val && val !== 0) return '-';
+    let html = `<div><span style="font-weight:700; color:#10b981; font-size:12.5px;">${fmt(val)} ${cur}</span></div>`;
+    const ronVal = s.purchase_price_ron || s.unit_price_ron;
+    if (cur === 'EUR' && ronVal) {
+      html += `<div style="font-size:11px; color:var(--muted); font-weight:500;">(${fmt(ronVal)} LEI)</div>`;
+    }
+    return html;
   }
 };
 
@@ -14003,8 +14631,8 @@ window.renderSlotsDetailsTable = function() {
         <td style="color:var(--muted);">${escapeHtml(s.cabinet)}</td>
         <td>${escapeHtml(s.location)}</td>
         <td style="text-align:center; color:var(--muted);">${escapeHtml(s.fabrication_year)}</td>
-        <td class="num" style="font-weight:600; color:#10b981;">
-          ${s.unit_price ? fmt(s.unit_price) + ' ' + (s.currency || 'RON') : '-'}
+        <td class="num" style="text-align:right;">
+          ${_renderSlotModalPriceCell(s)}
         </td>
         <td style="text-align:center;">
           <span style="color:${statusColor}; font-weight:600;">${escapeHtml(s.status)}</span>
@@ -14024,17 +14652,23 @@ window.exportSlotsToExcel = function() {
   const titleEl = document.getElementById('invoice-slots-modal-title');
   const modalTitle = titleEl ? titleEl.innerText.replace(/[^a-zA-Z0-9_-]/g, '_') : 'Sloturi';
 
-  const excelData = list.map((s, idx) => ({
-    "Nr. Crt.": idx + 1,
-    "Serie Aparat": s.serial_nr || '',
-    "Producător (Provider)": s.vendor || '',
-    "Model": s.model || '',
-    "Cabinet": s.cabinet || '',
-    "Sală (Locație)": s.location || '',
-    "An Fabricație": s.fabrication_year || '',
-    "Preț Achiziție (RON)": s.unit_price ? Number(s.unit_price) : '',
-    "Status": s.status || ''
-  }));
+  const excelData = list.map((s, idx) => {
+    const isSale = Boolean(s.is_sale || _currentSlotsIsSale);
+    const priceVal = isSale ? (s.sale_price !== null && s.sale_price !== undefined ? s.sale_price : s.unit_price) : (s.purchase_price !== null && s.purchase_price !== undefined ? s.purchase_price : s.unit_price);
+    const cur = isSale ? (s.sale_currency || s.currency || 'EUR') : (s.purchase_currency || s.currency || 'LEI');
+    const colName = isSale ? `Preț Vânzare (${cur})` : `Preț Achiziție (${cur})`;
+    return {
+      "Nr. Crt.": idx + 1,
+      "Serie Aparat": s.serial_nr || '',
+      "Producător (Provider)": s.vendor || '',
+      "Model": s.model || '',
+      "Cabinet": s.cabinet || '',
+      "Sală (Locație)": s.location || '',
+      "An Fabricație": s.fabrication_year || '',
+      [colName]: priceVal ? Number(priceVal) : '',
+      "Status": s.status || ''
+    };
+  });
 
   if (window.XLSX && XLSX.utils) {
     const ws = XLSX.utils.json_to_sheet(excelData);
@@ -14192,10 +14826,16 @@ window.loadSlotLifecycle = async function() {
     if (elSld) elSld.innerText = k.total_sold || 0;
 
     const elPur = document.getElementById('lifecycle-kpi-purchase');
-    if (elPur) elPur.innerText = (k.total_purchase_val || 0).toLocaleString('ro-RO') + ' RON';
+    if (elPur) {
+      elPur.innerText = (k.total_purchase_val || 0).toLocaleString('ro-RO') + ' RON';
+      elPur.style.color = '#10b981';
+    }
 
     const elSal = document.getElementById('lifecycle-kpi-sale');
-    if (elSal) elSal.innerText = (k.total_sale_val || 0).toLocaleString('ro-RO') + ' RON';
+    if (elSal) {
+      elSal.innerText = (k.total_sale_val || 0).toLocaleString('ro-RO') + ' RON';
+      elSal.style.color = '#ef4444';
+    }
 
     const elPrf = document.getElementById('lifecycle-kpi-profit');
     if (elPrf) {
@@ -14253,6 +14893,11 @@ window.renderLifecycleTable = function() {
   });
 
   // Client-side filtering if search is active
+  const searchInput = document.getElementById('lifecycle-search-input');
+  if (searchInput && searchInput.value !== undefined) {
+    _lifecycleSearch = searchInput.value.trim();
+  }
+
   let filteredList = _lifecycleData;
   if (_lifecycleSearch) {
     const q = _lifecycleSearch.toLowerCase();
@@ -14270,15 +14915,18 @@ window.renderLifecycleTable = function() {
     });
   }
 
-  // Update search count badge
+  // Update search count badge & clear button
   const searchBadge = document.getElementById('lifecycle-search-badge');
-  if (searchBadge) {
-    if (_lifecycleSearch) {
+  const searchClearBtn = document.getElementById('lifecycle-search-clear-btn');
+  if (_lifecycleSearch) {
+    if (searchBadge) {
       searchBadge.innerText = `${filteredList.length} / ${_lifecycleData.length}`;
       searchBadge.style.display = 'inline-block';
-    } else {
-      searchBadge.style.display = 'none';
     }
+    if (searchClearBtn) searchClearBtn.style.display = 'inline-block';
+  } else {
+    if (searchBadge) searchBadge.style.display = 'none';
+    if (searchClearBtn) searchClearBtn.style.display = 'none';
   }
 
   if (filteredList.length === 0) {
@@ -14318,7 +14966,7 @@ window.renderLifecycleTable = function() {
     // Purchase column formatting
     let purchaseHtml = '<span style="color:var(--muted);">-</span>';
     if (item.purchase_supplier && item.purchase_supplier !== '-') {
-      purchaseHtml = `<div style="font-weight:700; color:var(--text); font-size:12px; cursor:pointer; text-decoration:underline dotted; text-underline-offset:2px;" onclick="filterLifecycleByCompany('${escapeAttr(item.purchase_supplier)}')" title="Filtrează inventarul după ${escapeAttr(item.purchase_supplier)}" onmouseover="this.style.color='#10b981'" onmouseout="this.style.color='var(--text)'">${escapeHtml(item.purchase_supplier)}</div>`;
+      purchaseHtml = `<div style="font-weight:700; color:var(--text); font-size:12px;">${escapeHtml(item.purchase_supplier)}</div>`;
       if (item.purchase_invoice_number && item.purchase_invoice_number !== '-') {
         purchaseHtml += `<div style="font-size:11px; color:var(--muted); margin-top:2px;">Fact: ${escapeHtml(item.purchase_invoice_number)} ${item.purchase_invoice_date ? '(' + item.purchase_invoice_date + ')' : ''}</div>`;
       }
@@ -14330,16 +14978,16 @@ window.renderLifecycleTable = function() {
       const valStr = Number(item.purchase_price).toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       if (cur === 'EUR' && item.purchase_price_ron) {
         const ronStr = Number(item.purchase_price_ron).toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        pPriceStr = `<div><span style="font-weight:700; color:var(--text);">${valStr} EUR</span></div><div style="font-size:11px; color:var(--muted); margin-top:2px;">(${ronStr} LEI)</div>`;
+        pPriceStr = `<div><span style="font-weight:700; color:#10b981;">${valStr} EUR</span></div><div style="font-size:11px; color:#10b981; opacity:0.85; margin-top:2px;">(${ronStr} LEI)</div>`;
       } else {
-        pPriceStr = `<span style="font-weight:700; color:var(--text);">${valStr} ${cur}</span>`;
+        pPriceStr = `<span style="font-weight:700; color:#10b981;">${valStr} ${cur}</span>`;
       }
     }
 
     // Sale column formatting
     let saleHtml = '<span style="color:var(--muted);">-</span>';
     if (item.status === 'Vândut' && item.sale_buyer && item.sale_buyer !== '-') {
-      saleHtml = `<div style="font-weight:700; color:#f59e0b; font-size:12px; cursor:pointer; text-decoration:underline dotted; text-underline-offset:2px;" onclick="filterLifecycleByCompany('${escapeAttr(item.sale_buyer)}')" title="Filtrează inventarul după ${escapeAttr(item.sale_buyer)}" onmouseover="this.style.color='#10b981'" onmouseout="this.style.color='#f59e0b'">${escapeHtml(item.sale_buyer)}</div>`;
+      saleHtml = `<div style="font-weight:700; color:#f59e0b; font-size:12px;">${escapeHtml(item.sale_buyer)}</div>`;
       if (item.sale_invoice_number && item.sale_invoice_number !== '-') {
         saleHtml += `<div style="font-size:11px; color:var(--muted); margin-top:2px;">Fact: ${escapeHtml(item.sale_invoice_number)} ${item.sale_date ? '(' + item.sale_date + ')' : ''} ${item.sale_invoice_id ? `<a href="/api/contracts/invoices/${item.sale_invoice_id}/download" target="_blank" style="color:var(--accent); font-weight:700; margin-left:4px; text-decoration:none;" title="Descarcă Factură PDF">(PDF)</a>` : ''}</div>`;
       }
@@ -14351,9 +14999,9 @@ window.renderLifecycleTable = function() {
       const valStr = Number(item.sale_price).toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       if (cur === 'EUR' && item.sale_price_ron) {
         const ronStr = Number(item.sale_price_ron).toLocaleString('ro-RO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        sPriceStr = `<div><span style="font-weight:700; color:#10b981;">${valStr} EUR</span></div><div style="font-size:11px; color:var(--muted); margin-top:2px;">(${ronStr} LEI)</div>`;
+        sPriceStr = `<div><span style="font-weight:700; color:#ef4444;">${valStr} EUR</span></div><div style="font-size:11px; color:#ef4444; opacity:0.85; margin-top:2px;">(${ronStr} LEI)</div>`;
       } else {
-        sPriceStr = `<span style="font-weight:700; color:#10b981;">${valStr} ${cur}</span>`;
+        sPriceStr = `<span style="font-weight:700; color:#ef4444;">${valStr} ${cur}</span>`;
       }
     }
 
@@ -14513,9 +15161,17 @@ window.handleLifecycleSearch = function(val) {
   }, 150);
 };
 
+window.clearLifecycleSearch = function() {
+  const searchInput = document.getElementById('lifecycle-search-input');
+  if (searchInput) searchInput.value = '';
+  _lifecycleSearch = '';
+  _lifecyclePage = 1;
+  renderLifecycleTable();
+};
+
 window.filterLifecycleByCompany = function(company) {
   const val = (company || '').trim();
-  const searchInput = document.getElementById('search-lifecycle');
+  const searchInput = document.getElementById('lifecycle-search-input');
   if (searchInput) searchInput.value = val;
   _lifecycleSearch = val;
   _lifecyclePage = 1;

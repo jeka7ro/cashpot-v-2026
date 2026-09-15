@@ -1785,9 +1785,25 @@
           <div style="padding:16px;">
             <section class="card" style="margin-top:0; padding:0; overflow:hidden;">
               <div class="card-header"
-                style="display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border); padding:16px 20px;">
+                style="display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border); padding:16px 20px; flex-wrap:wrap; gap:12px;">
                 <div style="font-size: 16px; font-weight: 700; color: var(--text);">Depuneri POS pe Sală</div>
-                <button class="preset-btn" onclick="exportPosExcel()" style="flex:none;">↓ Excel</button>
+                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                  <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:12px; font-weight:600; color:var(--muted); text-transform:uppercase; letter-spacing:0.04em;">Locație:</span>
+                    <select id="pos-filter-loc" class="glass-select" onchange="applyPosLocFilter()"
+                      style="height:32px; border-radius:16px; padding:0 14px; background:var(--surface2, var(--surface)); border:1px solid var(--border); color:var(--text); font-size:12px; outline:none; cursor:pointer; min-width:170px;">
+                      <option value="">Toate locațiile</option>
+                    </select>
+                  </div>
+                  <button class="preset-btn" onclick="exportPosExcel()" style="flex:none; height:32px; padding:0 14px; display:inline-flex; align-items:center; gap:6px;">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                      <polyline points="7 10 12 15 17 10"></polyline>
+                      <line x1="12" y1="15" x2="12" y2="3"></line>
+                    </svg>
+                    Excel
+                  </button>
+                </div>
               </div>
               <!-- KPI Cards -->
               <div
@@ -4037,13 +4053,13 @@
               <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Vândute</div>
               <div id="lifecycle-kpi-sold" style="font-size:20px; font-weight:800; color:#f59e0b; line-height:1.2;">0</div>
             </div>
-            <div class="kpi-card" style="padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:8px;">
+            <div class="kpi-card" style="padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-left:4px solid #10b981; border-radius:8px;">
               <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Valoare Totală Achiziție</div>
-              <div id="lifecycle-kpi-purchase" style="font-size:18px; font-weight:800; color:var(--text); line-height:1.2;">0 RON</div>
+              <div id="lifecycle-kpi-purchase" style="font-size:18px; font-weight:800; color:#10b981; line-height:1.2;">0 RON</div>
             </div>
-            <div class="kpi-card" style="padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:8px;">
+            <div class="kpi-card" style="padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-left:4px solid #ef4444; border-radius:8px;">
               <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Valoare Totală Vânzări</div>
-              <div id="lifecycle-kpi-sale" style="font-size:18px; font-weight:800; color:#10b981; line-height:1.2;">0 RON</div>
+              <div id="lifecycle-kpi-sale" style="font-size:18px; font-weight:800; color:#ef4444; line-height:1.2;">0 RON</div>
             </div>
           </div>
 
@@ -4059,9 +4075,10 @@
               </div>
 
               <!-- Search box with count badge -->
-              <div style="position:relative;">
+              <div style="position:relative; display:inline-flex; align-items:center;">
                 <svg style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--muted); width:14px; height:14px; pointer-events:none;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                <input type="text" id="lifecycle-search-input" placeholder="Caută serie, furnizor, cumpărător..." oninput="handleLifecycleSearch(this.value)" style="padding:7px 80px 7px 34px; border:1px solid var(--border); border-radius:9999px; background:var(--surface); color:var(--text); font-size:13px; outline:none; min-width:260px;">
+                <input type="text" id="lifecycle-search-input" placeholder="Caută serie, furnizor, cumpărător..." oninput="handleLifecycleSearch(this.value)" style="padding:7px 95px 7px 34px; border:1px solid var(--border); border-radius:9999px; background:var(--surface); color:var(--text); font-size:13px; outline:none; min-width:280px;">
+                <button type="button" id="lifecycle-search-clear-btn" onclick="clearLifecycleSearch()" style="display:none; position:absolute; right:75px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--muted); font-size:16px; cursor:pointer; padding:2px 4px; line-height:1;" title="Șterge căutarea">&times;</button>
                 <span id="lifecycle-search-badge" style="display:none; position:absolute; right:8px; top:50%; transform:translateY(-50%); background:var(--accent); color:white; border-radius:9999px; padding:2px 8px; font-size:11px; font-weight:700; white-space:nowrap;"></span>
               </div>
             </div>
@@ -4119,13 +4136,13 @@
                   <th onclick="sortLifecycleTable('purchase_supplier')" style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase; cursor:pointer; user-select:none;" title="Click pentru sortare">
                     Intrare: Factură & Furnizor <span id="sort-life-purchase_supplier" style="font-size:10px; margin-left:4px;"></span>
                   </th>
-                  <th onclick="sortLifecycleTable('purchase_price')" style="padding:12px; text-align:right; width:110px; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase; cursor:pointer; user-select:none;" title="Click pentru sortare">
+                  <th onclick="sortLifecycleTable('purchase_price')" style="padding:12px; text-align:right; width:110px; border-bottom:1px solid var(--border); color:#10b981; font-size:11px; text-transform:uppercase; font-weight:700; cursor:pointer; user-select:none;" title="Click pentru sortare">
                     Preț Achiziție <span id="sort-life-purchase_price" style="font-size:10px; margin-left:4px;"></span>
                   </th>
                   <th onclick="sortLifecycleTable('sale_buyer')" style="padding:12px; text-align:left; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase; cursor:pointer; user-select:none;" title="Click pentru sortare">
                     Ieșire: Factură & Cumpărător <span id="sort-life-sale_buyer" style="font-size:10px; margin-left:4px;"></span>
                   </th>
-                  <th onclick="sortLifecycleTable('sale_price')" style="padding:12px; text-align:right; width:110px; border-bottom:1px solid var(--border); color:var(--muted); font-size:11px; text-transform:uppercase; cursor:pointer; user-select:none;" title="Click pentru sortare">
+                  <th onclick="sortLifecycleTable('sale_price')" style="padding:12px; text-align:right; width:110px; border-bottom:1px solid var(--border); color:#ef4444; font-size:11px; text-transform:uppercase; font-weight:700; cursor:pointer; user-select:none;" title="Click pentru sortare">
                     Preț Vânzare <span id="sort-life-sale_price" style="font-size:10px; margin-left:4px;"></span>
                   </th>
                 </tr>
@@ -4844,7 +4861,7 @@
   </div>
 
   <script src="game_uuids.js?v=1"></script>
-  <script src="app.js?v=52"></script>
+  <script src="app.js?v=65"></script>
   <script src="onjn.js?v=47"></script>
   <!-- CUSTOM PROMPT MODAL -->
   <div class="settings-modal" id="modal-custom-prompt" style="z-index: 99999;">
@@ -5079,14 +5096,14 @@
             <div>
               <label style="display:block; margin-bottom:8px; font-size:12px; color:var(--muted);">Valută *</label>
               <select id="contract-currency" class="glass-input" style="width:100%;" required
-                onchange="document.getElementById('contract-currency-label').innerText = this.value">
+                onchange="document.getElementById('contract-currency-label').innerText = this.value; if(typeof updateContractModalRateBanner === 'function') updateContractModalRateBanner(); if(typeof updateContractModalAutoCalc === 'function') updateContractModalAutoCalc();">
                 <option value="LEI">LEI</option>
                 <option value="EUR">EUR</option>
               </select>
             </div>
             <div>
               <label id="contract-start-label" style="display:block; margin-bottom:8px; font-size:12px; color:var(--muted);">Dată Început</label>
-              <input type="date" id="contract-start" class="glass-input" style="width:100%;">
+              <input type="date" id="contract-start" class="glass-input" style="width:100%;" onchange="if(typeof updateContractModalRateBanner === 'function') updateContractModalRateBanner();">
             </div>
             <div id="contract-end-container">
               <label style="display:block; margin-bottom:8px; font-size:12px; color:var(--muted);">Dată Sfârșit</label>
@@ -5122,7 +5139,7 @@
               <div style="position:relative;">
                 <input type="text" id="contract-total" class="glass-input"
                   style="width:100%; font-weight:bold; color:var(--accent); padding-right: 40px;" required
-                  placeholder="Ex: 15.000" oninput="formatNumberInput(event)">
+                  placeholder="Ex: 15.000" oninput="formatNumberInput(event); if(typeof updateContractModalRateBanner === 'function') updateContractModalRateBanner(); if(typeof updateContractModalAutoCalc === 'function') updateContractModalAutoCalc();">
                 <span id="contract-currency-label"
                   style="position:absolute; right:12px; top:50%; transform:translateY(-50%); font-size:12px; font-weight:bold; color:var(--accent);">LEI</span>
               </div>
@@ -5167,6 +5184,60 @@
                 <span id="contract-modal-slot-title" class="slot-section-title" style="font-size:14px; font-weight:700; color:var(--accent);">Factură Achiziție & Serii Sloturi</span>
               </div>
               <span id="contract-modal-pdf-status" style="font-size:11px; font-weight:600; color:var(--accent); display:none;"></span>
+            </div>
+
+            <!-- PANOU ÎNCĂRCARE SEPARATĂ: 1. FACTURĂ FISCALĂ  &  2. ANEXĂ SERII -->
+            <div style="background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:14px;">
+              <div style="font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+                <span>Încărcare Documente Automată (Factură & Anexă)</span>
+                <span style="font-size:10.5px; color:var(--accent); font-weight:600; text-transform:none;">Recunoaștere inteligentă date & serii</span>
+              </div>
+
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                <!-- 1. FACTURĂ FISCALĂ -->
+                <div style="background:rgba(255,255,255,0.02); border:1px dashed var(--border); border-radius:8px; padding:10px 12px; display:flex; flex-direction:column; justify-content:space-between; gap:8px;">
+                  <div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                      <span style="font-size:12px; font-weight:700; color:var(--text);">1. Factură Fiscală (PDF)</span>
+                      <span id="contract-modal-factura-status" style="display:none; font-size:10.5px; font-weight:700; color:#10b981; background:rgba(16,185,129,0.12); padding:2px 6px; border-radius:4px;">Factură citită</span>
+                    </div>
+                    <div style="font-size:11px; color:var(--muted); line-height:1.3;">Completează automat: Nr. factură, Dată, Valoare totală, Client / Furnizor.</div>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+                    <label for="contract-upload-factura-file" class="btn-ghost" style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; padding:6px 12px; font-size:11.5px; font-weight:600; border:1px solid var(--border); border-radius:6px; margin:0; white-space:nowrap;">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                      <span>Încarcă Factură</span>
+                    </label>
+                    <input type="file" id="contract-upload-factura-file" accept="application/pdf" style="display:none;" onchange="handleContractModalSpecificUpload(this, 'factura')">
+                    <span id="contract-modal-factura-filename" style="font-size:11px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:140px;" title=""></span>
+                  </div>
+                </div>
+
+                <!-- 2. ANEXĂ SERII -->
+                <div style="background:rgba(255,255,255,0.02); border:1px dashed var(--border); border-radius:8px; padding:10px 12px; display:flex; flex-direction:column; justify-content:space-between; gap:8px;">
+                  <div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                      <span style="font-size:12px; font-weight:700; color:var(--text);">2. Anexă Serii Sloturi (PDF)</span>
+                      <span id="contract-modal-anexa-status" style="display:none; font-size:10.5px; font-weight:700; color:#10b981; background:rgba(16,185,129,0.12); padding:2px 6px; border-radius:4px;">Serii extrase</span>
+                    </div>
+                    <div style="font-size:11px; color:var(--muted); line-height:1.3;">Extrage automat: Tabelul cu seriile aparatelor direct în tag-uri.</div>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+                    <label for="contract-upload-anexa-file" class="btn-ghost" style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; padding:6px 12px; font-size:11.5px; font-weight:600; border:1px solid var(--border); border-radius:6px; margin:0; color:var(--accent); white-space:nowrap;">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                      <span>Încarcă Anexă Serii</span>
+                    </label>
+                    <input type="file" id="contract-upload-anexa-file" accept="application/pdf" style="display:none;" onchange="handleContractModalSpecificUpload(this, 'anexa')">
+                    <span id="contract-modal-anexa-filename" style="font-size:11px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:140px;" title=""></span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Repartizare automată preț unitar (Factură + Anexă) -->
+              <div id="contract-modal-auto-calc-banner" style="display:none; margin-top:10px; background:rgba(16, 185, 129, 0.08); border:1px solid rgba(16, 185, 129, 0.25); border-radius:6px; padding:6px 10px; font-size:11.5px; color:#10b981; align-items:center; justify-content:space-between;">
+                <span id="contract-modal-auto-calc-text">Preț calculat automat per slot: -</span>
+                <span style="font-weight:700;">Repartizare Factură + Anexă</span>
+              </div>
             </div>
 
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;">
@@ -5248,14 +5319,30 @@
                 </svg>
                 <span>Atașează PDF</span>
               </label>
-              <input type="file" id="contract-upload-file" accept="application/pdf" style="display:none;"
+              <input type="file" id="contract-upload-file" accept="application/pdf" multiple style="display:none;"
                 onchange="handleContractModalPdfUpload(this)">
             </div>
           </div>
 
           <!-- Existing Attached Files in Edit Modal -->
           <div id="contract-modal-files-section" style="display:none; margin-bottom:18px; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:12px;">
-            <div style="font-size:12px; font-weight:700; color:var(--muted); margin-bottom:8px;">Fișiere atașate acestui contract:</div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:12px; font-weight:700; color:var(--muted);">Fișiere atașate acestui contract:</span>
+                <span id="contract-modal-files-count-badge" style="background:rgba(99, 102, 241, 0.15); color:var(--accent); font-size:11px; padding:2px 8px; border-radius:9999px; font-weight:700;">0 fișiere</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <label for="contract-modal-add-files-input" class="btn-ghost" style="display:inline-flex; align-items:center; gap:6px; cursor:pointer; font-size:11.5px; font-weight:600; padding:4px 10px; border:1px solid var(--border); border-radius:6px; margin:0; color:var(--accent);" title="Atașează încă un PDF (factură, anexă serii, proces verbal etc.)">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                  </svg>
+                  <span>Atașează alt PDF</span>
+                </label>
+                <input type="file" id="contract-modal-add-files-input" accept="application/pdf" multiple style="display:none;" onchange="handleUploadAdditionalContractFiles(this)">
+                <span id="contract-modal-add-files-status" style="font-size:11px; color:var(--accent); font-weight:600; display:none;"></span>
+              </div>
+            </div>
             <div id="contract-modal-files-list"></div>
           </div>
 
@@ -5435,15 +5522,15 @@
               </div>
               <div>
                 <label style="display:block; font-size:11px; font-weight:700; color:var(--muted); margin-bottom:6px;">Dată Factură *</label>
-                <input type="date" id="inv-date" class="glass-input" style="width:100%; box-sizing:border-box; padding:8px 12px;" required>
+                <input type="date" id="inv-date" class="glass-input" style="width:100%; box-sizing:border-box; padding:8px 12px;" required onchange="if(typeof updateInvoiceFormRateBanner === 'function') updateInvoiceFormRateBanner();">
               </div>
               <div>
                 <label style="display:block; font-size:11px; font-weight:700; color:var(--muted); margin-bottom:6px;">Valoare Factură *</label>
-                <input type="number" step="0.01" id="inv-amount" class="glass-input" style="width:100%; box-sizing:border-box; padding:8px 12px;" placeholder="0.00" required>
+                <input type="number" step="0.01" id="inv-amount" class="glass-input" style="width:100%; box-sizing:border-box; padding:8px 12px;" placeholder="0.00" required oninput="if(typeof updateInvoiceFormRateBanner === 'function') updateInvoiceFormRateBanner();">
               </div>
               <div>
                 <label style="display:block; font-size:11px; font-weight:700; color:var(--muted); margin-bottom:6px;">Valută</label>
-                <select id="inv-currency" class="glass-input" style="width:100%; box-sizing:border-box; padding:8px 12px;">
+                <select id="inv-currency" class="glass-input" style="width:100%; box-sizing:border-box; padding:8px 12px;" onchange="if(typeof updateInvoiceFormRateBanner === 'function') updateInvoiceFormRateBanner();">
                   <option value="EUR">EUR</option>
                   <option value="RON">RON / LEI</option>
                   <option value="USD">USD</option>
@@ -5554,72 +5641,68 @@
             <div id="invoice-slots-modal-subtitle" style="font-size:12px; color:var(--muted); margin-top:2px;"></div>
           </div>
         </div>
-        <button class="settings-close" style="border-radius:8px;" onclick="document.getElementById('invoice-slots-modal').classList.remove('show')">&times;</button>
+        <button class="settings-close" style="border-radius:9999px; width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center;" onclick="document.getElementById('invoice-slots-modal').classList.remove('show')">&times;</button>
       </div>
 
       <div class="settings-body" style="padding:20px 24px; overflow:hidden; display:flex; flex-direction:column; flex:1;">
         <!-- Top Stats KPIs -->
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:14px; flex-shrink:0;">
-          <div class="kpi-card" style="padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:8px; display:flex; flex-direction:column; justify-content:center;">
+          <div class="kpi-card" style="padding:12px 16px; background:var(--surface); border:1px solid var(--border); border-radius:12px; display:flex; flex-direction:column; justify-content:center;">
             <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Total Sloturi</div>
             <div id="slots-kpi-total" style="font-size:18px; font-weight:700; color:var(--text); line-height:1.2;">0</div>
           </div>
-          <div class="kpi-card" style="padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:8px; border-left:4px solid #10b981; display:flex; flex-direction:column; justify-content:center;">
+          <div class="kpi-card" style="padding:12px 16px; background:var(--surface); border:1px solid var(--border); border-radius:12px; border-left:4px solid #10b981; display:flex; flex-direction:column; justify-content:center;">
             <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Valoare Totală</div>
             <div id="slots-kpi-valoare" style="font-size:18px; font-weight:700; color:#10b981; line-height:1.2;">0 RON</div>
           </div>
-          <div class="kpi-card" style="padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:8px; display:flex; flex-direction:column; justify-content:center;">
+          <div class="kpi-card" style="padding:12px 16px; background:var(--surface); border:1px solid var(--border); border-radius:12px; display:flex; flex-direction:column; justify-content:center;">
             <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Producători (Provideri)</div>
             <div id="slots-kpi-vendors" style="font-size:13px; font-weight:600; color:var(--text); line-height:1.2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">-</div>
           </div>
-          <div class="kpi-card" style="padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:8px; display:flex; flex-direction:column; justify-content:center;">
+          <div class="kpi-card" style="padding:12px 16px; background:var(--surface); border:1px solid var(--border); border-radius:12px; display:flex; flex-direction:column; justify-content:center;">
             <div style="font-size:10px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:4px;">Săli (Locații)</div>
             <div id="slots-kpi-locations" style="font-size:13px; font-weight:600; color:var(--text); line-height:1.2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">-</div>
           </div>
         </div>
 
         <!-- Filter bar -->
-        <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap; flex-shrink:0;">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; flex-wrap:wrap; flex-shrink:0;">
           <div style="display:flex; gap:10px; flex:1; min-width:260px; align-items:center;">
-            <div style="position:relative; flex:1;">
-              <input type="text" id="search-invoice-slots" placeholder="Caută serie, provider, model, sală..." style="width:100%; box-sizing:border-box; height:34px; padding:0 12px 0 32px; font-size:12px; border:1px solid var(--border); border-radius:6px; background:var(--surface); color:var(--text); outline:none;" oninput="filterSlotsDetailsTable(this.value)">
-              <svg style="position:absolute; left:10px; top:50%; transform:translateY(-50%); width:14px; height:14px; color:var(--muted); pointer-events:none;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <div style="position:relative; flex:1; min-width:220px;">
+              <svg style="position:absolute; left:14px; top:50%; transform:translateY(-50%); width:14px; height:14px; color:var(--muted); pointer-events:none;" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input type="text" id="search-invoice-slots" placeholder="Caută serie, provider, model, sală..." style="width:100%; box-sizing:border-box; height:36px; padding:0 16px 0 38px; font-size:12px; border:1px solid var(--border); border-radius:9999px; background:var(--surface); color:var(--text); outline:none; transition:border-color 0.2s;" oninput="filterSlotsDetailsTable(this.value)">
             </div>
-            <select id="filter-slots-vendor" style="height:34px; box-sizing:border-box; padding:0 26px 0 10px; font-size:12px; min-width:130px; border:1px solid var(--border); border-radius:6px; background-color:var(--surface); color:var(--text); outline:none; cursor:pointer; appearance:none; -webkit-appearance:none; background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E&quot;); background-repeat:no-repeat; background-position:right 8px center;" onchange="filterSlotsDetailsTable()">
+            <select id="filter-slots-vendor" style="height:36px; box-sizing:border-box; padding:0 30px 0 14px; font-size:12px; min-width:140px; border:1px solid var(--border); border-radius:9999px; background-color:var(--surface); color:var(--text); outline:none; cursor:pointer; appearance:none; -webkit-appearance:none; background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E&quot;); background-repeat:no-repeat; background-position:right 12px center;" onchange="filterSlotsDetailsTable()">
               <option value="">Toți Providerii</option>
             </select>
-            <select id="filter-slots-location" style="height:34px; box-sizing:border-box; padding:0 26px 0 10px; font-size:12px; min-width:120px; border:1px solid var(--border); border-radius:6px; background-color:var(--surface); color:var(--text); outline:none; cursor:pointer; appearance:none; -webkit-appearance:none; background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E&quot;); background-repeat:no-repeat; background-position:right 8px center;" onchange="filterSlotsDetailsTable()">
+            <select id="filter-slots-location" style="height:36px; box-sizing:border-box; padding:0 30px 0 14px; font-size:12px; min-width:130px; border:1px solid var(--border); border-radius:9999px; background-color:var(--surface); color:var(--text); outline:none; cursor:pointer; appearance:none; -webkit-appearance:none; background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E&quot;); background-repeat:no-repeat; background-position:right 12px center;" onchange="filterSlotsDetailsTable()">
               <option value="">Toate Sălile</option>
             </select>
           </div>
           <div style="display:flex; gap:8px; align-items:center;">
-            <button type="button" onclick="exportSlotsToExcel()" class="btn btn-primary" style="height:34px; box-sizing:border-box; padding:0 12px; border-radius:6px; font-weight:600; font-size:12px; background:#10b981; color:white; border:none; display:inline-flex; align-items:center; gap:6px; cursor:pointer;" title="Descarcă în format Excel (.xlsx)">
-              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <button type="button" onclick="exportSlotsToExcel()" style="width:36px; height:36px; border-radius:50%; background:#10b981; color:white; border:none; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; padding:0; transition:opacity 0.2s;" title="Descarcă în format Excel (.xlsx)" onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                 <polyline points="14 2 14 8 20 8"></polyline>
                 <line x1="8" y1="13" x2="16" y2="13"></line>
                 <line x1="8" y1="17" x2="16" y2="17"></line>
                 <polyline points="10 9 9 9 8 9"></polyline>
               </svg>
-              <span>Export în Excel</span>
             </button>
-            <button type="button" onclick="copySlotsTableToClipboard()" class="btn-ghost" style="height:34px; box-sizing:border-box; padding:0 12px; border-radius:6px; display:inline-flex; align-items:center; gap:6px; font-size:12px;" title="Copiază datele din tabel în clipboard">
-              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-              <span>Copiază Tabel</span>
+            <button type="button" onclick="copySlotsTableToClipboard()" class="btn-ghost" style="width:36px; height:36px; border-radius:50%; border:1px solid var(--border); background:var(--surface); color:var(--text); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; padding:0; transition:all 0.2s;" title="Copiază datele din tabel în clipboard" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             </button>
-            <button type="button" onclick="copyInvoiceSlotsToClipboard()" class="btn-ghost" style="height:34px; box-sizing:border-box; padding:0 12px; border-radius:6px; display:inline-flex; align-items:center; gap:6px; font-size:12px;" title="Copiază doar lista seriilor">
-              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
-              <span>Doar Serii</span>
+            <button type="button" onclick="copyInvoiceSlotsToClipboard()" class="btn-ghost" style="width:36px; height:36px; border-radius:50%; border:1px solid var(--border); background:var(--surface); color:var(--text); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; padding:0; transition:all 0.2s;" title="Copiază doar lista seriilor" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>
             </button>
-            <button type="button" onclick="openCurrentContractInvoices()" class="btn-ghost" style="height:34px; box-sizing:border-box; padding:0 12px; border-radius:6px; display:inline-flex; align-items:center; gap:6px; font-size:12px; color:var(--text);" title="Vezi lista facturilor atașate">
-              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-              <span>Facturi</span>
+            <button type="button" onclick="openCurrentContractInvoices()" class="btn-ghost" style="width:36px; height:36px; border-radius:50%; border:1px solid var(--border); background:var(--surface); color:var(--text); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; padding:0; transition:all 0.2s;" title="Vezi lista facturilor atașate" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+              <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
             </button>
           </div>
         </div>
 
         <!-- Scrollable Table Container -->
-        <div style="flex:1; overflow-y:auto; border:1px solid var(--border); border-radius:8px; background:var(--surface);">
+        <div style="flex:1; overflow-y:auto; border:1px solid var(--border); border-radius:12px; background:var(--surface);">
           <table class="data-table">
             <thead>
               <tr>
@@ -5630,7 +5713,7 @@
                 <th style="text-align:left;">Cabinet</th>
                 <th style="text-align:left;">Sală (Locație)</th>
                 <th style="text-align:center; width:75px;">An Fabr.</th>
-                <th class="num" style="width:110px;">Preț Achiziție</th>
+                <th class="num" style="width:120px;" id="slots-modal-price-col-header">Preț Achiziție</th>
                 <th style="text-align:center; width:85px;">Status</th>
               </tr>
             </thead>
