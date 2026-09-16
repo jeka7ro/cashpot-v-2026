@@ -272,6 +272,9 @@ window.loadAnaliza = function(tab) {
   }
 };
 async function api(path, options = {}) {
+  if (typeof options === 'string') {
+    options = { method: options };
+  }
   const r = await fetch(API + path, options);
   if (!r.ok) {
     let msg = `HTTP ${r.status}`;
@@ -12438,7 +12441,7 @@ window.bulkDeleteContracts = async function() {
   
   for (const c of chks) {
     try {
-      await api(`/api/contracts/${c.value}`, 'DELETE');
+      await api(`/api/contracts/${c.value}`, { method: 'DELETE' });
     } catch(e) { console.error(e); }
   }
   

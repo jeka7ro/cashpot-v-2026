@@ -4833,45 +4833,44 @@ def sync_contract_inventory_slots(contract_id):
             inv_date = inv.get('invoice_date') or contract.get('start_date')
             partner = inv.get('customer') or inv.get('supplier') or contract.get('owner_name') or ''
 
-            for s_nr in s_list:
-                if is_sale:
-                    pg_qry("""
-                        UPDATE cp2_slot_inventory SET
-                            status = 'Vândut',
-                            exit_type = 'Vânzare',
-                            exit_date = %s,
-                            sale_contract_id = %s,
-                            sale_contract_number = %s,
-                            sale_invoice_id = %s,
-                            sale_invoice_number = %s,
-                            sale_invoice_date = %s,
-                            sale_buyer = %s,
-                            sale_price = %s,
-                            sale_currency = %s,
-                            sale_exchange_rate = %s,
-                            sale_price_ron = %s,
-                            updated_at = CURRENT_TIMESTAMP
-                        WHERE serial_nr = %s
-                    """, (
-                        inv_date, contract_id, contract.get('contract_number'),
-                        inv.get('id'), inv.get('invoice_number'), inv_date,
-                        partner, unit_p, inv_curr,
-                        inv_rate, unit_p_ron, s_nr
-                    ))
-                    pg_qry("""
-                        UPDATE cp2_slot_inventory SET
-                            purchase_contract_id = NULL,
-                            purchase_contract_number = NULL,
-                            purchase_invoice_id = NULL,
-                            purchase_invoice_number = NULL,
-                            purchase_invoice_date = NULL,
-                            purchase_supplier = NULL,
-                            purchase_price = NULL,
-                            purchase_price_ron = NULL,
-                            purchase_currency = 'RON',
-                            purchase_exchange_rate = NULL
-                        WHERE serial_nr = %s AND purchase_contract_id = %s
-                    """, (s_nr, contract_id))
+            if is_sale:
+                pg_qry("""
+                    UPDATE cp2_slot_inventory SET
+                        status = 'Vândut',
+                        exit_type = 'Vânzare',
+                        exit_date = %s,
+                        sale_contract_id = %s,
+                        sale_contract_number = %s,
+                        sale_invoice_id = %s,
+                        sale_invoice_number = %s,
+                        sale_invoice_date = %s,
+                        sale_buyer = %s,
+                        sale_price = %s,
+                        sale_currency = %s,
+                        sale_exchange_rate = %s,
+                        sale_price_ron = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE serial_nr = ANY(%s)
+                """, (
+                    inv_date, contract_id, contract.get('contract_number'),
+                    inv.get('id'), inv.get('invoice_number'), inv_date,
+                    partner, unit_p, inv_curr,
+                    inv_rate, unit_p_ron, s_list
+                ))
+                pg_qry("""
+                    UPDATE cp2_slot_inventory SET
+                        purchase_contract_id = NULL,
+                        purchase_contract_number = NULL,
+                        purchase_invoice_id = NULL,
+                        purchase_invoice_number = NULL,
+                        purchase_invoice_date = NULL,
+                        purchase_supplier = NULL,
+                        purchase_price = NULL,
+                        purchase_price_ron = NULL,
+                        purchase_currency = 'RON',
+                        purchase_exchange_rate = NULL
+                    WHERE serial_nr = ANY(%s) AND purchase_contract_id = %s
+                """, (s_list, contract_id))
     except Exception as e:
         print("sync_contract_inventory_slots error:", e)
 
@@ -4928,8 +4927,28 @@ def update_contract(contract_id):
 
 @app.route('/api/contracts/<contract_id>', methods=['DELETE'])
 def delete_contract(contract_id):
-    pg_qry("DELETE FROM cp2_contracts WHERE id = %s", (contract_id,))
-    return jsonify({"success": True})
+    try:
+        pg_qry("""
+            UPDATE cp2_slot_inventory 
+            SET status = CASE WHEN current_location IS NOT NULL AND current_location != 'Depozit' THEN 'Activ' ELSE 'În Stoc' END,
+                exit_type = NULL, exit_date = NULL,
+                sale_contract_id = NULL, sale_contract_number = NULL,
+                sale_invoice_id = NULL, sale_invoice_number = NULL, sale_invoice_date = NULL,
+                sale_buyer = NULL, sale_price = NULL, sale_currency = NULL,
+                sale_exchange_rate = NULL, sale_price_ron = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE sale_contract_id = %s
+        """, (contract_id,))
+        pg_qry("""
+            UPDATE cp2_slot_inventory 
+            SET purchase_contract_id = NULL, purchase_contract_number = NULL,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE purchase_contract_id = %s
+        """, (contract_id,))
+        pg_qry("DELETE FROM cp2_contracts WHERE id = %s", (contract_id,))
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 def auto_resize_pdf_if_large(file_data, target_max_bytes=10 * 1024 * 1024):
     """
@@ -5361,100 +5380,107 @@ def add_contract_invoice(contract_id):
             is_sale = ('vânzare' in c_type.lower() or 'vanzare' in c_type.lower())
             unit_p = round(amount / len(series_list), 2) if len(series_list) > 0 and amount > 0 else 0.0
             
-            for s_nr in series_list:
-                slot_p = float(series_prices.get(s_nr, unit_p)) if (series_prices and s_nr in series_prices) else unit_p
-                slot_rate = exchange_rate if (exchange_rate and currency == 'EUR') else 1.0
-                slot_p_ron = round(slot_p * slot_rate, 2) if (exchange_rate and currency == 'EUR') else slot_p
+            conn_sync = get_pg_conn()
+            try:
+                with conn_sync.cursor() as cur_sync:
+                    for s_nr in series_list:
+                        slot_p = float(series_prices.get(s_nr, unit_p)) if (series_prices and s_nr in series_prices) else unit_p
+                        slot_rate = exchange_rate if (exchange_rate and currency == 'EUR') else 1.0
+                        slot_p_ron = round(slot_p * slot_rate, 2) if (exchange_rate and currency == 'EUR') else slot_p
 
-                if is_sale:
-                    pg_qry("""
-                        INSERT INTO cp2_slot_inventory (
-                            serial_nr, status, exit_type, exit_date,
-                            sale_contract_id, sale_contract_number,
-                            sale_invoice_id, sale_invoice_number, sale_invoice_date,
-                            sale_buyer, sale_price, sale_currency,
-                            sale_exchange_rate, sale_price_ron, notes
-                        ) VALUES (
-                            %s, 'Vândut', 'Vânzare', %s,
-                            %s, %s,
-                            %s, %s, %s,
-                            %s, %s, %s,
-                            %s, %s, %s
-                        )
-                        ON CONFLICT (serial_nr) DO UPDATE SET
-                            status = 'Vândut',
-                            exit_type = 'Vânzare',
-                            exit_date = EXCLUDED.exit_date,
-                            sale_contract_id = EXCLUDED.sale_contract_id,
-                            sale_contract_number = EXCLUDED.sale_contract_number,
-                            sale_invoice_id = EXCLUDED.sale_invoice_id,
-                            sale_invoice_number = EXCLUDED.sale_invoice_number,
-                            sale_invoice_date = EXCLUDED.sale_invoice_date,
-                            sale_buyer = EXCLUDED.sale_buyer,
-                            sale_price = EXCLUDED.sale_price,
-                            sale_currency = EXCLUDED.sale_currency,
-                            sale_exchange_rate = EXCLUDED.sale_exchange_rate,
-                            sale_price_ron = EXCLUDED.sale_price_ron,
-                            notes = COALESCE(EXCLUDED.notes, cp2_slot_inventory.notes),
-                            updated_at = CURRENT_TIMESTAMP
-                    """, (
-                        s_nr, inv_date,
-                        contract_id, c_num,
-                        iid, inv_number, inv_date,
-                        supplier, slot_p, currency,
-                        slot_rate, slot_p_ron, notes
-                    ))
-                else:
-                    pg_qry("""
-                        INSERT INTO cp2_slot_inventory (
-                            serial_nr, status, entry_type, entry_date,
-                            purchase_contract_id, purchase_contract_number,
-                            purchase_invoice_id, purchase_invoice_number, purchase_invoice_date,
-                            purchase_supplier, purchase_price, purchase_currency,
-                            purchase_exchange_rate, purchase_price_ron, notes
-                        ) VALUES (
-                            %s, 'Activ', 'Achiziție', %s,
-                            %s, %s,
-                            %s, %s, %s,
-                            %s, %s, %s,
-                            %s, %s, %s
-                        )
-                        ON CONFLICT (serial_nr) DO UPDATE SET
-                            purchase_contract_id = EXCLUDED.purchase_contract_id,
-                            purchase_contract_number = EXCLUDED.purchase_contract_number,
-                            purchase_invoice_id = EXCLUDED.purchase_invoice_id,
-                            purchase_invoice_number = EXCLUDED.purchase_invoice_number,
-                            purchase_invoice_date = EXCLUDED.purchase_invoice_date,
-                            purchase_supplier = EXCLUDED.purchase_supplier,
-                            purchase_price = EXCLUDED.purchase_price,
-                            purchase_currency = EXCLUDED.purchase_currency,
-                            purchase_exchange_rate = EXCLUDED.purchase_exchange_rate,
-                            purchase_price_ron = EXCLUDED.purchase_price_ron,
-                            entry_date = COALESCE(cp2_slot_inventory.entry_date, EXCLUDED.entry_date),
-                            notes = COALESCE(EXCLUDED.notes, cp2_slot_inventory.notes),
-                            updated_at = CURRENT_TIMESTAMP
-                    """, (
-                        s_nr, inv_date,
-                        contract_id, c_num,
-                        iid, inv_number, inv_date,
-                        supplier, slot_p, currency,
-                        slot_rate, slot_p_ron, notes
-                    ))
-                    # Enrich metadata from casino_stations if available
-                    pg_qry("""
-                        UPDATE cp2_slot_inventory SET
-                            vendor = COALESCE(cp2_slot_inventory.vendor, v.name),
-                            model = COALESCE(cp2_slot_inventory.model, vm.name),
-                            cabinet = COALESCE(cp2_slot_inventory.cabinet, c.name),
-                            fabrication_year = COALESCE(cp2_slot_inventory.fabrication_year, s.fabrication_year),
-                            current_location = COALESCE(cp2_slot_inventory.current_location, l.name, 'În Stoc / Depozit')
-                        FROM casino_stations s
-                        LEFT JOIN casino_vendors v ON s.vendor_id = v.id
-                        LEFT JOIN casino_vendor_models vm ON s.vendor_model_id = vm.id
-                        LEFT JOIN casino_cabinets c ON s.cabinet_id = c.id
-                        LEFT JOIN casino_locations l ON s.location_id = l.id
-                        WHERE cp2_slot_inventory.serial_nr = %s AND s.serial_nr = %s
-                    """, (s_nr, s_nr))
+                        if is_sale:
+                            cur_sync.execute("""
+                                INSERT INTO cp2_slot_inventory (
+                                    serial_nr, status, exit_type, exit_date,
+                                    sale_contract_id, sale_contract_number,
+                                    sale_invoice_id, sale_invoice_number, sale_invoice_date,
+                                    sale_buyer, sale_price, sale_currency,
+                                    sale_exchange_rate, sale_price_ron, notes
+                                ) VALUES (
+                                    %s, 'Vândut', 'Vânzare', %s,
+                                    %s, %s,
+                                    %s, %s, %s,
+                                    %s, %s, %s,
+                                    %s, %s, %s
+                                )
+                                ON CONFLICT (serial_nr) DO UPDATE SET
+                                    status = 'Vândut',
+                                    exit_type = 'Vânzare',
+                                    exit_date = EXCLUDED.exit_date,
+                                    sale_contract_id = EXCLUDED.sale_contract_id,
+                                    sale_contract_number = EXCLUDED.sale_contract_number,
+                                    sale_invoice_id = EXCLUDED.sale_invoice_id,
+                                    sale_invoice_number = EXCLUDED.sale_invoice_number,
+                                    sale_invoice_date = EXCLUDED.sale_invoice_date,
+                                    sale_buyer = EXCLUDED.sale_buyer,
+                                    sale_price = EXCLUDED.sale_price,
+                                    sale_currency = EXCLUDED.sale_currency,
+                                    sale_exchange_rate = EXCLUDED.sale_exchange_rate,
+                                    sale_price_ron = EXCLUDED.sale_price_ron,
+                                    notes = COALESCE(EXCLUDED.notes, cp2_slot_inventory.notes),
+                                    updated_at = CURRENT_TIMESTAMP
+                            """, (
+                                s_nr, inv_date,
+                                contract_id, c_num,
+                                iid, inv_number, inv_date,
+                                supplier, slot_p, currency,
+                                slot_rate, slot_p_ron, notes
+                            ))
+                        else:
+                            cur_sync.execute("""
+                                INSERT INTO cp2_slot_inventory (
+                                    serial_nr, status, entry_type, entry_date,
+                                    purchase_contract_id, purchase_contract_number,
+                                    purchase_invoice_id, purchase_invoice_number, purchase_invoice_date,
+                                    purchase_supplier, purchase_price, purchase_currency,
+                                    purchase_exchange_rate, purchase_price_ron, notes
+                                ) VALUES (
+                                    %s, 'Activ', 'Achiziție', %s,
+                                    %s, %s,
+                                    %s, %s, %s,
+                                    %s, %s, %s,
+                                    %s, %s, %s
+                                )
+                                ON CONFLICT (serial_nr) DO UPDATE SET
+                                    purchase_contract_id = EXCLUDED.purchase_contract_id,
+                                    purchase_contract_number = EXCLUDED.purchase_contract_number,
+                                    purchase_invoice_id = EXCLUDED.purchase_invoice_id,
+                                    purchase_invoice_number = EXCLUDED.purchase_invoice_number,
+                                    purchase_invoice_date = EXCLUDED.purchase_invoice_date,
+                                    purchase_supplier = EXCLUDED.purchase_supplier,
+                                    purchase_price = EXCLUDED.purchase_price,
+                                    purchase_currency = EXCLUDED.purchase_currency,
+                                    purchase_exchange_rate = EXCLUDED.purchase_exchange_rate,
+                                    purchase_price_ron = EXCLUDED.purchase_price_ron,
+                                    entry_date = COALESCE(cp2_slot_inventory.entry_date, EXCLUDED.entry_date),
+                                    notes = COALESCE(EXCLUDED.notes, cp2_slot_inventory.notes),
+                                    updated_at = CURRENT_TIMESTAMP
+                            """, (
+                                s_nr, inv_date,
+                                contract_id, c_num,
+                                iid, inv_number, inv_date,
+                                supplier, slot_p, currency,
+                                slot_rate, slot_p_ron, notes
+                            ))
+
+                    if not is_sale and series_list:
+                        cur_sync.execute("""
+                            UPDATE cp2_slot_inventory SET
+                                vendor = COALESCE(cp2_slot_inventory.vendor, v.name),
+                                model = COALESCE(cp2_slot_inventory.model, vm.name),
+                                cabinet = COALESCE(cp2_slot_inventory.cabinet, c.name),
+                                fabrication_year = COALESCE(cp2_slot_inventory.fabrication_year, s.fabrication_year),
+                                current_location = COALESCE(cp2_slot_inventory.current_location, l.name, 'În Stoc / Depozit')
+                            FROM casino_stations s
+                            LEFT JOIN casino_vendors v ON s.vendor_id = v.id
+                            LEFT JOIN casino_vendor_models vm ON s.vendor_model_id = vm.id
+                            LEFT JOIN casino_cabinets c ON s.cabinet_id = c.id
+                            LEFT JOIN casino_locations l ON s.location_id = l.id
+                            WHERE cp2_slot_inventory.serial_nr = ANY(%s) AND s.serial_nr = cp2_slot_inventory.serial_nr
+                        """, (series_list,))
+                conn_sync.commit()
+            finally:
+                conn_sync.close()
         except Exception as ex_sync:
             print("Warning: could not sync inventory on invoice add:", ex_sync)
 
@@ -6338,48 +6364,54 @@ def sell_slots():
         unit_sale_p = round(amount / len(series_list), 2) if len(series_list) > 0 and amount > 0 else 0.0
 
         # Discharge from inventory (mark as Vândut)
-        for s_nr in series_list:
-            slot_p = float(series_prices.get(s_nr, unit_sale_p)) if (series_prices and s_nr in series_prices) else unit_sale_p
-            slot_rate = exchange_rate if (exchange_rate and currency == 'EUR') else 1.0
-            slot_p_ron = round(slot_p * slot_rate, 2) if (exchange_rate and currency == 'EUR') else slot_p
+        conn_b = get_pg_conn()
+        try:
+            with conn_b.cursor() as cur_b:
+                for s_nr in series_list:
+                    slot_p = float(series_prices.get(s_nr, unit_sale_p)) if (series_prices and s_nr in series_prices) else unit_sale_p
+                    slot_rate = exchange_rate if (exchange_rate and currency == 'EUR') else 1.0
+                    slot_p_ron = round(slot_p * slot_rate, 2) if (exchange_rate and currency == 'EUR') else slot_p
 
-            pg_qry("""
-                INSERT INTO cp2_slot_inventory (
-                    serial_nr, status, exit_type, exit_date,
-                    sale_contract_id, sale_contract_number,
-                    sale_invoice_id, sale_invoice_number, sale_invoice_date,
-                    sale_buyer, sale_price, sale_currency,
-                    sale_exchange_rate, sale_price_ron, notes
-                ) VALUES (
-                    %s, 'Vândut', 'Vânzare', %s,
-                    %s, %s,
-                    %s, %s, %s,
-                    %s, %s, %s,
-                    %s, %s, %s
-                )
-                ON CONFLICT (serial_nr) DO UPDATE SET
-                    status = 'Vândut',
-                    exit_type = 'Vânzare',
-                    exit_date = EXCLUDED.exit_date,
-                    sale_contract_id = EXCLUDED.sale_contract_id,
-                    sale_contract_number = EXCLUDED.sale_contract_number,
-                    sale_invoice_id = EXCLUDED.sale_invoice_id,
-                    sale_invoice_number = EXCLUDED.sale_invoice_number,
-                    sale_invoice_date = EXCLUDED.sale_invoice_date,
-                    sale_buyer = EXCLUDED.sale_buyer,
-                    sale_price = EXCLUDED.sale_price,
-                    sale_currency = EXCLUDED.sale_currency,
-                    sale_exchange_rate = EXCLUDED.sale_exchange_rate,
-                    sale_price_ron = EXCLUDED.sale_price_ron,
-                    notes = COALESCE(EXCLUDED.notes, cp2_slot_inventory.notes),
-                    updated_at = CURRENT_TIMESTAMP
-            """, (
-                s_nr, inv_date,
-                cid, c_num,
-                iid, inv_number, inv_date,
-                buyer, slot_p, currency,
-                slot_rate, slot_p_ron, notes
-            ))
+                    cur_b.execute("""
+                        INSERT INTO cp2_slot_inventory (
+                            serial_nr, status, exit_type, exit_date,
+                            sale_contract_id, sale_contract_number,
+                            sale_invoice_id, sale_invoice_number, sale_invoice_date,
+                            sale_buyer, sale_price, sale_currency,
+                            sale_exchange_rate, sale_price_ron, notes
+                        ) VALUES (
+                            %s, 'Vândut', 'Vânzare', %s,
+                            %s, %s,
+                            %s, %s, %s,
+                            %s, %s, %s,
+                            %s, %s, %s
+                        )
+                        ON CONFLICT (serial_nr) DO UPDATE SET
+                            status = 'Vândut',
+                            exit_type = 'Vânzare',
+                            exit_date = EXCLUDED.exit_date,
+                            sale_contract_id = EXCLUDED.sale_contract_id,
+                            sale_contract_number = EXCLUDED.sale_contract_number,
+                            sale_invoice_id = EXCLUDED.sale_invoice_id,
+                            sale_invoice_number = EXCLUDED.sale_invoice_number,
+                            sale_invoice_date = EXCLUDED.sale_invoice_date,
+                            sale_buyer = EXCLUDED.sale_buyer,
+                            sale_price = EXCLUDED.sale_price,
+                            sale_currency = EXCLUDED.sale_currency,
+                            sale_exchange_rate = EXCLUDED.sale_exchange_rate,
+                            sale_price_ron = EXCLUDED.sale_price_ron,
+                            notes = COALESCE(EXCLUDED.notes, cp2_slot_inventory.notes),
+                            updated_at = CURRENT_TIMESTAMP
+                    """, (
+                        s_nr, inv_date,
+                        cid, c_num,
+                        iid, inv_number, inv_date,
+                        buyer, slot_p, currency,
+                        slot_rate, slot_p_ron, notes
+                    ))
+            conn_b.commit()
+        finally:
+            conn_b.close()
 
         return jsonify({"success": True, "count": len(series_list), "invoice_id": iid, "contract_id": cid})
     except Exception as e:
