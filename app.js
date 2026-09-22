@@ -1926,6 +1926,25 @@ async function loadFilters(){
       if (repLunareLoc) repLunareLoc.innerHTML+=`<label style="display:flex; align-items:center; gap:8px; font-size:12px; padding:6px 8px; cursor:pointer; border-radius:8px; transition:background 0.2s; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'"><input type="checkbox" class="lunare-loc-cb" value="${l.id}" onchange="updateLocSelectText()"> ${l.name}</label>`;
     }
   });
+
+  const repLunareProv = document.getElementById('rep-lunare-prov');
+  if (repLunareProv) {
+    repLunareProv.innerHTML = '';
+    (filtersData.providers||[]).forEach(p=>{
+      repLunareProv.innerHTML+=`<label style="display:flex; align-items:center; gap:8px; font-size:12px; padding:6px 8px; cursor:pointer; border-radius:8px; transition:background 0.2s; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'"><input type="checkbox" class="lunare-prov-cb" value="${p.id}" onchange="updateProvSelectText()"> ${p.name}</label>`;
+    });
+  }
+
+  const repLunareCab = document.getElementById('rep-lunare-cab');
+  if (repLunareCab) {
+    repLunareCab.innerHTML = '';
+    (filtersData.cabinets||[]).forEach(c=>{
+      repLunareCab.innerHTML+=`<label style="display:flex; align-items:center; gap:8px; font-size:12px; padding:6px 8px; cursor:pointer; border-radius:8px; transition:background 0.2s; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'"><input type="checkbox" class="lunare-cab-cb" value="${c.id}" onchange="updateCabSelectText()"> ${c.name}</label>`;
+    });
+  }
+  if (typeof updateLocSelectText === 'function') updateLocSelectText();
+  if (typeof updateProvSelectText === 'function') updateProvSelectText();
+  if (typeof updateCabSelectText === 'function') updateCabSelectText();
   
   const rp=document.getElementById('rep-prov-select');
   const fp=document.getElementById('f-prov');
@@ -9044,8 +9063,11 @@ adjustMobileUI();
 // ─── LUNARE REPORT ────────────────────────────────────────────────────────
 let _lunareData = [];
 let _lunareSort = { col: 'month', dir: 'desc' };
+let _lunareExpandedMonths = new Set();
+let _lunareExpandedGroups = new Set();
 
 window.loadLunareReport = async function() {
+  if (typeof populateLunareFilters === 'function') populateLunareFilters();
   const serialsEl = document.getElementById('rep-lunare-serials');
   const serials = serialsEl ? serialsEl.value : '';
   const locCheckboxes = document.querySelectorAll('.lunare-loc-cb:checked');
@@ -9055,12 +9077,38 @@ window.loadLunareReport = async function() {
     if (vals.length > 0) customLoc = `&loc_ids=${vals.join(',')}`;
   }
   
+  const provCheckboxes = document.querySelectorAll('.lunare-prov-cb:checked');
+  let customProv = '';
+  if (provCheckboxes && provCheckboxes.length > 0) {
+    const pVals = Array.from(provCheckboxes).map(cb => cb.value).filter(Boolean);
+    if (pVals.length > 0) customProv = `&provider_ids=${pVals.join(',')}`;
+  }
+
+  const cabCheckboxes = document.querySelectorAll('.lunare-cab-cb:checked');
+  let customCab = '';
+  if (cabCheckboxes && cabCheckboxes.length > 0) {
+    const cVals = Array.from(cabCheckboxes).map(cb => cb.value).filter(Boolean);
+    if (cVals.length > 0) customCab = `&cabinet_ids=${cVals.join(',')}`;
+  }
+
   const { s, e } = getPeriod();
+  const filterParams = `start=${s}&end=${e}&serials=${encodeURIComponent(serials)}${customLoc}${customProv}${customCab}`;
   showLoader(true);
   try {
-    const data = await api(`/api/rapoarte/lunare?start=${s}&end=${e}&serials=${encodeURIComponent(serials)}${customLoc}`);
+    const [data, chartRes] = await Promise.all([
+      api(`/api/rapoarte/lunare?${filterParams}`),
+      api(`/api/rapoarte/lunare/chart?${filterParams}`).catch(err => {
+        console.warn('Eroare chart lunare:', err);
+        return null;
+      })
+    ]);
     _lunareData = data || [];
+    _lunareExpandedMonths.clear();
+    _lunareExpandedGroups.clear();
     renderLunareReport();
+    if (chartRes) {
+      renderLunareChart(chartRes);
+    }
   } catch (err) {
     console.error('loadLunareReport error:', err);
     if (typeof showAlert === 'function') showAlert('Eroare la încărcarea raportului lunar.');
@@ -9068,6 +9116,233 @@ window.loadLunareReport = async function() {
   } finally {
     showLoader(false);
   }
+};
+
+window._lunareChartInstance = null;
+
+window.renderLunareChart = function(chartRes) {
+  const canvas = document.getElementById('lunare-chart');
+  const badge = document.getElementById('lunare-chart-granularity-badge');
+  const subtitle = document.getElementById('lunare-chart-subtitle');
+  if (!canvas) return;
+
+  const dataList = (chartRes && chartRes.data) ? chartRes.data : [];
+  const granularity = chartRes ? chartRes.granularity : 'month';
+
+  if (badge) {
+    if (granularity === 'day') {
+      badge.innerText = `Vizualizare: Pe Zile (${dataList.length} ${dataList.length === 1 ? 'zi' : 'zile'})`;
+    } else {
+      badge.innerText = `Vizualizare: Pe Luni (${dataList.length} ${dataList.length === 1 ? 'lună' : 'luni'})`;
+    }
+  }
+
+  if (subtitle) {
+    if (granularity === 'day') {
+      subtitle.innerText = `Evoluție zilnică a valorilor IN / GGR și a aparatelor active în perioada selectată`;
+    } else {
+      subtitle.innerText = `Evoluție lunară a valorilor IN / GGR și a aparatelor active pe lunile selectate`;
+    }
+  }
+
+  if (window._lunareChartInstance) {
+    window._lunareChartInstance.destroy();
+    window._lunareChartInstance = null;
+  }
+
+  if (dataList.length === 0) {
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    return;
+  }
+
+  const monthNames = {
+    '01': 'Ian', '02': 'Feb', '03': 'Mar', '04': 'Apr',
+    '05': 'Mai', '06': 'Iun', '07': 'Iul', '08': 'Aug',
+    '09': 'Sep', '10': 'Oct', '11': 'Noi', '12': 'Dec'
+  };
+
+  const labels = dataList.map(d => {
+    const key = String(d.period_key || '');
+    if (granularity === 'day') {
+      const parts = key.split('-');
+      if (parts.length === 3) return `${parts[2]}.${parts[1]}`;
+      return key;
+    } else {
+      const parts = key.split('-');
+      if (parts.length >= 2) {
+        const mStr = monthNames[parts[1]] || parts[1];
+        return `${mStr} ${parts[0]}`;
+      }
+      return key;
+    }
+  });
+
+  const inData = dataList.map(d => +d.in_val || 0);
+  const ggrData = dataList.map(d => +d.ggr || 0);
+  const aparateData = dataList.map(d => +d.aparate_active || 0);
+
+  const ggrColors = ggrData.map(v => v >= 0 ? 'rgba(16, 185, 129, 0.85)' : 'rgba(239, 68, 68, 0.85)');
+  const ggrHoverColors = ggrData.map(v => v >= 0 ? 'rgba(16, 185, 129, 1)' : 'rgba(239, 68, 68, 1)');
+
+  const ctx = canvas.getContext('2d');
+  window._lunareChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          type: 'line',
+          label: 'Aparate Active',
+          data: aparateData,
+          borderColor: '#f59e0b',
+          backgroundColor: 'rgba(245, 158, 11, 0.15)',
+          borderWidth: 2.5,
+          pointRadius: dataList.length > 25 ? 2.5 : 4.5,
+          pointHoverRadius: 6,
+          pointBackgroundColor: '#f59e0b',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 1.5,
+          tension: 0.3,
+          yAxisID: 'y1',
+          order: 1
+        },
+        {
+          type: 'bar',
+          label: 'Total IN',
+          data: inData,
+          backgroundColor: 'rgba(59, 130, 246, 0.65)',
+          hoverBackgroundColor: 'rgba(59, 130, 246, 0.9)',
+          borderRadius: 4,
+          borderSkipped: false,
+          yAxisID: 'y',
+          order: 2
+        },
+        {
+          type: 'bar',
+          label: 'GGR',
+          data: ggrData,
+          backgroundColor: ggrColors,
+          hoverBackgroundColor: ggrHoverColors,
+          borderRadius: 4,
+          borderSkipped: false,
+          yAxisID: 'y',
+          order: 3
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: 'index',
+        intersect: false
+      },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          labels: {
+            boxWidth: 12,
+            font: { size: 11, weight: '600' },
+            color: '#94a3b8',
+            padding: 12
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(15, 23, 42, 0.92)',
+          titleFont: { size: 12, weight: 'bold' },
+          bodyFont: { size: 11 },
+          padding: 10,
+          cornerRadius: 8,
+          callbacks: {
+            label: function(context) {
+              if (context.dataset.yAxisID === 'y1') {
+                return `${context.dataset.label}: ${context.raw} aparate`;
+              }
+              const val = context.raw;
+              const formatted = typeof fmt === 'function' ? fmt(val) : Math.round(val).toLocaleString();
+              return `${context.dataset.label}: ${formatted} RON`;
+            }
+          }
+        },
+        datalabels: {
+          display: false
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: {
+            color: '#94a3b8',
+            font: { size: 10 },
+            maxRotation: dataList.length > 15 ? 45 : 0
+          }
+        },
+        y: {
+          type: 'linear',
+          position: 'left',
+          title: {
+            display: true,
+            text: 'Sume (RON)',
+            color: '#94a3b8',
+            font: { size: 10, weight: '600' }
+          },
+          grid: {
+            color: 'rgba(255, 255, 255, 0.05)'
+          },
+          ticks: {
+            color: '#94a3b8',
+            font: { size: 10 },
+            callback: function(val) {
+              if (Math.abs(val) >= 1000000) return (val / 1000000).toFixed(1) + 'M';
+              if (Math.abs(val) >= 1000) return (val / 1000).toFixed(0) + 'k';
+              return val.toLocaleString();
+            }
+          }
+        },
+        y1: {
+          type: 'linear',
+          position: 'right',
+          title: {
+            display: true,
+            text: 'Aparate Active',
+            color: '#f59e0b',
+            font: { size: 10, weight: '600' }
+          },
+          grid: {
+            drawOnChartArea: false
+          },
+          ticks: {
+            color: '#f59e0b',
+            font: { size: 10 },
+            precision: 0,
+            stepSize: 1
+          },
+          beginAtZero: true
+        }
+      }
+    }
+  });
+};
+
+let _lunareGrouping = 'loc'; // 'loc', 'prov', 'cab', 'loc_prov', 'serials'
+window.setLunareGrouping = function(grp) {
+  _lunareGrouping = grp;
+  _lunareExpandedGroups.clear();
+  ['loc', 'prov', 'cab', 'loc_prov', 'serials'].forEach(g => {
+    const btn = document.getElementById('btn-group-' + g.replace('_', '-'));
+    if (btn) {
+      if (g === grp) {
+        btn.style.background = 'var(--accent)';
+        btn.style.color = '#fff';
+      } else {
+        btn.style.background = 'transparent';
+        btn.style.color = 'var(--text)';
+      }
+    }
+  });
+  renderLunareReport();
 };
 
 let _lunareTotalSortAsc = false;
@@ -9084,13 +9359,17 @@ function renderLunareReport() {
   if (!_lunareData || _lunareData.length === 0) {
     body.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:40px; color:var(--muted);">Nu există date pentru selecția curentă.</td></tr>';
     if (foot) foot.innerHTML = '';
+    const kpiSerialsEl = document.getElementById('lunare-kpi-serials');
+    if (kpiSerialsEl) kpiSerialsEl.innerText = '0';
     return;
   }
 
-  // Pre-calculate totals for the full dataset
-  let tIn = 0, tOut = 0, tGgr = 0, tMkt = 0, tNgr = 0, tWin = 0, tBet = 0;
+  // Pre-calculate totals and unique entities
+  let tIn = 0, tOut = 0, tGgr = 0, tMkt = 0, tNgr = 0, tWin = 0, tBet = 0, tDays = 0;
   const monthlyData = {};
   const locations = new Set();
+  const providers = new Set();
+  const cabinets = new Set();
   const globalSerials = new Set();
   
   _lunareData.forEach(r => {
@@ -9101,6 +9380,7 @@ function renderLunareReport() {
     const ngrV = (+r.ngr || 0);
     const winV = (+r.win || 0);
     const betV = (+r.bet || 0);
+    const daysV = (+r.days_active || 0);
     tIn += inV;
     tOut += outV;
     tGgr += ggrV;
@@ -9108,21 +9388,33 @@ function renderLunareReport() {
     tNgr += ngrV;
     tWin += winV;
     tBet += betV;
+    tDays += daysV;
     
-    const daysActive = (+r.days_active || 0);
-    if (r.serial_nr && daysActive >= 3) globalSerials.add(r.serial_nr);
+    // Numarul real de aparate fizice
+    if (r.serial_nr) globalSerials.add(r.serial_nr);
     
     const m = r.month || 'Necunoscut';
     const loc = r.location_name || 'Necunoscut';
+    const prov = r.provider || 'Necunoscut';
+    const cab = r.cabinet || '—';
     locations.add(loc);
+    providers.add(prov);
+    cabinets.add(cab);
     
-    if (!monthlyData[m]) monthlyData[m] = { in: 0, out: 0, ggr: 0, mkt: 0, ngr: 0, win: 0, bet: 0, serials: new Set(), locs: {} };
-    if (!monthlyData[m].locs[loc]) monthlyData[m].locs[loc] = { in: 0, out: 0, ggr: 0, mkt: 0, ngr: 0, win: 0, bet: 0, serials: new Set() };
+    let groupKey = loc;
+    if (_lunareGrouping === 'prov') groupKey = prov;
+    else if (_lunareGrouping === 'cab') groupKey = cab;
+    else if (_lunareGrouping === 'loc_prov') groupKey = `${loc} — ${prov}`;
+    else if (_lunareGrouping === 'serials') groupKey = `${loc} — ${r.serial_nr || '—'} (${prov} · ${cab})`;
+
+    if (!monthlyData[m]) monthlyData[m] = { in: 0, out: 0, ggr: 0, mkt: 0, ngr: 0, win: 0, bet: 0, days: 0, serials: new Set(), groups: {} };
+    if (!monthlyData[m].groups[groupKey]) monthlyData[m].groups[groupKey] = { in: 0, out: 0, ggr: 0, mkt: 0, ngr: 0, win: 0, bet: 0, days: 0, serials: new Set(), machines: [] };
     
-    if (r.serial_nr && daysActive >= 3) {
+    if (r.serial_nr) {
       monthlyData[m].serials.add(r.serial_nr);
-      monthlyData[m].locs[loc].serials.add(r.serial_nr);
+      monthlyData[m].groups[groupKey].serials.add(r.serial_nr);
     }
+    monthlyData[m].groups[groupKey].machines.push(r);
     
     monthlyData[m].in += inV;
     monthlyData[m].out += outV;
@@ -9131,26 +9423,44 @@ function renderLunareReport() {
     monthlyData[m].ngr += ngrV;
     monthlyData[m].win += winV;
     monthlyData[m].bet += betV;
+    monthlyData[m].days += daysV;
     
-    monthlyData[m].locs[loc].in += inV;
-    monthlyData[m].locs[loc].out += outV;
-    monthlyData[m].locs[loc].ggr += ggrV;
-    monthlyData[m].locs[loc].mkt += mktV;
-    monthlyData[m].locs[loc].ngr += ngrV;
-    monthlyData[m].locs[loc].win += winV;
-    monthlyData[m].locs[loc].bet += betV;
+    monthlyData[m].groups[groupKey].in += inV;
+    monthlyData[m].groups[groupKey].out += outV;
+    monthlyData[m].groups[groupKey].ggr += ggrV;
+    monthlyData[m].groups[groupKey].mkt += mktV;
+    monthlyData[m].groups[groupKey].ngr += ngrV;
+    monthlyData[m].groups[groupKey].win += winV;
+    monthlyData[m].groups[groupKey].bet += betV;
+    monthlyData[m].groups[groupKey].days += daysV;
   });
+
+  // Update KPI Cards
+  const kpiSerialsEl = document.getElementById('lunare-kpi-serials');
+  const kpiLocsEl = document.getElementById('lunare-kpi-locs');
+  const kpiProvsEl = document.getElementById('lunare-kpi-provs');
+  const kpiCabsEl = document.getElementById('lunare-kpi-cabs');
+  if (kpiSerialsEl) kpiSerialsEl.innerText = globalSerials.size;
+  if (kpiLocsEl) kpiLocsEl.innerText = locations.size;
+  if (kpiProvsEl) kpiProvsEl.innerText = providers.size;
+  if (kpiCabsEl) kpiCabsEl.innerText = cabinets.size;
 
   const headTotal = document.getElementById('head-rep-lunare-total');
   const bodyTotal = document.getElementById('body-rep-lunare-total');
   const footTotal = document.getElementById('foot-rep-lunare-total');
   if (headTotal && bodyTotal) {
-    const sortedLocs = Array.from(locations).sort((a,b) => a.localeCompare(b));
+    let groupColName = 'Lună / Locație';
+    if (_lunareGrouping === 'prov') groupColName = 'Lună / Producător';
+    else if (_lunareGrouping === 'cab') groupColName = 'Lună / Cabinet';
+    else if (_lunareGrouping === 'loc_prov') groupColName = 'Lună / Locație & Producător';
+    else if (_lunareGrouping === 'serials') groupColName = 'Lună / Serie Aparat';
+
     const sortedMonths = Object.keys(monthlyData).sort((a,b) => _lunareTotalSortAsc ? a.localeCompare(b) : b.localeCompare(a));
     
     let headHtml = `<tr>
-      <th style="cursor:pointer;" onclick="sortLunareTotalMonths()">Lună / Locație ${_lunareTotalSortAsc ? '↑' : '↓'}</th>
-      <th class="num">Aparate</th>
+      <th style="cursor:pointer;" onclick="sortLunareTotalMonths()">${groupColName} ${_lunareTotalSortAsc ? '↑' : '↓'}</th>
+      <th class="num" title="Numărul real de aparate fizice distincte">Aparate</th>
+      <th class="num" title="Zile lucrate efectiv în lună/perioadă">Zile Lucrate</th>
       <th class="num">IN</th>
       <th class="num">IN Mediu</th>
       <th class="num">OUT</th>
@@ -9166,9 +9476,21 @@ function renderLunareReport() {
     let totalHtml = '';
     sortedMonths.forEach(m => {
       const d = monthlyData[m];
-      totalHtml += `<tr style="background:var(--surface2);">
-        <td style="font-weight:700; border-top:1px solid var(--border);">${m} (TOTAL)</td>
-        <td class="num" style="font-weight:700; border-top:1px solid var(--border);">${d.serials.size}</td>
+      const safeM = m.replace(/'/g, "\\'");
+      const safeMId = m.replace(/[^a-zA-Z0-9_-]/g, '_');
+      const isExpanded = _lunareExpandedMonths.has(m);
+
+      totalHtml += `<tr class="lunare-month-row" data-month="${safeM}" style="background:var(--surface2);" onclick="toggleLunareMonth('${safeM}')">
+        <td style="font-weight:700; border-top:1px solid var(--border); display:flex; align-items:center; gap:8px;">
+          <span id="chevron-lunare-${safeMId}" class="lunare-chevron" style="transform:${isExpanded ? 'rotate(90deg)' : 'rotate(0deg)'}; color:var(--muted); width:16px; height:16px;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </span>
+          <span>${m} (TOTAL)</span>
+        </td>
+        <td class="num" style="font-weight:800; border-top:1px solid var(--border);" onclick="event.stopPropagation()">
+          <span class="drill-link" style="cursor:pointer; color:var(--accent); text-decoration:underline;" onclick="openLunareSerialsModal('${safeM}', 'ALL')" title="Apasă pentru a vedea lista aparatelor fizice">${d.serials.size}</span>
+        </td>
+        <td class="num" style="font-weight:700; border-top:1px solid var(--border);" title="Medie: ${d.serials.size > 0 ? (d.days / d.serials.size).toFixed(1) : 0} zile/aparat">${(d.days || 0).toLocaleString('ro-RO')}</td>
         <td class="num" style="font-weight:700; border-top:1px solid var(--border);">${fmt(d.in)}</td>
         <td class="num" style="font-weight:700; border-top:1px solid var(--border);">${d.serials.size > 0 ? fmt(d.in / d.serials.size) : 0}</td>
         <td class="num" style="font-weight:700; border-top:1px solid var(--border);">${fmt(d.out)}</td>
@@ -9180,24 +9502,78 @@ function renderLunareReport() {
         <td class="num" style="font-weight:700; border-top:1px solid var(--border);">${d.bet > 0 ? ((d.win - d.mkt) / d.bet * 100).toFixed(2) + '%' : '0.00%'}</td>
       </tr>`;
       
-      sortedLocs.forEach(loc => {
-        if (!d.locs[loc]) return;
-        const ld = d.locs[loc];
-        if (ld.in === 0 && ld.out === 0 && ld.ggr === 0 && ld.mkt === 0 && (!ld.serials || ld.serials.size === 0)) return;
+      const sortedGroups = Object.keys(d.groups).sort((a,b) => a.localeCompare(b));
+      sortedGroups.forEach(gKey => {
+        const gd = d.groups[gKey];
+        if (gd.in === 0 && gd.out === 0 && gd.ggr === 0 && gd.mkt === 0 && (!gd.serials || gd.serials.size === 0)) return;
+        const safeGKey = gKey.replace(/'/g, "\\'");
+        const safeGId = gKey.replace(/[^a-zA-Z0-9_-]/g, '_');
+        const grpCompositeKey = `${m}:::${gKey}`;
+        const isGrpExpanded = _lunareExpandedGroups.has(grpCompositeKey);
+        const hasSubSerials = _lunareGrouping !== 'serials' && gd.machines && gd.machines.length > 0;
 
-        totalHtml += `<tr>
-          <td style="padding-left:20px; font-size:12px;">${loc}</td>
-          <td class="num" style="font-weight:700; font-size:12px;">${ld.serials ? ld.serials.size : 0}</td>
-          <td class="num" style="font-size:12px;">${fmt(ld.in)}</td>
-          <td class="num" style="font-size:12px;">${(ld.serials && ld.serials.size > 0) ? fmt(ld.in / ld.serials.size) : 0}</td>
-          <td class="num" style="font-size:12px;">${fmt(ld.out)}</td>
-          <td class="num" style="font-weight:700; font-size:12px; color:${ld.ggr >= 0 ? 'var(--green)' : 'var(--red)'}">${fmt(ld.ggr)}</td>
-          <td class="num" style="font-weight:700; font-size:12px; color:${ld.ggr >= 0 ? 'var(--green)' : 'var(--red)'}">${(ld.serials && ld.serials.size > 0) ? fmt(ld.ggr / ld.serials.size) : 0}</td>
-          <td class="num" style="font-weight:700; font-size:12px; color:${ld.ngr >= 0 ? 'var(--green)' : 'var(--red)'}">${fmt(ld.ngr)}</td>
-          <td class="num" style="font-size:12px; color:var(--muted);">${fmt(ld.mkt)}</td>
-          <td class="num" style="font-weight:700; font-size:12px;">${ld.bet > 0 ? (ld.win / ld.bet * 100).toFixed(2) + '%' : '0.00%'}</td>
-          <td class="num" style="font-weight:700; font-size:12px;">${ld.bet > 0 ? ((ld.win - ld.mkt) / ld.bet * 100).toFixed(2) + '%' : '0.00%'}</td>
+        totalHtml += `<tr class="lunare-subrow lunare-subrow-${safeMId}" data-month="${safeM}" data-group="${safeGKey}" style="display:${isExpanded ? 'table-row' : 'none'}; ${hasSubSerials ? 'cursor:pointer;' : ''}" ${hasSubSerials ? `onclick="toggleLunareGroup('${safeM}', '${safeGKey}')"` : ''}>
+          <td style="padding-left:36px; font-size:12px; font-weight:600; display:flex; align-items:center; gap:6px;">
+            ${hasSubSerials ? `
+              <span id="chevron-lunare-grp-${safeMId}-${safeGId}" class="lunare-chevron" style="transform:${isGrpExpanded ? 'rotate(90deg)' : 'rotate(0deg)'}; color:var(--muted); width:14px; height:14px;">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </span>
+            ` : '<span style="display:inline-block; width:14px;"></span>'}
+            <span>${gKey}</span>
+          </td>
+          <td class="num" style="font-weight:700; font-size:12px;" onclick="event.stopPropagation()">
+            <span class="drill-link" style="cursor:pointer; color:var(--accent); text-decoration:underline;" onclick="openLunareSerialsModal('${safeM}', '${safeGKey}')" title="Apasă pentru a vedea lista aparatelor fizice">${gd.serials ? gd.serials.size : 0}</span>
+          </td>
+          <td class="num" style="font-size:12px; font-weight:600;" title="Medie: ${(gd.serials && gd.serials.size > 0) ? (gd.days / gd.serials.size).toFixed(1) : 0} zile/aparat">${(gd.days || 0).toLocaleString('ro-RO')}</td>
+          <td class="num" style="font-size:12px;">${fmt(gd.in)}</td>
+          <td class="num" style="font-size:12px;">${(gd.serials && gd.serials.size > 0) ? fmt(gd.in / gd.serials.size) : 0}</td>
+          <td class="num" style="font-size:12px;">${fmt(gd.out)}</td>
+          <td class="num" style="font-weight:700; font-size:12px; color:${gd.ggr >= 0 ? 'var(--green)' : 'var(--red)'}">${fmt(gd.ggr)}</td>
+          <td class="num" style="font-weight:700; font-size:12px; color:${gd.ggr >= 0 ? 'var(--green)' : 'var(--red)'}">${(gd.serials && gd.serials.size > 0) ? fmt(gd.ggr / gd.serials.size) : 0}</td>
+          <td class="num" style="font-weight:700; font-size:12px; color:${gd.ngr >= 0 ? 'var(--green)' : 'var(--red)'}">${fmt(gd.ngr)}</td>
+          <td class="num" style="font-size:12px; color:var(--muted);">${fmt(gd.mkt)}</td>
+          <td class="num" style="font-weight:700; font-size:12px;">${gd.bet > 0 ? (gd.win / gd.bet * 100).toFixed(2) + '%' : '0.00%'}</td>
+          <td class="num" style="font-weight:700; font-size:12px;">${gd.bet > 0 ? ((gd.win - gd.mkt) / gd.bet * 100).toFixed(2) + '%' : '0.00%'}</td>
         </tr>`;
+
+        if (hasSubSerials) {
+          const sortedMachines = gd.machines.slice().sort((a,b) => {
+            const locComp = (a.location_name || '').localeCompare(b.location_name || '');
+            if (locComp !== 0) return locComp;
+            return (a.serial_nr || '').localeCompare(b.serial_nr || '');
+          });
+          sortedMachines.forEach(mach => {
+            const mIn = +mach.in_val || 0;
+            const mOut = +mach.out_val || 0;
+            const mGgr = +mach.ggr || 0;
+            const mNgr = +mach.ngr || 0;
+            const mMkt = +mach.marketing || 0;
+            const mBet = +mach.bet || 0;
+            const mWin = +mach.win || 0;
+            const safeMachSerial = (mach.serial_nr || '').replace(/'/g, "\\'");
+
+            totalHtml += `<tr class="lunare-serial-row lunare-serial-row-${safeMId} lunare-serial-row-${safeMId}-${safeGId}" data-month="${safeM}" data-group="${safeGKey}" style="display:${(isExpanded && isGrpExpanded) ? 'table-row' : 'none'}; background:var(--surface);">
+              <td style="padding-left:56px; font-size:11px;">
+                ${_lunareGrouping !== 'loc' ? `<span style="font-weight:700; color:var(--text);">${mach.location_name || '—'}</span> <span style="color:var(--muted); margin:0 3px;">—</span> ` : ''}
+                <span style="font-family:monospace; font-weight:700; color:var(--accent); font-size:12px;">${mach.serial_nr}</span>
+                <span style="color:var(--muted); margin-left:6px; font-size:11px;">(${mach.provider || '—'} · ${mach.cabinet || '—'})</span>
+              </td>
+              <td class="num" style="font-size:11px; color:var(--muted);" onclick="event.stopPropagation()">
+                <span class="drill-link" style="cursor:pointer; color:var(--accent); text-decoration:underline;" onclick="openLunareSerialsModal('${safeM}', '${safeGKey}', '${safeMachSerial}')" title="Apasă pentru detalii aparat">1</span>
+              </td>
+              <td class="num" style="font-size:11px; font-weight:600;">${mach.days_active || 0}</td>
+              <td class="num" style="font-size:11px;">${fmt(mIn)}</td>
+              <td class="num" style="font-size:11px; color:var(--muted);">${fmt(mIn)}</td>
+              <td class="num" style="font-size:11px;">${fmt(mOut)}</td>
+              <td class="num" style="font-weight:700; font-size:11px; color:${mGgr >= 0 ? 'var(--green)' : 'var(--red)'}">${fmt(mGgr)}</td>
+              <td class="num" style="font-weight:700; font-size:11px; color:${mGgr >= 0 ? 'var(--green)' : 'var(--red)'}">${fmt(mGgr)}</td>
+              <td class="num" style="font-weight:700; font-size:11px; color:${mNgr >= 0 ? 'var(--green)' : 'var(--red)'}">${fmt(mNgr)}</td>
+              <td class="num" style="font-size:11px; color:var(--muted);">${fmt(mMkt)}</td>
+              <td class="num" style="font-size:11px;">${mBet > 0 ? (mWin / mBet * 100).toFixed(2) + '%' : '0.00%'}</td>
+              <td class="num" style="font-size:11px;">${mBet > 0 ? ((mWin - mMkt) / mBet * 100).toFixed(2) + '%' : '0.00%'}</td>
+            </tr>`;
+          });
+        }
       });
     });
     bodyTotal.innerHTML = totalHtml;
@@ -9205,7 +9581,10 @@ function renderLunareReport() {
     if (footTotal) {
       let footHtml = `<tr style="background:var(--surface2); font-weight:800;">
         <td style="border-top:2px solid var(--border);">TOTAL PERIOADĂ (GLOBAL)</td>
-        <td class="num" style="border-top:2px solid var(--border); font-weight:700;">${globalSerials.size}</td>
+        <td class="num" style="border-top:2px solid var(--border); font-weight:800;">
+          <span class="drill-link" style="cursor:pointer; color:var(--accent); text-decoration:underline;" onclick="openLunareSerialsModal('ALL', 'ALL')" title="Apasă pentru a vedea lista tuturor aparatelor fizice">${globalSerials.size}</span>
+        </td>
+        <td class="num" style="border-top:2px solid var(--border); font-weight:800;" title="Medie: ${globalSerials.size > 0 ? (tDays / globalSerials.size).toFixed(1) : 0} zile/aparat">${tDays.toLocaleString('ro-RO')}</td>
         <td class="num" style="border-top:2px solid var(--border);">${fmt(tIn)}</td>
         <td class="num" style="border-top:2px solid var(--border);">${globalSerials.size > 0 ? fmt(tIn / globalSerials.size) : 0}</td>
         <td class="num" style="border-top:2px solid var(--border);">${fmt(tOut)}</td>
@@ -9237,6 +9616,7 @@ function renderLunareReport() {
       <td>${r.location_name || '—'}</td>
       <td>${r.provider || '—'}</td>
       <td>${r.cabinet || '—'}</td>
+      <td class="num">${r.days_active || 0}</td>
       <td class="num">${fmt(inVal)}</td>
       <td class="num">${fmt(outVal)}</td>
       <td class="num" style="font-weight:700; color:${ggrVal >= 0 ? 'var(--green)' : 'var(--red)'}">${fmt(ggrVal)}</td>
@@ -9254,12 +9634,77 @@ function renderLunareReport() {
   if (foot) {
     foot.innerHTML = `<tr style="background:var(--surface2); font-weight:800;">
       <td colspan="5">TOTAL (Toate paginile)</td>
+      <td class="num">${tDays.toLocaleString('ro-RO')}</td>
       <td class="num">${fmt(tIn)}</td>
       <td class="num">${fmt(tOut)}</td>
       <td class="num" style="color:${tGgr >= 0 ? 'var(--green)' : 'var(--red)'}">${fmt(tGgr)}</td>
     </tr>`;
   }
 }
+
+window.toggleLunareMonth = function(m) {
+  const safeMId = m.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const chevron = document.getElementById('chevron-lunare-' + safeMId);
+  const rows = document.querySelectorAll('.lunare-subrow-' + safeMId);
+  const serialRows = document.querySelectorAll('.lunare-serial-row-' + safeMId);
+  if (_lunareExpandedMonths.has(m)) {
+    _lunareExpandedMonths.delete(m);
+    rows.forEach(r => r.style.display = 'none');
+    serialRows.forEach(r => r.style.display = 'none');
+    if (chevron) chevron.style.transform = 'rotate(0deg)';
+  } else {
+    _lunareExpandedMonths.add(m);
+    rows.forEach(r => {
+      r.style.display = 'table-row';
+      const gKey = r.getAttribute('data-group');
+      if (gKey && _lunareExpandedGroups.has(`${m}:::${gKey}`)) {
+        const safeGId = gKey.replace(/[^a-zA-Z0-9_-]/g, '_');
+        document.querySelectorAll(`.lunare-serial-row-${safeMId}-${safeGId}`).forEach(sr => sr.style.display = 'table-row');
+      }
+    });
+    if (chevron) chevron.style.transform = 'rotate(90deg)';
+  }
+};
+
+window.toggleLunareGroup = function(m, gKey) {
+  const safeMId = m.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const safeGId = gKey.replace(/[^a-zA-Z0-9_-]/g, '_');
+  const grpCompositeKey = `${m}:::${gKey}`;
+  const chevron = document.getElementById(`chevron-lunare-grp-${safeMId}-${safeGId}`);
+  const rows = document.querySelectorAll(`.lunare-serial-row-${safeMId}-${safeGId}`);
+  if (_lunareExpandedGroups.has(grpCompositeKey)) {
+    _lunareExpandedGroups.delete(grpCompositeKey);
+    rows.forEach(r => r.style.display = 'none');
+    if (chevron) chevron.style.transform = 'rotate(0deg)';
+  } else {
+    _lunareExpandedGroups.add(grpCompositeKey);
+    rows.forEach(r => r.style.display = 'table-row');
+    if (chevron) chevron.style.transform = 'rotate(90deg)';
+  }
+};
+
+window.expandAllLunareMonths = function() {
+  document.querySelectorAll('.lunare-month-row').forEach(tr => {
+    const m = tr.getAttribute('data-month');
+    if (m) _lunareExpandedMonths.add(m);
+  });
+  document.querySelectorAll('.lunare-subrow').forEach(tr => {
+    tr.style.display = 'table-row';
+    const m = tr.getAttribute('data-month');
+    const gKey = tr.getAttribute('data-group');
+    if (m && gKey) _lunareExpandedGroups.add(`${m}:::${gKey}`);
+  });
+  document.querySelectorAll('.lunare-serial-row').forEach(r => r.style.display = 'table-row');
+  document.querySelectorAll('.lunare-chevron').forEach(ch => ch.style.transform = 'rotate(90deg)');
+};
+
+window.collapseAllLunareMonths = function() {
+  _lunareExpandedMonths.clear();
+  _lunareExpandedGroups.clear();
+  document.querySelectorAll('.lunare-subrow').forEach(r => r.style.display = 'none');
+  document.querySelectorAll('.lunare-serial-row').forEach(r => r.style.display = 'none');
+  document.querySelectorAll('.lunare-chevron').forEach(ch => ch.style.transform = 'rotate(0deg)');
+};
 
 window.toggleLunareDetails = function() {
   const container = document.getElementById('lunare-detaliat-container');
@@ -9284,20 +9729,33 @@ window.exportLunareExcel = function() {
     return;
   }
   
+  let groupColName = 'Lună / Locație';
+  if (_lunareGrouping === 'prov') groupColName = 'Lună / Producător';
+  else if (_lunareGrouping === 'cab') groupColName = 'Lună / Cabinet';
+  else if (_lunareGrouping === 'loc_prov') groupColName = 'Lună / Locație & Producător';
+  else if (_lunareGrouping === 'serials') groupColName = 'Lună / Serie Aparat';
+
   const monthlyData = {};
-  const locations = new Set();
   _lunareData.forEach(r => {
     const m = r.month || 'Necunoscut';
     const loc = r.location_name || 'Necunoscut';
-    locations.add(loc);
-    if (!monthlyData[m]) monthlyData[m] = { in: 0, out: 0, ggr: 0, mkt: 0, ngr: 0, win: 0, bet: 0, serials: new Set(), locs: {} };
-    if (!monthlyData[m].locs[loc]) monthlyData[m].locs[loc] = { in: 0, out: 0, ggr: 0, mkt: 0, ngr: 0, win: 0, bet: 0, serials: new Set() };
+    const prov = r.provider || 'Necunoscut';
+    const cab = r.cabinet || '—';
     
-    const daysActive = (+r.days_active || 0);
-    if (r.serial_nr && daysActive >= 3) {
+    let groupKey = loc;
+    if (_lunareGrouping === 'prov') groupKey = prov;
+    else if (_lunareGrouping === 'cab') groupKey = cab;
+    else if (_lunareGrouping === 'loc_prov') groupKey = `${loc} — ${prov}`;
+    else if (_lunareGrouping === 'serials') groupKey = `${loc} — ${r.serial_nr || '—'} (${prov} · ${cab})`;
+
+    if (!monthlyData[m]) monthlyData[m] = { in: 0, out: 0, ggr: 0, mkt: 0, ngr: 0, win: 0, bet: 0, days: 0, serials: new Set(), groups: {} };
+    if (!monthlyData[m].groups[groupKey]) monthlyData[m].groups[groupKey] = { in: 0, out: 0, ggr: 0, mkt: 0, ngr: 0, win: 0, bet: 0, days: 0, serials: new Set(), machines: [] };
+    
+    if (r.serial_nr) {
       monthlyData[m].serials.add(r.serial_nr);
-      monthlyData[m].locs[loc].serials.add(r.serial_nr);
+      monthlyData[m].groups[groupKey].serials.add(r.serial_nr);
     }
+    monthlyData[m].groups[groupKey].machines.push(r);
     
     const inV = (+r.in_val || 0);
     const outV = (+r.out_val || 0);
@@ -9306,6 +9764,7 @@ window.exportLunareExcel = function() {
     const ngrV = (+r.ngr || 0);
     const winV = (+r.win || 0);
     const betV = (+r.bet || 0);
+    const daysV = (+r.days_active || 0);
     
     monthlyData[m].in += inV;
     monthlyData[m].out += outV;
@@ -9314,53 +9773,92 @@ window.exportLunareExcel = function() {
     monthlyData[m].ngr += ngrV;
     monthlyData[m].win += winV;
     monthlyData[m].bet += betV;
+    monthlyData[m].days += daysV;
     
-    monthlyData[m].locs[loc].in += inV;
-    monthlyData[m].locs[loc].out += outV;
-    monthlyData[m].locs[loc].ggr += ggrV;
-    monthlyData[m].locs[loc].mkt += mktV;
-    monthlyData[m].locs[loc].ngr += ngrV;
-    monthlyData[m].locs[loc].win += winV;
-    monthlyData[m].locs[loc].bet += betV;
+    monthlyData[m].groups[groupKey].in += inV;
+    monthlyData[m].groups[groupKey].out += outV;
+    monthlyData[m].groups[groupKey].ggr += ggrV;
+    monthlyData[m].groups[groupKey].mkt += mktV;
+    monthlyData[m].groups[groupKey].ngr += ngrV;
+    monthlyData[m].groups[groupKey].win += winV;
+    monthlyData[m].groups[groupKey].bet += betV;
+    monthlyData[m].groups[groupKey].days += daysV;
   });
   const sortedMonths = Object.keys(monthlyData).sort((a,b) => b.localeCompare(a));
-  const sortedLocs = Array.from(locations).sort((a,b) => a.localeCompare(b));
   
   const dataTotal = [];
   sortedMonths.forEach(m => {
+    const d = monthlyData[m];
     dataTotal.push({
-      'Lună / Locație': `${m} (TOTAL)`,
-      'Aparate': monthlyData[m].serials.size,
-      'IN': monthlyData[m].in,
-      'IN Mediu': monthlyData[m].serials.size > 0 ? (monthlyData[m].in / monthlyData[m].serials.size) : 0,
-      'OUT': monthlyData[m].out,
-      'GGR': monthlyData[m].ggr,
-      'GGR Mediu': monthlyData[m].serials.size > 0 ? (monthlyData[m].ggr / monthlyData[m].serials.size) : 0,
-      'NGR': monthlyData[m].ngr,
-      'MKT Cost': monthlyData[m].mkt,
-      'WIN/BET %': monthlyData[m].bet > 0 ? (monthlyData[m].win / monthlyData[m].bet * 100).toFixed(2) + '%' : '0.00%',
-      'WIN/BET NGR %': monthlyData[m].bet > 0 ? ((monthlyData[m].win - monthlyData[m].mkt) / monthlyData[m].bet * 100).toFixed(2) + '%' : '0.00%'
+      [groupColName]: `${m} (TOTAL)`,
+      'Aparate': d.serials.size,
+      'Zile Lucrate': d.days,
+      'IN': d.in,
+      'IN Mediu': d.serials.size > 0 ? (d.in / d.serials.size) : 0,
+      'OUT': d.out,
+      'GGR': d.ggr,
+      'GGR Mediu': d.serials.size > 0 ? (d.ggr / d.serials.size) : 0,
+      'NGR': d.ngr,
+      'MKT Cost': d.mkt,
+      'WIN/BET %': d.bet > 0 ? (d.win / d.bet * 100).toFixed(2) + '%' : '0.00%',
+      'WIN/BET NGR %': d.bet > 0 ? ((d.win - d.mkt) / d.bet * 100).toFixed(2) + '%' : '0.00%'
     });
     
-    sortedLocs.forEach(loc => {
-      const ld = monthlyData[m].locs[loc];
-      if (!ld) return;
-      if (ld.in === 0 && ld.out === 0 && ld.ggr === 0 && ld.mkt === 0 && (!ld.serials || ld.serials.size === 0)) return;
+    if (_lunareExpandedMonths.has(m)) {
+      const sortedGroups = Object.keys(d.groups).sort((a,b) => a.localeCompare(b));
+      sortedGroups.forEach(gKey => {
+        const gd = d.groups[gKey];
+        if (!gd) return;
+        if (gd.in === 0 && gd.out === 0 && gd.ggr === 0 && gd.mkt === 0 && (!gd.serials || gd.serials.size === 0)) return;
 
-      dataTotal.push({
-        'Lună / Locație': `  ${loc}`,
-        'Aparate': ld.serials ? ld.serials.size : 0,
-        'IN': ld.in,
-        'IN Mediu': (ld.serials && ld.serials.size > 0) ? (ld.in / ld.serials.size) : 0,
-        'OUT': ld.out,
-        'GGR': ld.ggr,
-        'GGR Mediu': (ld.serials && ld.serials.size > 0) ? (ld.ggr / ld.serials.size) : 0,
-        'NGR': ld.ngr,
-        'MKT Cost': ld.mkt,
-        'WIN/BET %': ld.bet > 0 ? (ld.win / ld.bet * 100).toFixed(2) + '%' : '0.00%',
-        'WIN/BET NGR %': ld.bet > 0 ? ((ld.win - ld.mkt) / ld.bet * 100).toFixed(2) + '%' : '0.00%'
+        dataTotal.push({
+          [groupColName]: `  ${gKey}`,
+          'Aparate': gd.serials ? gd.serials.size : 0,
+          'Zile Lucrate': gd.days || 0,
+          'IN': gd.in,
+          'IN Mediu': (gd.serials && gd.serials.size > 0) ? (gd.in / gd.serials.size) : 0,
+          'OUT': gd.out,
+          'GGR': gd.ggr,
+          'GGR Mediu': (gd.serials && gd.serials.size > 0) ? (gd.ggr / gd.serials.size) : 0,
+          'NGR': gd.ngr,
+          'MKT Cost': gd.mkt,
+          'WIN/BET %': gd.bet > 0 ? (gd.win / gd.bet * 100).toFixed(2) + '%' : '0.00%',
+          'WIN/BET NGR %': gd.bet > 0 ? ((gd.win - gd.mkt) / gd.bet * 100).toFixed(2) + '%' : '0.00%'
+        });
+
+        const grpCompositeKey = `${m}:::${gKey}`;
+        if (_lunareGrouping !== 'serials' && _lunareExpandedGroups.has(grpCompositeKey) && gd.machines && gd.machines.length > 0) {
+          const sortedMachines = gd.machines.slice().sort((a,b) => {
+            const locComp = (a.location_name || '').localeCompare(b.location_name || '');
+            if (locComp !== 0) return locComp;
+            return (a.serial_nr || '').localeCompare(b.serial_nr || '');
+          });
+          sortedMachines.forEach(mach => {
+            const mIn = +mach.in_val || 0;
+            const mOut = +mach.out_val || 0;
+            const mGgr = +mach.ggr || 0;
+            const mNgr = +mach.ngr || 0;
+            const mMkt = +mach.marketing || 0;
+            const mBet = +mach.bet || 0;
+            const mWin = +mach.win || 0;
+            dataTotal.push({
+              [groupColName]: `    ${_lunareGrouping !== 'loc' ? (mach.location_name || '—') + ' — ' : ''}${mach.serial_nr} (${mach.provider || '—'} · ${mach.cabinet || '—'})`,
+              'Aparate': 1,
+              'Zile Lucrate': +mach.days_active || 0,
+              'IN': mIn,
+              'IN Mediu': mIn,
+              'OUT': mOut,
+              'GGR': mGgr,
+              'GGR Mediu': mGgr,
+              'NGR': mNgr,
+              'MKT Cost': mMkt,
+              'WIN/BET %': mBet > 0 ? (mWin / mBet * 100).toFixed(2) + '%' : '0.00%',
+              'WIN/BET NGR %': mBet > 0 ? ((mWin - mMkt) / mBet * 100).toFixed(2) + '%' : '0.00%'
+            });
+          });
+        }
       });
-    });
+    }
   });
 
   const dataDetaliat = _lunareData.map(r => ({
@@ -9369,6 +9867,7 @@ window.exportLunareExcel = function() {
     'Locație': r.location_name || '',
     'Provider': r.provider || '',
     'Cabinet': r.cabinet || '',
+    'Zile Lucrate': +r.days_active || 0,
     'IN': r.in_val || 0,
     'OUT': r.out_val || 0,
     'GGR': r.ggr || 0,
@@ -11826,78 +12325,141 @@ async function copyLunareTable(btn) {
   };
   
   // Re-build dataTotal just like exportLunareExcel
+  let groupColName = 'Lună / Locație';
+  if (_lunareGrouping === 'prov') groupColName = 'Lună / Producător';
+  else if (_lunareGrouping === 'cab') groupColName = 'Lună / Cabinet';
+  else if (_lunareGrouping === 'loc_prov') groupColName = 'Lună / Locație & Producător';
+  else if (_lunareGrouping === 'serials') groupColName = 'Lună / Serie Aparat';
+
   const monthlyData = {};
   _lunareData.forEach(r => {
     const m = r.month || 'Necunoscut';
     const loc = r.location_name || 'Necunoscut';
+    const prov = r.provider || 'Necunoscut';
+    const cab = r.cabinet || '—';
+    
+    let groupKey = loc;
+    if (_lunareGrouping === 'prov') groupKey = prov;
+    else if (_lunareGrouping === 'cab') groupKey = cab;
+    else if (_lunareGrouping === 'loc_prov') groupKey = `${loc} — ${prov}`;
+    else if (_lunareGrouping === 'serials') groupKey = `${loc} — ${r.serial_nr || '—'} (${prov} · ${cab})`;
+
     if (!monthlyData[m]) {
-      monthlyData[m] = { in: 0, out: 0, ggr: 0, ngr: 0, mkt: 0, win: 0, bet: 0, serials: new Set(), locs: {} };
+      monthlyData[m] = { in: 0, out: 0, ggr: 0, ngr: 0, mkt: 0, win: 0, bet: 0, days: 0, serials: new Set(), groups: {} };
     }
-    if (!monthlyData[m].locs[loc]) {
-      monthlyData[m].locs[loc] = { in: 0, out: 0, ggr: 0, ngr: 0, mkt: 0, win: 0, bet: 0, serials: new Set() };
+    if (!monthlyData[m].groups[groupKey]) {
+      monthlyData[m].groups[groupKey] = { in: 0, out: 0, ggr: 0, ngr: 0, mkt: 0, win: 0, bet: 0, days: 0, serials: new Set(), machines: [] };
     }
     
-    monthlyData[m].in += (+r.in_val || 0);
-    monthlyData[m].out += (+r.out_val || 0);
-    monthlyData[m].ggr += (+r.ggr || 0);
-    monthlyData[m].ngr += (+r.ngr || 0);
-    monthlyData[m].mkt += (+r.marketing || 0);
-    monthlyData[m].win += (+r.win || 0);
-    monthlyData[m].bet += (+r.bet || 0);
-    
-    const daysActive = (+r.days_active || 0);
-    if (r.serial_nr && daysActive >= 3) {
+    if (r.serial_nr) {
       monthlyData[m].serials.add(r.serial_nr);
-      monthlyData[m].locs[loc].serials.add(r.serial_nr);
+      monthlyData[m].groups[groupKey].serials.add(r.serial_nr);
     }
+    monthlyData[m].groups[groupKey].machines.push(r);
+
+    const inV = (+r.in_val || 0);
+    const outV = (+r.out_val || 0);
+    const ggrV = (+r.ggr || 0);
+    const ngrV = (+r.ngr || 0);
+    const mktV = (+r.marketing || 0);
+    const winV = (+r.win || 0);
+    const betV = (+r.bet || 0);
+    const daysV = (+r.days_active || 0);
+
+    monthlyData[m].in += inV;
+    monthlyData[m].out += outV;
+    monthlyData[m].ggr += ggrV;
+    monthlyData[m].ngr += ngrV;
+    monthlyData[m].mkt += mktV;
+    monthlyData[m].win += winV;
+    monthlyData[m].bet += betV;
+    monthlyData[m].days += daysV;
     
-    monthlyData[m].locs[loc].in += (+r.in_val || 0);
-    monthlyData[m].locs[loc].out += (+r.out_val || 0);
-    monthlyData[m].locs[loc].ggr += (+r.ggr || 0);
-    monthlyData[m].locs[loc].ngr += (+r.ngr || 0);
-    monthlyData[m].locs[loc].mkt += (+r.marketing || 0);
-    monthlyData[m].locs[loc].win += (+r.win || 0);
-    monthlyData[m].locs[loc].bet += (+r.bet || 0);
+    monthlyData[m].groups[groupKey].in += inV;
+    monthlyData[m].groups[groupKey].out += outV;
+    monthlyData[m].groups[groupKey].ggr += ggrV;
+    monthlyData[m].groups[groupKey].ngr += ngrV;
+    monthlyData[m].groups[groupKey].mkt += mktV;
+    monthlyData[m].groups[groupKey].win += winV;
+    monthlyData[m].groups[groupKey].bet += betV;
+    monthlyData[m].groups[groupKey].days += daysV;
   });
 
   const dataTotal = [];
   const sortedMonths = Object.keys(monthlyData).sort((a,b) => b.localeCompare(a));
   
   sortedMonths.forEach(m => {
-    const sortedLocs = Object.keys(monthlyData[m].locs).sort();
+    const d = monthlyData[m];
     dataTotal.push({
-      'Lună / Locație': `${m} (TOTAL)`,
-      'Aparate': monthlyData[m].serials.size,
-      'IN': monthlyData[m].in,
-      'IN Mediu': monthlyData[m].serials.size > 0 ? (monthlyData[m].in / monthlyData[m].serials.size) : 0,
-      'OUT': monthlyData[m].out,
-      'GGR': monthlyData[m].ggr,
-      'GGR Mediu': monthlyData[m].serials.size > 0 ? (monthlyData[m].ggr / monthlyData[m].serials.size) : 0,
-      'NGR': monthlyData[m].ngr,
-      'MKT Cost': monthlyData[m].mkt,
-      'WIN/BET %': monthlyData[m].bet > 0 ? (monthlyData[m].win / monthlyData[m].bet * 100).toFixed(2) + '%' : '0.00%',
-      'WIN/BET NGR %': monthlyData[m].bet > 0 ? ((monthlyData[m].win - monthlyData[m].mkt) / monthlyData[m].bet * 100).toFixed(2) + '%' : '0.00%'
+      [groupColName]: `${m} (TOTAL)`,
+      'Aparate': d.serials.size,
+      'Zile Lucrate': d.days,
+      'IN': d.in,
+      'IN Mediu': d.serials.size > 0 ? (d.in / d.serials.size) : 0,
+      'OUT': d.out,
+      'GGR': d.ggr,
+      'GGR Mediu': d.serials.size > 0 ? (d.ggr / d.serials.size) : 0,
+      'NGR': d.ngr,
+      'MKT Cost': d.mkt,
+      'WIN/BET %': d.bet > 0 ? (d.win / d.bet * 100).toFixed(2) + '%' : '0.00%',
+      'WIN/BET NGR %': d.bet > 0 ? ((d.win - d.mkt) / d.bet * 100).toFixed(2) + '%' : '0.00%'
     });
     
-    sortedLocs.forEach(loc => {
-      const ld = monthlyData[m].locs[loc];
-      if (!ld) return;
-      if (ld.in === 0 && ld.out === 0 && ld.ggr === 0 && ld.mkt === 0 && (!ld.serials || ld.serials.size === 0)) return;
+    if (_lunareExpandedMonths.has(m)) {
+      const sortedGroups = Object.keys(d.groups).sort((a,b) => a.localeCompare(b));
+      sortedGroups.forEach(gKey => {
+        const gd = d.groups[gKey];
+        if (!gd) return;
+        if (gd.in === 0 && gd.out === 0 && gd.ggr === 0 && gd.mkt === 0 && (!gd.serials || gd.serials.size === 0)) return;
 
-      dataTotal.push({
-        'Lună / Locație': `  ${loc}`,
-        'Aparate': ld.serials ? ld.serials.size : 0,
-        'IN': ld.in,
-        'IN Mediu': (ld.serials && ld.serials.size > 0) ? (ld.in / ld.serials.size) : 0,
-        'OUT': ld.out,
-        'GGR': ld.ggr,
-        'GGR Mediu': (ld.serials && ld.serials.size > 0) ? (ld.ggr / ld.serials.size) : 0,
-        'NGR': ld.ngr,
-        'MKT Cost': ld.mkt,
-        'WIN/BET %': ld.bet > 0 ? (ld.win / ld.bet * 100).toFixed(2) + '%' : '0.00%',
-        'WIN/BET NGR %': ld.bet > 0 ? ((ld.win - ld.mkt) / ld.bet * 100).toFixed(2) + '%' : '0.00%'
+        dataTotal.push({
+          [groupColName]: `  ${gKey}`,
+          'Aparate': gd.serials ? gd.serials.size : 0,
+          'Zile Lucrate': gd.days || 0,
+          'IN': gd.in,
+          'IN Mediu': (gd.serials && gd.serials.size > 0) ? (gd.in / gd.serials.size) : 0,
+          'OUT': gd.out,
+          'GGR': gd.ggr,
+          'GGR Mediu': (gd.serials && gd.serials.size > 0) ? (gd.ggr / gd.serials.size) : 0,
+          'NGR': gd.ngr,
+          'MKT Cost': gd.mkt,
+          'WIN/BET %': gd.bet > 0 ? (gd.win / gd.bet * 100).toFixed(2) + '%' : '0.00%',
+          'WIN/BET NGR %': gd.bet > 0 ? ((gd.win - gd.mkt) / gd.bet * 100).toFixed(2) + '%' : '0.00%'
+        });
+
+        const grpCompositeKey = `${m}:::${gKey}`;
+        if (_lunareGrouping !== 'serials' && _lunareExpandedGroups.has(grpCompositeKey) && gd.machines && gd.machines.length > 0) {
+          const sortedMachines = gd.machines.slice().sort((a,b) => {
+            const locComp = (a.location_name || '').localeCompare(b.location_name || '');
+            if (locComp !== 0) return locComp;
+            return (a.serial_nr || '').localeCompare(b.serial_nr || '');
+          });
+          sortedMachines.forEach(mach => {
+            const mIn = +mach.in_val || 0;
+            const mOut = +mach.out_val || 0;
+            const mGgr = +mach.ggr || 0;
+            const mNgr = +mach.ngr || 0;
+            const mMkt = +mach.marketing || 0;
+            const mBet = +mach.bet || 0;
+            const mWin = +mach.win || 0;
+            dataTotal.push({
+              [groupColName]: `    ${_lunareGrouping !== 'loc' ? (mach.location_name || '—') + ' — ' : ''}${mach.serial_nr} (${mach.provider || '—'} · ${mach.cabinet || '—'})`,
+              'Aparate': 1,
+              'Zile Lucrate': +mach.days_active || 0,
+              'IN': mIn,
+              'IN Mediu': mIn,
+              'OUT': mOut,
+              'GGR': mGgr,
+              'GGR Mediu': mGgr,
+              'NGR': mNgr,
+              'MKT Cost': mMkt,
+              'WIN/BET %': mBet > 0 ? (mWin / mBet * 100).toFixed(2) + '%' : '0.00%',
+              'WIN/BET NGR %': mBet > 0 ? ((mWin - mMkt) / mBet * 100).toFixed(2) + '%' : '0.00%'
+            });
+          });
+        }
       });
-    });
+    }
   });
 
   let html = `<table style="border-collapse: collapse; font-family: Arial, sans-serif; font-size: 11px;">`;
@@ -11912,9 +12474,11 @@ async function copyLunareTable(btn) {
   const roFormatInt = new Intl.NumberFormat('ro-RO', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
   
   dataTotal.forEach(row => {
-     const isTotal = row['Lună / Locație'].includes('(TOTAL)');
-     const bg = isTotal ? '#F1F5F9' : '#FFFFFF';
-     const fw = isTotal ? 'bold' : 'normal';
+     const groupVal = String(row[groupColName] || '');
+     const isTotal = groupVal.includes('(TOTAL)');
+     const isSerial = groupVal.startsWith('    ');
+     const bg = isTotal ? '#F1F5F9' : (isSerial ? '#F8FAFC' : '#FFFFFF');
+     const fw = isTotal ? 'bold' : (isSerial ? 'normal' : '600');
      html += `<tr style="background-color: ${bg}; font-weight: ${fw};">`;
      headers.forEach(h => {
        let val = row[h];
@@ -11927,7 +12491,7 @@ async function copyLunareTable(btn) {
        
        let text = val;
        if (typeof val === 'number') {
-         if (h === 'Aparate') text = roFormatInt.format(val);
+         if (h === 'Aparate' || h === 'Zile Lucrate') text = roFormatInt.format(val);
          else text = roFormat.format(val);
        }
        
@@ -11939,7 +12503,7 @@ async function copyLunareTable(btn) {
   
   let textStr = headers.join('\t') + '\n' + dataTotal.map(r => headers.map(h => {
        let val = r[h];
-       if (typeof val === 'number' && h !== 'Aparate') return roFormat.format(val).replace(/\./g, '');
+       if (typeof val === 'number' && h !== 'Aparate' && h !== 'Zile Lucrate') return roFormat.format(val).replace(/\./g, '');
        return val;
   }).join('\t')).join('\n');
   
@@ -11998,23 +12562,208 @@ async function copyLunareTable(btn) {
   }
 }
 
+window.populateLunareFilters = function() {
+  const data = window.filtersData || (typeof filtersData !== 'undefined' ? filtersData : null);
+  if (!data) return;
+  const ex = typeof getExcluded === 'function' ? getExcluded() : [];
+  let perms = { locations: [] };
+  if (window.currentUser && currentUser.role !== 'Super Admin' && currentUser.permissions) {
+    try { perms = JSON.parse(currentUser.permissions); } catch(e) {}
+  }
+  
+  const repLunareLoc = document.getElementById('rep-lunare-loc');
+  if (repLunareLoc && repLunareLoc.children.length === 0) {
+    repLunareLoc.innerHTML = '';
+    (data.locations || []).forEach(l => {
+      if (!ex.includes(String(l.id))) {
+        if (perms.locations && perms.locations.length > 0 && !perms.locations.includes(l.id)) return;
+        repLunareLoc.innerHTML += `<label style="display:flex; align-items:center; gap:8px; font-size:12px; padding:6px 8px; cursor:pointer; border-radius:8px; transition:background 0.2s; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'"><input type="checkbox" class="lunare-loc-cb" value="${l.id}" onchange="updateLocSelectText()"> ${l.name}</label>`;
+      }
+    });
+  }
+
+  const repLunareProv = document.getElementById('rep-lunare-prov');
+  if (repLunareProv && repLunareProv.children.length === 0) {
+    repLunareProv.innerHTML = '';
+    (data.providers || []).forEach(p => {
+      repLunareProv.innerHTML += `<label style="display:flex; align-items:center; gap:8px; font-size:12px; padding:6px 8px; cursor:pointer; border-radius:8px; transition:background 0.2s; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'"><input type="checkbox" class="lunare-prov-cb" value="${p.id}" onchange="updateProvSelectText()"> ${p.name}</label>`;
+    });
+  }
+
+  const repLunareCab = document.getElementById('rep-lunare-cab');
+  if (repLunareCab && repLunareCab.children.length === 0) {
+    repLunareCab.innerHTML = '';
+    (data.cabinets || []).forEach(c => {
+      repLunareCab.innerHTML += `<label style="display:flex; align-items:center; gap:8px; font-size:12px; padding:6px 8px; cursor:pointer; border-radius:8px; transition:background 0.2s; white-space:nowrap; text-overflow:ellipsis; overflow:hidden;" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='transparent'"><input type="checkbox" class="lunare-cab-cb" value="${c.id}" onchange="updateCabSelectText()"> ${c.name}</label>`;
+    });
+  }
+  if (typeof updateLocSelectText === 'function') updateLocSelectText();
+  if (typeof updateProvSelectText === 'function') updateProvSelectText();
+  if (typeof updateCabSelectText === 'function') updateCabSelectText();
+};
+
+window.toggleAllLunare = function(type, checked) {
+  let cbSelector = '';
+  let updateFn = null;
+  let masterId = '';
+
+  if (type === 'loc') {
+    cbSelector = '.lunare-loc-cb';
+    updateFn = window.updateLocSelectText;
+    masterId = 'lunare-loc-all';
+  } else if (type === 'prov') {
+    cbSelector = '.lunare-prov-cb';
+    updateFn = window.updateProvSelectText;
+    masterId = 'lunare-prov-all';
+  } else if (type === 'cab') {
+    cbSelector = '.lunare-cab-cb';
+    updateFn = window.updateCabSelectText;
+    masterId = 'lunare-cab-all';
+  } else if (type === 'exp-loc') {
+    cbSelector = '.exp-loc-cb';
+    updateFn = window.updateExpLocSelectText;
+    masterId = 'exp-loc-all';
+  }
+
+  if (!cbSelector) return;
+  const cbs = document.querySelectorAll(cbSelector);
+  cbs.forEach(cb => {
+    cb.checked = !!checked;
+  });
+
+  const master = document.getElementById(masterId);
+  if (master) {
+    master.checked = !!checked;
+    master.indeterminate = false;
+  }
+
+  if (typeof updateFn === 'function') {
+    updateFn();
+  }
+};
+
 window.updateLocSelectText = function() {
+  const allCbs = document.querySelectorAll('.lunare-loc-cb');
   const cbs = document.querySelectorAll('.lunare-loc-cb:checked');
   const span = document.getElementById('loc-select-text');
+  const master = document.getElementById('lunare-loc-all');
+
+  if (master && allCbs.length > 0) {
+    if (cbs.length === 0) {
+      master.checked = false;
+      master.indeterminate = false;
+    } else if (cbs.length === allCbs.length) {
+      master.checked = true;
+      master.indeterminate = false;
+    } else {
+      master.checked = false;
+      master.indeterminate = true;
+    }
+  }
+
   if (!span) return;
   if (cbs.length === 0) span.innerText = 'Toate locațiile';
-  else if (cbs.length === 1) span.innerText = '1 locație selectată';
+  else if (cbs.length === 1) span.innerText = cbs[0].parentElement.textContent.trim() || '1 locație selectată';
   else span.innerText = `${cbs.length} locații selectate`;
 };
 
+window.updateProvSelectText = function() {
+  const allCbs = document.querySelectorAll('.lunare-prov-cb');
+  const cbs = document.querySelectorAll('.lunare-prov-cb:checked');
+  const span = document.getElementById('prov-select-text');
+  const master = document.getElementById('lunare-prov-all');
+
+  if (master && allCbs.length > 0) {
+    if (cbs.length === 0) {
+      master.checked = false;
+      master.indeterminate = false;
+    } else if (cbs.length === allCbs.length) {
+      master.checked = true;
+      master.indeterminate = false;
+    } else {
+      master.checked = false;
+      master.indeterminate = true;
+    }
+  }
+
+  if (!span) return;
+  if (cbs.length === 0) span.innerText = 'Toți providerii';
+  else if (cbs.length === 1) span.innerText = cbs[0].parentElement.textContent.trim() || '1 provider selectat';
+  else span.innerText = `${cbs.length} provideri selectați`;
+};
+
+window.updateCabSelectText = function() {
+  const allCbs = document.querySelectorAll('.lunare-cab-cb');
+  const cbs = document.querySelectorAll('.lunare-cab-cb:checked');
+  const span = document.getElementById('cab-select-text');
+  const master = document.getElementById('lunare-cab-all');
+
+  if (master && allCbs.length > 0) {
+    if (cbs.length === 0) {
+      master.checked = false;
+      master.indeterminate = false;
+    } else if (cbs.length === allCbs.length) {
+      master.checked = true;
+      master.indeterminate = false;
+    } else {
+      master.checked = false;
+      master.indeterminate = true;
+    }
+  }
+
+  if (!span) return;
+  if (cbs.length === 0) span.innerText = 'Toate cabinetele';
+  else if (cbs.length === 1) span.innerText = cbs[0].parentElement.textContent.trim() || '1 cabinet selectat';
+  else span.innerText = `${cbs.length} cabinete selectate`;
+};
+
 window.updateExpLocSelectText = function() {
+  const allCbs = document.querySelectorAll('.exp-loc-cb');
   const cbs = document.querySelectorAll('.exp-loc-cb:checked');
   const span = document.getElementById('exp-loc-select-text');
+  const master = document.getElementById('exp-loc-all');
+
+  if (master && allCbs.length > 0) {
+    if (cbs.length === 0) {
+      master.checked = false;
+      master.indeterminate = false;
+    } else if (cbs.length === allCbs.length) {
+      master.checked = true;
+      master.indeterminate = false;
+    } else {
+      master.checked = false;
+      master.indeterminate = true;
+    }
+  }
+
   if (!span) return;
   if (cbs.length === 0) span.innerText = 'Toate locațiile';
   else if (cbs.length === 1) span.innerText = '1 locație selectată';
   else span.innerText = `${cbs.length} locații selectate`;
-  applyExpFilters();
+  if (typeof applyExpFilters === 'function') applyExpFilters();
+};
+
+window.toggleLunareDropdown = function(type) {
+  const locDd = document.getElementById('loc-dropdown');
+  const provDd = document.getElementById('prov-dropdown');
+  const cabDd = document.getElementById('cab-dropdown');
+
+  if (type === 'loc') {
+    const isClosed = !locDd || locDd.style.display === 'none';
+    if (provDd) provDd.style.display = 'none';
+    if (cabDd) cabDd.style.display = 'none';
+    if (locDd) locDd.style.display = isClosed ? 'block' : 'none';
+  } else if (type === 'prov') {
+    const isClosed = !provDd || provDd.style.display === 'none';
+    if (locDd) locDd.style.display = 'none';
+    if (cabDd) cabDd.style.display = 'none';
+    if (provDd) provDd.style.display = isClosed ? 'block' : 'none';
+  } else if (type === 'cab') {
+    const isClosed = !cabDd || cabDd.style.display === 'none';
+    if (locDd) locDd.style.display = 'none';
+    if (provDd) provDd.style.display = 'none';
+    if (cabDd) cabDd.style.display = isClosed ? 'block' : 'none';
+  }
 };
 
 document.addEventListener('click', (e) => {
@@ -12026,6 +12775,22 @@ document.addEventListener('click', (e) => {
     }
   }
 
+  const provTrigger = document.getElementById('prov-select-trigger');
+  const provDd = document.getElementById('prov-dropdown');
+  if (provTrigger && provDd) {
+    if (!provTrigger.contains(e.target) && !provDd.contains(e.target)) {
+      provDd.style.display = 'none';
+    }
+  }
+
+  const cabTrigger = document.getElementById('cab-select-trigger');
+  const cabDd = document.getElementById('cab-dropdown');
+  if (cabTrigger && cabDd) {
+    if (!cabTrigger.contains(e.target) && !cabDd.contains(e.target)) {
+      cabDd.style.display = 'none';
+    }
+  }
+
   const expTrigger = document.getElementById('exp-loc-select-trigger');
   const expDd = document.getElementById('exp-loc-dropdown');
   if (expTrigger && expDd) {
@@ -12033,7 +12798,301 @@ document.addEventListener('click', (e) => {
       expDd.style.display = 'none';
     }
   }
+
+  const serialsModal = document.getElementById('lunare-serials-modal');
+  if (serialsModal && e.target === serialsModal) {
+    serialsModal.style.display = 'none';
+  }
 });
+
+// --- LUNARE SERIALS MODAL ---
+let _currentModalSerials = [];
+
+window.openLunareSerialsModal = function(month, groupKey, serialNr) {
+  const modal = document.getElementById('lunare-serials-modal');
+  if (!modal) return;
+  
+  let filtered = _lunareData || [];
+  if (month !== 'ALL') {
+    filtered = filtered.filter(r => r.month === month);
+  }
+  if (serialNr) {
+    filtered = filtered.filter(r => String(r.serial_nr || '') === String(serialNr));
+  } else if (groupKey !== 'ALL') {
+    if (_lunareGrouping === 'loc') {
+      filtered = filtered.filter(r => (r.location_name || 'Necunoscut') === groupKey);
+    } else if (_lunareGrouping === 'prov') {
+      filtered = filtered.filter(r => (r.provider || 'Necunoscut') === groupKey);
+    } else if (_lunareGrouping === 'cab') {
+      filtered = filtered.filter(r => (r.cabinet || '—') === groupKey);
+    } else if (_lunareGrouping === 'loc_prov') {
+      filtered = filtered.filter(r => `${r.location_name || 'Necunoscut'} — ${r.provider || 'Necunoscut'}` === groupKey);
+    } else if (_lunareGrouping === 'serials') {
+      filtered = filtered.filter(r => {
+        const key = `${r.serial_nr || '—'} — ${r.location_name || 'Necunoscut'} (${r.provider || 'Necunoscut'} · ${r.cabinet || '—'})`;
+        return key === groupKey || String(r.serial_nr || '') === groupKey;
+      });
+    }
+  }
+
+  // Aggregate stats per unique physical serial number
+  const serialMap = new Map();
+  filtered.forEach(r => {
+    const sn = r.serial_nr || 'Necunoscut';
+    if (!serialMap.has(sn)) {
+      serialMap.set(sn, {
+        serial_nr: sn,
+        location_name: r.location_name || '—',
+        provider: r.provider || '—',
+        cabinet: r.cabinet || '—',
+        days_active: +r.days_active || 0,
+        in_val: +r.in_val || 0,
+        out_val: +r.out_val || 0,
+        ggr: +r.ggr || 0
+      });
+    } else {
+      const existing = serialMap.get(sn);
+      existing.days_active += (+r.days_active || 0);
+      existing.in_val += (+r.in_val || 0);
+      existing.out_val += (+r.out_val || 0);
+      existing.ggr += (+r.ggr || 0);
+    }
+  });
+
+  _currentModalSerials = Array.from(serialMap.values()).sort((a,b) => a.serial_nr.localeCompare(b.serial_nr));
+
+  const titleEl = document.getElementById('lunare-modal-title');
+  const subEl = document.getElementById('lunare-modal-subtitle');
+  const badgeEl = document.getElementById('lunare-modal-count-badge');
+  const searchInput = document.getElementById('lunare-modal-search');
+  if (searchInput) searchInput.value = '';
+
+  const groupLabel = serialNr ? `Aparat ${serialNr}` : (groupKey === 'ALL' ? 'Toate aparatele' : groupKey);
+  const monthLabel = month === 'ALL' ? 'Toată perioada' : month;
+  if (titleEl) titleEl.innerText = `Aparate Fizice: ${groupLabel}`;
+  if (subEl) subEl.innerText = `Perioadă / Lună: ${monthLabel} · ${_currentModalSerials.length} aparate fizice unice`;
+  if (badgeEl) badgeEl.innerText = `${_currentModalSerials.length} aparate`;
+
+  renderLunareModalTable(_currentModalSerials);
+  modal.style.display = 'flex';
+};
+
+window.closeLunareSerialsModal = function() {
+  const modal = document.getElementById('lunare-serials-modal');
+  if (modal) modal.style.display = 'none';
+};
+
+window.renderLunareModalTable = function(list) {
+  const tbody = document.getElementById('lunare-modal-tbody');
+  if (!tbody) return;
+  if (list.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:30px; color:var(--muted); background:var(--surface);">Niciun aparat găsit.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = list.map((r, i) => {
+    const rowBg = (i % 2 === 0) ? 'var(--surface)' : 'var(--surface2)';
+    const cellStyle = `background:${rowBg}; border-bottom:1px solid var(--border); padding:9px 12px;`;
+    return `<tr>
+      <td style="${cellStyle} color:var(--muted); font-size:11px;">${i + 1}</td>
+      <td style="${cellStyle} font-weight:700; color:var(--accent); font-family:monospace; font-size:12px;">${r.serial_nr}</td>
+      <td style="${cellStyle}">${r.location_name}</td>
+      <td style="${cellStyle}"><strong>${r.provider}</strong></td>
+      <td style="${cellStyle}">${r.cabinet}</td>
+      <td class="num" style="${cellStyle}">${r.days_active} zile</td>
+      <td class="num" style="${cellStyle}">${typeof fmt === 'function' ? fmt(r.in_val) : r.in_val.toLocaleString()}</td>
+      <td class="num" style="${cellStyle}">${typeof fmt === 'function' ? fmt(r.out_val) : r.out_val.toLocaleString()}</td>
+      <td class="num" style="${cellStyle} font-weight:700; color:${r.ggr >= 0 ? 'var(--green)' : 'var(--red)'};">${typeof fmt === 'function' ? fmt(r.ggr) : r.ggr.toLocaleString()}</td>
+    </tr>`;
+  }).join('');
+};
+
+window.filterLunareModalRows = function() {
+  const q = (document.getElementById('lunare-modal-search')?.value || '').toLowerCase().trim();
+  const filtered = _currentModalSerials.filter(r => {
+    return r.serial_nr.toLowerCase().includes(q) ||
+           r.location_name.toLowerCase().includes(q) ||
+           r.provider.toLowerCase().includes(q) ||
+           r.cabinet.toLowerCase().includes(q);
+  });
+  const badgeEl = document.getElementById('lunare-modal-count-badge');
+  if (badgeEl) badgeEl.innerText = `${filtered.length} aparate`;
+  renderLunareModalTable(filtered);
+};
+
+window.exportLunareModalExcel = function() {
+  if (!_currentModalSerials || _currentModalSerials.length === 0) {
+    if (typeof showAlert === 'function') showAlert('Nu există date pentru export.');
+    else alert('Nu există date pentru export.');
+    return;
+  }
+  if (typeof XLSX === 'undefined') {
+    if (typeof showAlert === 'function') showAlert('Librăria XLSX nu este disponibilă.');
+    else alert('Librăria XLSX nu este disponibilă.');
+    return;
+  }
+
+  const q = (document.getElementById('lunare-modal-search')?.value || '').toLowerCase().trim();
+  const currentList = q ? _currentModalSerials.filter(r => 
+    r.serial_nr.toLowerCase().includes(q) ||
+    r.location_name.toLowerCase().includes(q) ||
+    r.provider.toLowerCase().includes(q) ||
+    r.cabinet.toLowerCase().includes(q)
+  ) : _currentModalSerials;
+
+  if (currentList.length === 0) {
+    if (typeof showAlert === 'function') showAlert('Nu există rânduri care corespund căutării curente.');
+    else alert('Nu există rânduri care corespund căutării curente.');
+    return;
+  }
+
+  let totalDays = 0;
+  let totalIn = 0;
+  let totalOut = 0;
+  let totalGgr = 0;
+
+  const excelRows = currentList.map((r, i) => {
+    const days = +r.days_active || 0;
+    const inV = +r.in_val || 0;
+    const outV = +r.out_val || 0;
+    const ggrV = +r.ggr || 0;
+
+    totalDays += days;
+    totalIn += inV;
+    totalOut += outV;
+    totalGgr += ggrV;
+
+    return {
+      'Nr. Crt.': i + 1,
+      'Serie': r.serial_nr || '',
+      'Locație': r.location_name || '',
+      'Provider': r.provider || '',
+      'Cabinet': r.cabinet || '',
+      'Zile Active': days,
+      'IN': inV,
+      'OUT': outV,
+      'GGR': ggrV
+    };
+  });
+
+  // TOTAL row
+  excelRows.push({
+    'Nr. Crt.': 'TOTAL',
+    'Serie': `${currentList.length} aparate`,
+    'Locație': '',
+    'Provider': '',
+    'Cabinet': '',
+    'Zile Active': totalDays,
+    'IN': totalIn,
+    'OUT': totalOut,
+    'GGR': totalGgr
+  });
+
+  const ws = XLSX.utils.json_to_sheet(excelRows);
+
+  ws['!cols'] = [
+    { wch: 8 },
+    { wch: 14 },
+    { wch: 20 },
+    { wch: 18 },
+    { wch: 20 },
+    { wch: 14 },
+    { wch: 16 },
+    { wch: 16 },
+    { wch: 16 }
+  ];
+
+  if (ws['!ref']) {
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    for (let R = range.s.r; R <= range.e.r; ++R) {
+      const isHeader = (R === 0);
+      const isTotal = (R === range.e.r);
+
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+        const cell = ws[cellAddress];
+        if (!cell) continue;
+
+        if (!cell.s) cell.s = {};
+        if (!cell.s.font) cell.s.font = { name: "Arial", sz: 10 };
+
+        if (isHeader) {
+          cell.s.font.bold = true;
+          cell.s.fill = { patternType: "solid", fgColor: { rgb: "F1F5F9" } };
+          cell.s.font.color = { rgb: "0F172A" };
+        } else if (isTotal) {
+          cell.s.font.bold = true;
+          cell.s.fill = { patternType: "solid", fgColor: { rgb: "E2E8F0" } };
+          cell.s.font.color = { rgb: "0F172A" };
+        }
+
+        const headerCell = ws[XLSX.utils.encode_cell({ r: 0, c: C })];
+        const colName = (headerCell && headerCell.v) ? headerCell.v.toString() : '';
+
+        if (R > 0) {
+          if (colName === 'Serie' || colName === 'Nr. Crt.') {
+            cell.s.alignment = { horizontal: 'center' };
+          }
+          if (colName === 'Zile Active') {
+            cell.s.alignment = { horizontal: 'right' };
+            if (cell.t === 'n') cell.z = '#,##0';
+          }
+          if (colName === 'IN' || colName === 'OUT' || colName === 'GGR') {
+            cell.s.alignment = { horizontal: 'right' };
+            if (cell.t === 'n') cell.z = '#,##0.00';
+            if (colName === 'GGR') {
+              const val = parseFloat(cell.v);
+              if (!isNaN(val)) {
+                if (val > 0) cell.s.font.color = { rgb: "059669" };
+                else if (val < 0) cell.s.font.color = { rgb: "DC2626" };
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Aparate Fizice");
+
+  const rawTitle = (document.getElementById('lunare-modal-title')?.innerText || 'Aparate_Fizice')
+    .replace(/^Aparate Fizice:\s*/i, '')
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .replace(/_+/g, '_');
+  const dateStr = new Date().toISOString().slice(0, 10);
+  const filename = `Aparate_Fizice_${rawTitle}_${dateStr}.xlsx`;
+
+  XLSX.writeFile(wb, filename);
+
+  if (typeof showToast === 'function') {
+    showToast(`Fișierul Excel (${currentList.length} aparate) a fost descărcat!`, 'success');
+  }
+};
+
+window.copyLunareModalSerials = function() {
+  if (!_currentModalSerials || _currentModalSerials.length === 0) return;
+  const q = (document.getElementById('lunare-modal-search')?.value || '').toLowerCase().trim();
+  const currentList = q ? _currentModalSerials.filter(r => 
+    r.serial_nr.toLowerCase().includes(q) ||
+    r.location_name.toLowerCase().includes(q) ||
+    r.provider.toLowerCase().includes(q) ||
+    r.cabinet.toLowerCase().includes(q)
+  ) : _currentModalSerials;
+
+  const serialsStr = currentList.map(r => r.serial_nr).join(', ');
+  navigator.clipboard.writeText(serialsStr).then(() => {
+    if (typeof showToast === 'function') {
+      showToast(`Au fost copiate ${currentList.length} serii în memorie!`, 'success');
+    } else {
+      alert(`Au fost copiate ${currentList.length} serii în memorie!`);
+    }
+  }).catch(() => {
+    if (typeof showToast === 'function') {
+      showToast('Eroare la copiere în memorie.', 'error');
+    }
+  });
+};
+
 
 
 // --- CONTRACTS MODULE ---

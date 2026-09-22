@@ -654,3 +654,65 @@ td.cell-neg-3 { background:rgba(239,68,68,.38) !important; }
 .toggle-switch input:checked + .slider:before {
   transform: translateX(20px);
 }
+
+/* ─── LUNARE SERIALS MODAL OPAQUE FIX ─────────────────────────── */
+#lunare-serials-modal {
+  background: rgba(0, 0, 0, 0.75) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+#lunare-serials-modal .card,
+#lunare-serials-modal [class*="card"] {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6) !important;
+  opacity: 1 !important;
+}
+#lunare-serials-modal .table-scroll {
+  background: var(--surface) !important;
+}
+#lunare-serials-modal table,
+#lunare-serials-modal table.data-table {
+  background: var(--surface) !important;
+}
+#lunare-serials-modal thead th {
+  background: var(--surface2) !important;
+  color: var(--text) !important;
+  opacity: 1 !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 2 !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+#lunare-serials-modal tbody tr {
+  background: var(--surface) !important;
+}
+#lunare-serials-modal tbody tr:nth-child(even) {
+  background: var(--surface2) !important;
+}
+#lunare-serials-modal tbody tr:hover {
+  background: rgba(16, 185, 129, 0.12) !important;
+}
+#lunare-serials-modal td {
+  background: transparent !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+
+/* ─── LUNARE COLLAPSIBLE ROWS ──────────────────────────────────── */
+.lunare-month-row {
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+.lunare-month-row:hover {
+  filter: brightness(0.96);
+}
+.lunare-chevron {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.lunare-subrow {
+  transition: background 0.15s ease;
+}

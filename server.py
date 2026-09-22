@@ -2467,12 +2467,54 @@ def rep_lunare():
             serial_filter = f" AND m.slot_machine_id IN ({placeholders})"
             serial_params = serials
 
+    # Provider filter
+    prov_raw = request.args.get('provider_ids') or request.args.get('provider_id', '')
+    prov_filter = ""
+    prov_params = []
+    if prov_raw and prov_raw != 'all':
+        prov_items = [p.strip() for p in prov_raw.split(',') if p.strip()]
+        prov_ids = [int(p) for p in prov_items if p.isdigit()]
+        prov_names = [p for p in prov_items if not p.isdigit()]
+        conds = []
+        if prov_ids:
+            ph = ','.join(['%s'] * len(prov_ids))
+            conds.append(f"mt.manufacturer_id IN ({ph})")
+            prov_params.extend(prov_ids)
+        if prov_names:
+            ph1 = ','.join(['%s'] * len(prov_names))
+            ph2 = ','.join(['%s'] * len(prov_names))
+            conds.append(f"(mm.name IN ({ph1}) OR mt.manufacturer IN ({ph2}))")
+            prov_params.extend(prov_names)
+            prov_params.extend(prov_names)
+        if conds:
+            prov_filter = f" AND ({' OR '.join(conds)})"
+
+    # Cabinet filter
+    cab_raw = request.args.get('cabinet_ids') or request.args.get('cabinet_id', '')
+    cab_filter = ""
+    cab_params = []
+    if cab_raw and cab_raw != 'all':
+        cab_items = [c.strip() for c in cab_raw.split(',') if c.strip()]
+        cab_ids = [int(c) for c in cab_items if c.isdigit()]
+        cab_names = [c for c in cab_items if not c.isdigit()]
+        conds = []
+        if cab_ids:
+            ph = ','.join(['%s'] * len(cab_ids))
+            conds.append(f"m.cabinet_type_id IN ({ph})")
+            cab_params.extend(cab_ids)
+        if cab_names:
+            ph = ','.join(['%s'] * len(cab_names))
+            conds.append(f"mct.name IN ({ph})")
+            cab_params.extend(cab_names)
+        if conds:
+            cab_filter = f" AND ({' OR '.join(conds)})"
+
     query = f"""
         SELECT 
             m.slot_machine_id as serial_nr,
             COALESCE(l.display_code, l.code) as location_name,
-            mt.manufacturer as provider,
-            mt.name as cabinet,
+            COALESCE(NULLIF(mm.name,''), NULLIF(mt.manufacturer,''), 'Necunoscut') as provider,
+            COALESCE(mct.name, mt.name, '—') as cabinet,
             DATE_FORMAT(mas.date, '%%Y-%%m') as month,
             SUM(mas.`in`) as in_val,
             SUM(mas.`out`) as out_val,
@@ -2485,14 +2527,110 @@ def rep_lunare():
         FROM machine_audit_summaries mas
         JOIN locations l ON l.id = mas.location_id
         JOIN machines m ON m.id = mas.machine_id
-        JOIN machine_types mt ON m.machine_type_id = mt.id
-        WHERE mas.date >= %s AND mas.date <= %s {lf} {serial_filter}
+        LEFT JOIN machine_types mt ON m.machine_type_id = mt.id
+        LEFT JOIN machine_manufacturers mm ON mt.manufacturer_id = mm.id
+        LEFT JOIN machine_cabinet_types mct ON m.cabinet_type_id = mct.id
+        WHERE mas.date >= %s AND mas.date <= %s {lf} {serial_filter} {prov_filter} {cab_filter}
         GROUP BY serial_nr, location_name, provider, cabinet, month
         ORDER BY month DESC, location_name ASC, serial_nr ASC
     """
     start, end = period_params(request)
-    rows = qry(query, [start, end] + lp + serial_params)
+    rows = qry(query, [start, end] + lp + serial_params + prov_params + cab_params)
     return jsonify(rows)
+
+@app.route('/api/rapoarte/lunare/chart')
+def rep_lunare_chart():
+    lf, lp = loc_filter(request)
+    serials_raw = request.args.get('serials', '')
+    serial_filter = ""
+    serial_params = []
+    
+    if serials_raw:
+        serials = [s.strip() for s in serials_raw.replace(',', ' ').split() if s.strip()]
+        if serials:
+            placeholders = ','.join(['%s'] * len(serials))
+            serial_filter = f" AND m.slot_machine_id IN ({placeholders})"
+            serial_params = serials
+
+    # Provider filter
+    prov_raw = request.args.get('provider_ids') or request.args.get('provider_id', '')
+    prov_filter = ""
+    prov_params = []
+    if prov_raw and prov_raw != 'all':
+        prov_items = [p.strip() for p in prov_raw.split(',') if p.strip()]
+        prov_ids = [int(p) for p in prov_items if p.isdigit()]
+        prov_names = [p for p in prov_items if not p.isdigit()]
+        conds = []
+        if prov_ids:
+            ph = ','.join(['%s'] * len(prov_ids))
+            conds.append(f"mt.manufacturer_id IN ({ph})")
+            prov_params.extend(prov_ids)
+        if prov_names:
+            ph1 = ','.join(['%s'] * len(prov_names))
+            ph2 = ','.join(['%s'] * len(prov_names))
+            conds.append(f"(mm.name IN ({ph1}) OR mt.manufacturer IN ({ph2}))")
+            prov_params.extend(prov_names)
+            prov_params.extend(prov_names)
+        if conds:
+            prov_filter = f" AND ({' OR '.join(conds)})"
+
+    # Cabinet filter
+    cab_raw = request.args.get('cabinet_ids') or request.args.get('cabinet_id', '')
+    cab_filter = ""
+    cab_params = []
+    if cab_raw and cab_raw != 'all':
+        cab_items = [c.strip() for c in cab_raw.split(',') if c.strip()]
+        cab_ids = [int(c) for c in cab_items if c.isdigit()]
+        cab_names = [c for c in cab_items if not c.isdigit()]
+        conds = []
+        if cab_ids:
+            ph = ','.join(['%s'] * len(cab_ids))
+            conds.append(f"m.cabinet_type_id IN ({ph})")
+            cab_params.extend(cab_ids)
+        if cab_names:
+            ph = ','.join(['%s'] * len(cab_names))
+            conds.append(f"mct.name IN ({ph})")
+            cab_params.extend(cab_names)
+        if conds:
+            cab_filter = f" AND ({' OR '.join(conds)})"
+
+    start, end = period_params(request)
+    start_str = str(start)[:10]
+    end_str = str(end)[:10]
+
+    start_m = start_str[:7]
+    end_m = end_str[:7]
+    granularity = 'day' if start_m == end_m else 'month'
+
+    if granularity == 'day':
+        group_col = "DATE_FORMAT(mas.date, '%%Y-%%m-%%d')"
+    else:
+        group_col = "DATE_FORMAT(mas.date, '%%Y-%%m')"
+
+    query = f"""
+        SELECT 
+            {group_col} as period_key,
+            SUM(mas.`in`) as in_val,
+            SUM(mas.`out`) as out_val,
+            SUM(mas.`in` - mas.`out`) as ggr,
+            COUNT(DISTINCT m.slot_machine_id) as aparate_active
+        FROM machine_audit_summaries mas
+        JOIN locations l ON l.id = mas.location_id
+        JOIN machines m ON m.id = mas.machine_id
+        LEFT JOIN machine_types mt ON m.machine_type_id = mt.id
+        LEFT JOIN machine_manufacturers mm ON mt.manufacturer_id = mm.id
+        LEFT JOIN machine_cabinet_types mct ON m.cabinet_type_id = mct.id
+        WHERE mas.date >= %s AND mas.date <= %s {lf} {serial_filter} {prov_filter} {cab_filter}
+        GROUP BY period_key
+        ORDER BY period_key ASC
+    """
+    rows = qry(query, [start, end] + lp + serial_params + prov_params + cab_params)
+    return jsonify({
+        'granularity': granularity,
+        'start': start_str,
+        'end': end_str,
+        'data': rows
+    })
 
 # ─── HH Advanced Analysis (from Prompt) ──────────────────────────────────────
 @app.route('/api/hh_advanced')
